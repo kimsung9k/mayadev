@@ -1,0 +1,38 @@
+import maya.cmds as cmds
+
+def addModification( meshObjs ):
+    
+    import sgBFunction_attribute
+    import sgBFunction_dag
+    
+    meshObjs = sgBFunction_dag.getChildrenShapeExists( meshObjs )
+    softMod = cmds.deformer( meshObjs, type='softMod' )[0]
+    
+    ctlGrp = cmds.createNode( 'transform' )
+    cmds.setAttr( ctlGrp+'.dh', 1 )
+    dcmp   = cmds.createNode( 'decomposeMatrix' )
+    ctl = cmds.sphere()[0]
+    ctl = cmds.parent( ctl, ctlGrp )[0]
+    sgBFunction_attribute.addAttr( ctl, ln='__________', at='enum', enumName = ':Modify Attr', cb=1 )
+    sgBFunction_attribute.addAttr( ctl, ln='falloffRadius', min=0, dv=1, k=1 )
+    sgBFunction_attribute.addAttr( ctl, ln='envelope', min=0, max=1, dv=1, k=1 )
+    
+    cmds.connectAttr( ctlGrp+'.wim', softMod+'.bindPreMatrix' )
+    cmds.connectAttr( ctlGrp+'.wm', softMod+'.preMatrix' )
+    cmds.connectAttr( ctl+'.wm', softMod+'.matrix' )
+    cmds.connectAttr( ctl+'.m',  softMod+'.weightedMatrix' )
+    
+    cmds.connectAttr( ctlGrp+'.wm', dcmp+'.imat' )
+    
+    cmds.connectAttr( dcmp+'.ot', softMod+'.falloffCenter' )
+    
+    for i in range( len( meshObjs ) ):
+        cmds.connectAttr( meshObjs[i]+'.wm', softMod+'.geomMatrix[%d]' % i )
+    
+    cmds.connectAttr( ctl+'.envelope', softMod+'.envelope' )
+    cmds.connectAttr( ctl+'.falloffRadius', softMod+'.falloffRadius' )
+    
+    cmds.xform( ctlGrp, ws=1, t=cmds.getAttr( meshObjs[0]+'.wm' )[-4:-1] )
+    cmds.select( ctlGrp )
+
+addModification( cmds.ls( sl=1 ) )

@@ -1,0 +1,8 @@
+import sgBFunction_shader
+import sgBFunction_dag
+
+sels = cmds.ls( sl=1 )
+eachMeshs = sgBFunction_dag.getChildrenMeshExists( sels )
+for sel in eachMeshs:
+    sgBFunction_shader.makeSparateShader( sel )
+cmds.select( d=1 )

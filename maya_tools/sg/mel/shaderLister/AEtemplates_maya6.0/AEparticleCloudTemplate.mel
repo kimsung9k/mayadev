@@ -1,0 +1,311 @@
+// Copyright (C) 1997-2004 Alias,
+// a division of Silicon Graphics Limited.
+// 
+// The information in this file is provided for the exclusive use of the
+// licensees of Alias.  Such users have the right to use, modify,
+// and incorporate this code into other products for purposes authorized
+// by the Alias license agreement, without fee.
+// 
+// ALIAS DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
+// INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
+// EVENT SHALL ALIAS BE LIABLE FOR ANY SPECIAL, INDIRECT OR
+// CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE,
+// DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+// TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+// PERFORMANCE OF THIS SOFTWARE.
+
+//
+//  Alias|Wavefront Script File
+//
+//  Creation Date:	May 20, 1997
+//  Author:		sw
+//
+//  Procedure Name:
+//	AEparticleCloudTemplate
+//
+//  Description Name;
+//	Creates the attribute editor controls for the particleCloud Node
+//
+//  Input Value:
+//	nodeName 
+//
+//  Output Value:
+//	None
+// 
+
+global proc AEstandardControlsNew ( string $color, 
+									string $transparency, 
+									string $incandescence )
+{
+	setUITemplate -pst attributeEditorTemplate;
+
+	if (`licenseCheck -mode edit -type fx`)
+	{
+		attrColorSliderGrp  -h 23 -dgc drag_ya -dpc drop_ya -l "Color" -at $color particleColorControl;
+		attrColorSliderGrp  -h 23 -dgc drag_ya -dpc drop_ya -l "Transparency" -at $transparency particleTransparencyControl;
+		attrColorSliderGrp  -h 23 -dgc drag_ya -dpc drop_ya -l "Incandescence" -at $incandescence particleIncandescenceControl;
+	
+		popupMenu -pmc ("popupItems " + $color + " pop_pcolor") -p particleColorControl pop_pcolor;
+		popupMenu -pmc ("popupItems " + $transparency + " pop_ptransp") -p particleTransparencyControl pop_ptransp;
+		popupMenu -pmc ("popupItems " + $incandescence + " pop_pincand") -p particleIncandescenceControl pop_pincand;
+	}
+	else
+	{
+		attrColorSliderGrp  -h 23 -l "Color" -at $color -enable false particleColorControl;
+		attrColorSliderGrp  -h 23 -l "Transparency" -at $transparency -enable false particleTransparencyControl;
+		attrColorSliderGrp  -h 23 -l "Incandescence" -at $incandescence -enable false particleIncandescenceControl;
+	}
+	
+	setUITemplate -ppt;
+}
+
+global proc AEstandardControlsReplace ( string $color,
+										string $transparency,
+										string $incandescence )
+{
+	attrColorSliderGrp -edit -dgc drag_ya -dpc drop_ya -at $color particleColorControl;
+	attrColorSliderGrp -edit -dgc drag_ya -dpc drop_ya -at $transparency particleTransparencyControl;
+	attrColorSliderGrp -edit -dgc drag_ya -dpc drop_ya -at $incandescence particleIncandescenceControl;
+	
+	popupMenu -e -pmc ("popupItems " + $color + " pop_pcolor") -p particleColorControl pop_pcolor;
+	popupMenu -e -pmc ("popupItems " + $transparency + " pop_ptransp") -p particleTransparencyControl pop_ptransp;
+	popupMenu -e -pmc ("popupItems " + $incandescence + " pop_pincand") -p particleIncandescenceControl pop_pincand;
+}
+
+global proc AElifeControlsNew ( string $color, 
+								string $transparency, 
+								string $incandescence )
+{
+	setUITemplate -pst attributeEditorTemplate;
+
+	if (`licenseCheck -mode edit -type fx`)
+	{
+		attrNavigationControlGrp  -h 23 -dgc drag_ya -dpc drop_ya -l "Life Color" -and $color "particleSamplerInfo" lifeColorControl;
+		attrNavigationControlGrp  -h 23 -dgc drag_ya -dpc drop_ya -l "Life Transparency" -and $transparency "particleSamplerInfo" lifeTransparencyControl;
+		attrNavigationControlGrp  -h 23 -dgc drag_ya -dpc drop_ya -l "Life Incandescence" -and $incandescence "particleSamplerInfo" lifeIncandescenceControl;
+		
+		popupMenu -pmc ("popupItems " + $color + " pop_lcolor") -p lifeColorControl pop_lcolor;
+		popupMenu -pmc ("popupItems " + $transparency + " pop_ltransp") -p lifeTransparencyControl pop_ltransp;
+		popupMenu -pmc ("popupItems " + $incandescence + " pop_lincand") -p lifeIncandescenceControl pop_lincand;
+	}
+	else
+	{
+	        attrNavigationControlGrp  -h 23 -l "Life Color" -and $color "particleSamplerInfo" -enable false lifeColorControl;
+	    	attrNavigationControlGrp  -h 23 -l "Life Transparency" -and $transparency "particleSamplerInfo" -enable false lifeTransparencyControl;     
+        	attrNavigationControlGrp  -h 23 -l "Life Incandescence" -and $incandescence "particleSamplerInfo" -enable false lifeIncandescenceControl;
+	}
+	
+	setUITemplate -ppt;
+}	
+
+global proc AElifeControlsReplace ( string $color,
+									string $transparency,
+									string $incandescence )
+{
+	attrNavigationControlGrp -edit -dgc drag_ya -dpc drop_ya -and $color "particleSamplerInfo" lifeColorControl;
+	attrNavigationControlGrp -edit -dgc drag_ya -dpc drop_ya -and $transparency "particleSamplerInfo" lifeTransparencyControl;
+	attrNavigationControlGrp -edit -dgc drag_ya -dpc drop_ya -and $incandescence "particleSamplerInfo" lifeIncandescenceControl;
+	
+	popupMenu -e -pmc ("popupItems " + $color + " pop_lcolor") -p lifeColorControl pop_lcolor;
+	popupMenu -e -pmc ("popupItems " + $transparency + " pop_ltransp") -p lifeTransparencyControl pop_ltransp;
+	popupMenu -e -pmc ("popupItems " + $incandescence + " pop_lincand") -p lifeIncandescenceControl pop_lincand;	
+}
+
+global proc licenseGlowIntensity ( string $nodeName )
+{
+	if (!`licenseCheck -mode edit -type fx`)
+		editorTemplate -dimControl $nodeName "glowIntensity" true;
+}
+
+global proc licenseDensity ( string $nodeName )
+{
+    if (!`licenseCheck -mode edit -type fx`)
+        editorTemplate -dimControl $nodeName "density" true;
+}
+
+global proc licenseNoise ( string $nodeName )
+{
+    if (!`licenseCheck -mode edit -type fx`) {
+        editorTemplate -dimControl $nodeName "noise" true;
+		editorTemplate -dimControl $nodeName "noiseFreq" true;
+		editorTemplate -dimControl $nodeName "noiseAspect" true;
+		editorTemplate -dimControl $nodeName "noiseAnimRate" true;
+		editorTemplate -dimControl $nodeName "solidCoreSize" true;
+	} else {
+		string $nodeAttr = $nodeName + ".noise";
+
+		// Dim out noise only if it is 0.0 and not connected.
+		// If it is connected, it is probably to a ramp or param
+		// curve and we want to leave the other attributes enabled,
+		// even if the value at this moment happens to be 0.0.
+		//
+		float $noise = `getAttr $nodeAttr`;
+		string $conn[] = `listConnections $nodeAttr`;		
+		if( (size($conn) == 0) && ($noise == 0.0) ) {
+	        editorTemplate -dimControl $nodeName "noise" false;
+			editorTemplate -dimControl $nodeName "noiseFreq" true;
+			editorTemplate -dimControl $nodeName "noiseAspect" true;
+			editorTemplate -dimControl $nodeName "noiseAnimRate" true;
+			editorTemplate -dimControl $nodeName "solidCoreSize" true;
+		} else {
+	        editorTemplate -dimControl $nodeName "noise" false;
+			editorTemplate -dimControl $nodeName "noiseFreq" false;
+			editorTemplate -dimControl $nodeName "noiseAspect" false;
+			editorTemplate -dimControl $nodeName "noiseAnimRate" false;
+			editorTemplate -dimControl $nodeName "solidCoreSize" false;
+		}
+	}
+}
+
+global proc licenseBlobMap ( string $nodeName )
+{
+    if (!`licenseCheck -mode edit -type fx`)
+        editorTemplate -dimControl $nodeName "blobMap" true;
+}
+
+global proc licenseFilterRadius ( string $nodeName )
+{
+    if (!`licenseCheck -mode edit -type fx`)
+        editorTemplate -dimControl $nodeName "filterRadius" true;
+}
+
+global proc licenseTranslucence ( string $nodeName )
+{
+    if (!`licenseCheck -mode edit -type fx`)
+        editorTemplate -dimControl $nodeName "translucence" true;
+}
+
+global proc licenseDiffuseCoeff ( string $nodeName )
+{
+    if (!`licenseCheck -mode edit -type fx`) {
+        editorTemplate -dimControl $nodeName "diffuseCoeff" true;
+		editorTemplate -dimControl $nodeName "surfaceColor" true;
+		editorTemplate -dimControl $nodeName "normalCamera" true;
+		editorTemplate -dimControl $nodeName "translucenceCoeff" true;
+		editorTemplate -dimControl $nodeName "surfaceShadingShadow" true;
+	} else {
+		// Dim out diffuse coeff only if it is 0.0 and not connected.
+		// If it is connected, it is probably to a ramp or param
+		// curve and we want to leave the other attributes enabled,
+		// even if the value at this moment happens to be 0.0.
+		//
+		string $nodeAttr = $nodeName + ".diffuseCoeff";
+		float $diffuseCoeff = `getAttr $nodeAttr`;
+		string $conn[] = `listConnections $nodeAttr`;		
+		if( (size($conn) == 0) && ($diffuseCoeff == 0.0) ) {
+	        editorTemplate -dimControl $nodeName "diffuseCoeff" false;
+			editorTemplate -dimControl $nodeName "surfaceColor" true;
+			editorTemplate -dimControl $nodeName "normalCamera" true;
+			editorTemplate -dimControl $nodeName "translucenceCoeff" true;
+			editorTemplate -dimControl $nodeName "surfaceShadingShadow" true;
+		} else {
+	        editorTemplate -dimControl $nodeName "diffuseCoeff" false;
+			editorTemplate -dimControl $nodeName "surfaceColor" false;
+			editorTemplate -dimControl $nodeName "normalCamera" false;
+			editorTemplate -dimControl $nodeName "translucenceCoeff" false;
+			editorTemplate -dimControl $nodeName "surfaceShadingShadow" false;
+		}
+	}
+}
+
+global proc licenseRoundness ( string $nodeName )
+{
+    if (!`licenseCheck -mode edit -type fx`)
+        editorTemplate -dimControl $nodeName "roundness" true;
+}
+
+//
+//  Procedure Name:
+//	 AEshaderBumpNew2
+//
+
+global proc AEshaderBumpNew2 (string $attrName)
+{
+	string $buffer_ya[];
+	tokenize $attrName "." $buffer_ya;
+	$popName = ("pop2_" + $buffer_ya[size($buffer_ya)-1]);
+	
+	setUITemplate -pst attributeEditorTemplate;
+
+	attrNavigationControlGrp -h 23 -dgc drag_ya -dpc drop_ya -l "Bump Mapping" -at $attrName bumpControl;
+		popupMenu -pmc ("popupItems " + $attrName + " " + $popName) -p bumpControl $popName;
+
+	setUITemplate -ppt;
+}
+
+
+//
+//  Procedure Name:
+//	AEshaderBumpReplace2
+//
+
+global proc AEshaderBumpReplace2 (string $attrName)
+{
+	string $buffer_ya[];
+	tokenize $attrName "." $buffer_ya;
+	$popName = ("pop2_" + $buffer_ya[size($buffer_ya)-1]);
+	
+	attrNavigationControlGrp -edit -dgc drag_ya -dpc drop_ya -at $attrName bumpControl;
+		popupMenu -e -pmc ("popupItems " + $attrName + " " + $popName) -p bumpControl $popName;
+	
+}
+
+//
+//  Procedure Name:
+//	AElambertCommon
+//
+
+global proc AEparticleCloudTemplate ( string $nodeName )
+{
+	AEswatchDisplay $nodeName;
+	editorTemplate -beginScrollLayout;
+
+	editorTemplate -beginLayout "Common Material Attributes" -collapse 0;
+		editorTemplate -callCustom 	"AEstandardControlsNew"
+									"AEstandardControlsReplace"
+									"color" "transparency" "incandescence";
+		editorTemplate -callCustom 	"AElifeControlsNew"
+									"AElifeControlsReplace"
+									"color" "transparency" "incandescence";
+		editorTemplate -suppress "color";
+		editorTemplate -suppress "transparency";
+		editorTemplate -suppress "incandescence";
+		editorTemplate -addControl "glowIntensity" licenseGlowIntensity;
+	
+	editorTemplate -endLayout;
+
+	editorTemplate -beginLayout "Transparency" -collapse 0;
+		editorTemplate -addControl "density" licenseDensity;
+		editorTemplate -addControl "blobMap" licenseBlobMap;
+		editorTemplate -addControl "roundness" licenseRoundness;
+		editorTemplate -addControl "translucence" licenseTranslucence;
+	editorTemplate -endLayout;
+
+	editorTemplate -beginLayout "Built-in Noise" -collapse 0;
+		editorTemplate -addControl "noise" licenseNoise;
+		editorTemplate -addControl "noiseFreq";
+		editorTemplate -addControl "noiseAspect";
+		editorTemplate -addControl "noiseAnimRate";
+		editorTemplate -addControl "solidCoreSize";
+	editorTemplate -endLayout;
+
+	editorTemplate -beginLayout "Surface Shading Properties" -collapse 0;
+		editorTemplate -addControl "diffuseCoeff" licenseDiffuseCoeff;
+		editorTemplate -addControl "surfaceColor";
+		editorTemplate -callCustom "AEshaderBumpNew2" "AEshaderBumpReplace2"
+			 		"normalCamera";
+		editorTemplate -addControl "translucenceCoeff";
+		editorTemplate -addControl "surfaceShadingShadow";
+	editorTemplate -endLayout;
+
+	editorTemplate -beginLayout "Pre-illumination Controls" -collapse 1;
+		editorTemplate -addControl "filterRadius" licenseFilterRadius;
+	editorTemplate -endLayout;
+
+	editorTemplate -suppress "renderState";
+	
+	// include/call base class/node attributes
+	AEdependNodeTemplate $nodeName;
+	editorTemplate -addExtraControls;
+	editorTemplate -endScrollLayout;
+}

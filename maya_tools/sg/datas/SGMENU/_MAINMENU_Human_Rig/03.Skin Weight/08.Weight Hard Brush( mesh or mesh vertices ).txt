@@ -1,0 +1,2 @@
+import sg.skinCluster
+sg.skinCluster.toolHardBrush()

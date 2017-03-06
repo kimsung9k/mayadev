@@ -1,0 +1,9 @@
+import maya.cmds as cmds
+
+sels = cmds.ls( sl=1 )
+
+for sel in sels:
+    selPos = cmds.getAttr( sel+'.wm' )
+    selP = cmds.listRelatives( sel, p=1, f=1 )[0]
+    cmds.xform( selP, ws=1, matrix= selPos )
+    cmds.xform( sel, ws=1, matrix= selPos )

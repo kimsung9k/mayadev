@@ -1,0 +1,2 @@
+import sgBFunction_chRig
+sgBFunction_chRig.bakeFKfromIK( cmds.ls( sl=1 )[0] )

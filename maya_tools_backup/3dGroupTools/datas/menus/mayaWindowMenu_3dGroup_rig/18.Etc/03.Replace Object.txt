@@ -1,0 +1,8 @@
+import maya.cmds as cmds
+import sgRigDag
+sels = cmds.ls( sl=1 )
+
+firsts = sels[::2]
+seconds = sels[1::2]
+for i in range( len( seconds ) ):
+    sgRigDag.replaceObject( firsts[i], seconds[i] )

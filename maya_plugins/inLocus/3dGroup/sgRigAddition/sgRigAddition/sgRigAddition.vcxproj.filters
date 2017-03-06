@@ -1,0 +1,83 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{f1271e27-9441-4ab6-a893-651ca6353505}</UniqueIdentifier>
+      <Extensions>cpp</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{cf49fbee-789b-45a2-8eab-c0a7c88a321e}</UniqueIdentifier>
+      <Extensions>h</Extensions>
+    </Filter>
+    <Filter Include="Miscellaneous Files">
+      <UniqueIdentifier>{deae52c3-1dca-456d-878a-875eb8747d76}</UniqueIdentifier>
+      <Extensions>txt</Extensions>
+    </Filter>
+    <Filter Include="Header Files\sgDynPointInMesh">
+      <UniqueIdentifier>{f8d8fa09-b89a-4db3-9b23-2f869033dba1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\sgDynPointInMesh">
+      <UniqueIdentifier>{1f44b7ea-8856-444f-aa20-86259e710146}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ReadMe.txt">
+      <Filter>Miscellaneous Files</Filter>
+    </None>
+    <None Include="Options.txt">
+      <Filter>Miscellaneous Files</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="pluginMain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sgLockAngleMatrix.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sgVerticeToCurve.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sgVerticeToCurve_def.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sgMatrixFromVertices.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sgSlidingDeformer_def.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sgSlidingDeformer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sgCurveFromPoints.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sgDynPointInMesh.cpp">
+      <Filter>Source Files\sgDynPointInMesh</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="sgLockAngleMatrix.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sgVerticeToCurve.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sgMatrixFromVertices.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sgCurveFromPoints.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sgRivetFromFourPoints.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sgSlidingDeformer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sgDynPointInMesh.h">
+      <Filter>Header Files\sgDynPointInMesh</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,19 @@
+import sgBRig_hair
+import sgBFunction_attribute
+
+sels = cmds.ls( sl=1 )
+
+centerCurve = sgBRig_hair.createCenterCurve( sels )
+sgBFunction_attribute.addAttr( centerCurve, ln='srcCurve', at='message' )
+cmds.setAttr( centerCurve+'.overrideEnabled', True )
+cmds.setAttr( centerCurve+'.overrideColor', 17 )
+
+for sel in sels:
+    sgBFunction_attribute.addAttr( sel, ln='centerCurve', at='message' )
+    cmds.connectAttr( centerCurve + '.srcCurve', sel + '.centerCurve' )
+    cmds.setAttr( sel+'.overrideEnabled', True )
+    cmds.setAttr( sel+'.overrideColor', 12 )
+    #cmds.setAttr( sel + '.v', 0 )
+
+#cmds.setAttr( centerCurve + '.v', 0 )
+cmds.select( centerCurve )

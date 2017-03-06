@@ -1,0 +1,6 @@
+import maya.cmds as cmds
+import sgBFunction_skinCluster
+
+sels = cmds.ls( sl=1 )
+
+sgBFunction_skinCluster.setBindPreMatrix( *sels )

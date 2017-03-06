@@ -1,0 +1,4 @@
+import maya.cmds as cmds
+import sgRigCurve
+for sel in cmds.ls( sl=1 ):
+    sgRigCurve.createLocatorOnCurve( sel )

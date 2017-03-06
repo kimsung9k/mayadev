@@ -1,0 +1,4 @@
+fnMeshList = []
+fnCrvList  = []
+crvPoints  = []
+meshPoints = []

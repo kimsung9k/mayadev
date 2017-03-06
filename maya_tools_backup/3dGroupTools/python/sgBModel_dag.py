@@ -1,0 +1,3 @@
+
+cloneTargetAttrName = 'cloneTarget'
+constrainedTargetAttrName = 'constrainedTarget'

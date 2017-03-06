@@ -1,0 +1,34 @@
+import maya.cmds as cmds
+import sgHumanRig.dag
+import sgHumanRig.withMixamo
+
+sels = cmds.ls( sl=1 )
+setGroup = sels[0]
+mixamo_hip = sels[1]
+sgHumanRig.withMixamo.setStdToMixamo( setGroup, mixamo_hip )
+sgHumanRig.withMixamo.setStdToMixamo( setGroup, mixamo_hip )
+sgHumanRig.withMixamo.setStdToMixamo( setGroup, mixamo_hip )
+
+ns = mixamo_hip.replace( 'Hips', '' )
+
+childrenJnts = cmds.listRelatives( mixamo_hip, c=1, ad=1, type='joint' )
+childrenJnts.append( mixamo_hip )
+
+skinNodes = []
+
+for jnt in childrenJnts:
+    connectedNodes = cmds.listConnections( jnt, type='skinCluster', s=0, d=1 )
+    if not connectedNodes: continue
+    for conNode in connectedNodes:
+        if not conNode in skinNodes:
+            skinNodes.append( conNode )
+
+meshs = []
+for skinNode in skinNodes:
+    meshs += cmds.listConnections( skinNode + '.outputGeometry' )
+
+mixamoMeshGrp = cmds.createNode( 'transform', n=ns + 'meshs' )
+cmds.parent( meshs, mixamoMeshGrp )
+
+duMeshGrp = sgHumanRig.withMixamo.mixamoMeshToAutoRig( mixamoMeshGrp, setGroup )
+cmds.parent( duMeshGrp, setGroup )

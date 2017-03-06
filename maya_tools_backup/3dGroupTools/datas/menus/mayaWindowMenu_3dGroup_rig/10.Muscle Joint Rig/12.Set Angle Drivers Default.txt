@@ -1,0 +1,21 @@
+import maya.cmds as cmds
+
+
+def setAngleDriversDefault():
+    
+    agDrivers = cmds.ls( type='angleDriver' )
+    
+    for agDriver in agDrivers:
+        
+        print "agDriver : ", agDriver
+        mmdc = cmds.listConnections( agDriver, s=1, d=0, type='multMatrix' )
+        if not mmdc: continue
+        
+        base = cmds.listConnections( mmdc[0]+'.i[1]' )
+        driver = cmds.listConnections( mmdc[0]+'.i[0]' )
+        
+        if not base or not driver: continue
+        driverMtx = cmds.getAttr( driver[0]+'.wm' )
+        cmds.xform( base[0], ws=1, matrix= driverMtx )
+
+setAngleDriversDefault()

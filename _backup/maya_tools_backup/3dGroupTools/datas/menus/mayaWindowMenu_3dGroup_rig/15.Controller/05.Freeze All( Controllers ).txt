@@ -1,0 +1,4 @@
+sels = cmds.ls( sl=1 )
+
+for sel in sels:
+    cmds.makeIdentity( sel, t=1, r=1, s=1, n=0, apply=1 )

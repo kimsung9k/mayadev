@@ -1,0 +1,24 @@
+import maya.cmds as cmds
+
+def copyKeyframe( sourceAnimCurve, targetAnimCurve ):
+    
+    srcCons = cmds.listConnections( targetAnimCurve, s=1, d=0, p=1, c=1 )
+    dstCons = cmds.listConnections( targetAnimCurve, s=0, d=1, p=1, c=1 )
+    
+    if srcCons:
+        cmds.disconnectAttr( srcCons[1], srcCons[0] )
+    if dstCons:
+        cmds.disconnectAttr( dstCons[0], dstCons[1] )
+    
+    duAnimCurve = cmds.duplicate( sourceAnimCurve )
+    cmds.delete( targetAnimCurve )
+    
+    duAnimCurve = cmds.rename( duAnimCurve, targetAnimCurve )
+    if srcCons:
+        cmds.connectAttr( srcCons[1], duAnimCurve+'.input' )
+    if dstCons:
+        cmds.connectAttr( duAnimCurve+'.output', dstCons[1] )
+    
+sels = cmds.ls( sl=1 )
+
+copyKeyframe( sels[0], sels[1] )

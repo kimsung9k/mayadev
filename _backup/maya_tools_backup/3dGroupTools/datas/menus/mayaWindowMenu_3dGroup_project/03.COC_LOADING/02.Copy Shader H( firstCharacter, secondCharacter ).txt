@@ -1,0 +1,17 @@
+import sgBFunction_dag
+import sgBFunction_connection
+
+sels = cmds.ls( sl=1 )
+
+first = sels[0]
+second = sels[1]
+
+firstNs = first[:-9]
+secondNs = second[:-9]
+
+for firstChild in sgBFunction_dag.getChildrenMeshExists( first ):
+    
+    firstChildName = firstChild.split( '|' )[-1]
+    secondChild = firstChildName.replace( firstNs, secondNs )
+    
+    sgBFunction_connection.copyShader( firstChild, secondChild )

@@ -1,0 +1,3 @@
+import sgBFunction_chRig
+sels = cmds.ls( sl=1 )
+sgBFunction_chRig.bakeMoc( sels[0] )

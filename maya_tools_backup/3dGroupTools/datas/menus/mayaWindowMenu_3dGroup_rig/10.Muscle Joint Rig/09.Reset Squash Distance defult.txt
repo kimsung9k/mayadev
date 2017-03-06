@@ -1,0 +1,2 @@
+import sgBFunction_rigObject
+sgBFunction_rigObject.resetSquashDistanceDefault()

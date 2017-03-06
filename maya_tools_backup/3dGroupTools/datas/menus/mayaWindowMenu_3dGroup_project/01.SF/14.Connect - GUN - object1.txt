@@ -1,0 +1,19 @@
+import sgBFunction_dag
+import sgBFunction_connection
+
+topNodes = cmds.ls( tr=1 )
+gunRoot = gunRoot = 'Object_1:root'
+gun = ''
+for node in topNodes:
+    if node.find( 'Ctl_Move' ) != -1:
+        gun = node
+
+if cmds.objExists( gunRoot ):
+    pos = cmds.getAttr( gunRoot+'.wm' )
+    
+    cmds.xform( gun, ws=1, matrix=pos )
+    cmds.rotate( 0, 90, 0, gun, r=1, os=1 )
+    cmds.move( -8, -3, 37, gun, r=1, wd=1, os=1 )
+    cmds.rotate( 0, 0, -21, gun, r=1, os=1 )
+    
+    sgBFunction_connection.constraintMaintainOffset( gunRoot, gun )

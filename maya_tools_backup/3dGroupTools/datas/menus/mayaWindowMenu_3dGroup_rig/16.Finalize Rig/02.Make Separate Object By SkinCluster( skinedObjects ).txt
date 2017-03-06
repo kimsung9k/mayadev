@@ -1,0 +1,2 @@
+import sgBRig_character
+sgBRig_character.separateMeshsBySkinWeight( cmds.ls( sl=1 ) )

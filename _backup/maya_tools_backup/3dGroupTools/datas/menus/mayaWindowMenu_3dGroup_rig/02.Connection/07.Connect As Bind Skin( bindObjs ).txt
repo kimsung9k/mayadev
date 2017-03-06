@@ -1,0 +1,54 @@
+import sgBFunction_dag
+import sgBModel_data
+import sgBFunction_attribute
+
+def bindConnect( targets, jnt ):
+    
+    def getBindConnectObjectDcmp( jnt ):
+        sgBFunction_attribute.addAttr( jnt, ln='bindConnectObject', at='message' ) 
+        
+        cons = cmds.listConnections( jnt+'.bindConnectObject', d=1, s=0 )
+        if not cons:
+            bindConnectObject = cmds.createNode( 'transform', n= 'BindCObj_' + jnt )
+            sgBFunction_attribute.addAttr( bindConnectObject, ln='bindConnectObject_target', at='message' )
+            cmds.connectAttr( jnt+'.bindConnectObject', bindConnectObject+'.bindConnectObject_target' )
+            cmds.parent( bindConnectObject, jnt )
+        else:
+            bindConnectObject = cons[0]
+        
+        cons = cmds.listConnections( bindConnectObject+'.wm', type='decomposeMatrix' )
+        if not cons:
+            dcmp = cmds.createNode( 'decomposeMatrix' )
+            cmds.connectAttr( bindConnectObject+'.wm', dcmp+'.imat' )
+        else:
+            dcmp = cons[0]
+        
+        cmds.xform( bindConnectObject, ws=1, matrix=sgBModel_data.getDefaultMatrix() )
+        return dcmp
+        
+    
+    dcmp = getBindConnectObjectDcmp( jnt )
+    
+    for target in targets:
+        cmds.connectAttr( dcmp+'.ot', target+'.t', f=1 )
+        cmds.connectAttr( dcmp+'.or', target+'.r', f=1 )
+        cmds.connectAttr( dcmp+'.os', target+'.s', f=1 )
+        cmds.connectAttr( dcmp+'.osh', target+'.sh', f=1 )
+
+
+sels = cmds.ls( sl=1 )
+
+targets = []
+jnt = ''
+
+for sel in sels:
+    if cmds.nodeType( sel ) == 'joint':
+        jnt = sel
+    else:
+        targets.append( sel )
+
+if not jnt:
+    targets = sels[:-1]
+    jnt = sels[-1]
+
+bindConnect( targets, jnt )

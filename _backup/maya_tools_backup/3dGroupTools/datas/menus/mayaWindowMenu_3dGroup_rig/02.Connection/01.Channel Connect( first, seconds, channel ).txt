@@ -1,0 +1,14 @@
+import maya.cmds as cmds
+import sgBFunction_attribute
+
+sels = cmds.ls( sl=1 )
+
+first = sels[0]
+seconds = sels[1:]
+
+attrs = sgBFunction_attribute.getChannelAttributeFromSelection()
+
+for second in seconds:
+   for attr in attrs:
+       if cmds.isConnected( first + '.' + attr, second + '.' + attr ): continue
+       cmds.connectAttr( first+'.'+attr, second+'.'+attr, f=1 )

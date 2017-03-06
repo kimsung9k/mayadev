@@ -1,0 +1,5 @@
+import maya.cmds as cmds
+import sgRigConnection
+
+sels = cmds.ls( sl=1 )
+sgRigConnection.copyShader( sels[0], sels[1] )

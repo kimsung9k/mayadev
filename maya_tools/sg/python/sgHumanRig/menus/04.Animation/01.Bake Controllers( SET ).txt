@@ -1,0 +1,3 @@
+import sgHumanRig.animation
+sels = cmds.ls( sl=1 )
+sgHumanRig.animation.bakeController( sels[0] )

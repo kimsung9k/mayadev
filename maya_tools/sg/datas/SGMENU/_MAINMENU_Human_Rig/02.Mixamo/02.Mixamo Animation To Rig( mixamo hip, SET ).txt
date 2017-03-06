@@ -1,0 +1,6 @@
+import maya.cmds as cmds
+import sgHumanRig.withMixamo
+sels = cmds.ls( sl=1 )
+mixamoHip = sels[0]
+setGrp = sels[1]
+sgHumanRig.withMixamo.connectMixamoJointToAutoRig( mixamoHip, setGrp )

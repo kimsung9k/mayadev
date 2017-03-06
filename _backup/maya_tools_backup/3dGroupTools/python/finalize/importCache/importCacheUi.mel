@@ -1,0 +1,284 @@
+
+
+//
+//global string $gGeomCacheCurrentProject = "CurrentProject";
+//global string $gGeomCacheAutomaticName = "Automatic";
+//global string $gGeomCacheSceneNameForPrefs = "";
+
+global proc string geomCacheGetCurrentDir()
+//
+// Return a string corresponding to the current directory preference.
+// Use the current project's data directory by default.
+//
+{
+	global string $gGeomCacheCurrentProject;
+
+	// first find the current project directory, if it is defined
+	//
+	string $currentProj = (`workspace -q -rd`+"data\/");
+	int $needSubdir = 1;
+
+	// check what the user has as their preference
+	//
+	if (`optionVar -exists geomCacheDirName`)
+	{
+		string $cacheVar = `optionVar -q geomCacheDirName`;
+		if ($cacheVar != $gGeomCacheCurrentProject) {
+			$currentProj = $cacheVar;
+			$needSubdir = 0;
+		}
+	}
+
+	if( $needSubdir ) {
+		// Find default subdirectory location
+		//
+		string $subDir = getNameForCacheSubDir( 0, $currentProj, "" );
+		$currentProj += $subDir;
+	}
+	return $currentProj;
+}
+
+global proc cacheSetDirOptionVar()
+//
+// Set the optionVar based on the user's entry in the option box
+//
+{
+	global string $gGeomCacheCurrentProject;
+	global string $gGeomCacheSceneNameForPrefs;
+
+	if ( `textFieldGrp -q -en cacheDir` )
+	{
+		string $value = `textFieldGrp -q -tx cacheDir`;
+		if ( $value != "" )
+		{
+			string $currentProj = (`workspace -q -rd`+"data\/");
+			if ($currentProj == $value) {
+				$value = $gGeomCacheCurrentProject;
+			}
+			optionVar -sv geomCacheDirName $value;
+			$gGeomCacheSceneNameForPrefs = `file -q -loc`;
+		}
+		else
+		{
+			optionVar -sv geomCacheDirName $gGeomCacheCurrentProject;
+		}
+	}
+}
+
+global proc int cacheSetDirectory( string $dir, string $type )
+{
+	textFieldGrp -e -tx $dir cacheDir;
+	cacheSetDirOptionVar();
+	return 1;
+}
+
+global proc cacheBrowseForFolder()
+{
+	string $cmd = "cacheSetDirectory ";
+	string $action = (uiRes("m_performCreateGeometryCache.kSetDir"));
+	string $startInDir;
+	$startInDir = `textFieldGrp -q -tx cacheDir`;
+	if ( size( $startInDir ) == 0 )
+	{
+		$startInDir = `internalVar -uwd`;
+	}
+
+	if ( `file -q -ex $startInDir` ) {
+		workspace -dir $startInDir;
+	}
+
+	fileBrowser( $cmd, $action, "", 4 );
+}
+
+global proc getSelect ()
+{
+	string $s_getObject[] = `ls -sl`;
+	textScrollList -e -removeAll multiObjScrollList;
+	for ( $sti in $s_getObject){
+		textScrollList -e -a $sti multiObjScrollList;
+	}
+}
+
+
+global proc string  shapeOrder( string $sti)
+{
+	//string $sti = "chaw_cache|srfHI_Body";
+	string $stiShapes[] = `listRelatives -s -pa $sti `;
+	string $tmps[] ;
+	tokenize $stiShapes[0] "|" $tmps;
+	string $tmpShape = $tmps[`size $tmps`-1];
+	string $sameShapes[] = `ls $tmpShape`;
+
+	int $orderTh = 0 ;
+	int $sizeSaameShapes = `size $sameShapes`;
+
+	for ( $i = 0 ; $i < $sizeSaameShapes ; $i++ ) {
+		if ( $sameShapes[$i] == $stiShapes[0] ) $orderTh = $i ;
+	}
+	$orderTh = $sizeSaameShapes - $orderTh -1;
+
+	string $returnSt = "";
+	if ( $orderTh != 0 )
+		$returnSt =  $orderTh;
+	return $returnSt ;
+
+}
+
+
+
+
+global proc import_multiObjs()
+{
+	string $path = ( `textFieldGrp -q -tx  cacheDir` + "\\" ) ;
+	$path = `encodeString  $path`;
+
+//string $sti = "srfHI_Body";
+	string $objs[] = `textScrollList -q -ai multiObjScrollList`;
+	int $op = `radioButtonGrp -q -sl opRadioButton_name`;
+	int $plat = `radioButtonGrp -q -sl platRadioButton_name`;
+
+	string $makingCache[] ;
+	if ( `size $objs` != 0 ) {
+		for ( $sti in $objs) {
+			string  $orderTH = shapeOrder( $sti) ;
+
+			string $objShape[] = {};
+//---------------------------------maya or max-----------------
+			if ( $plat == 1 ) {
+				$objShape = `listRelatives -s $sti `;
+			}
+			else{
+				$objShape[0] = $sti ;
+			}
+//--------------------------
+			string $xmlCacheFile = $objShape[0] + $orderTH + ".xml" ;
+
+			string $xmlFiles[] = `getFileList -folder $path -filespec $xmlCacheFile` ;
+			if ( `size $xmlFiles` != 0 ){
+				if ( $op == 1 ) {
+					string $geometires[] = {};
+						string $geometires[] = {$sti};
+						doImportCacheFile ( ($path + "/" + $xmlCacheFile ) , "xml" , $geometires,{} );				// 	import cache file
+					}
+				else if ( $op == 2 ){
+					string $nodeType = `nodeType $objShape[0]` ;
+					string $hisSwitchNode[] = {};
+					if( $nodeType != "transform")  {
+						$hisSwitchNode = `listConnections -s 1 -type "historySwitch" $objShape[0]`;
+					}
+					else {
+						string $shapeNode[] = `listRelatives -s $objShape[0]`;
+						$hisSwitchNode = `listConnections -s 1 -type "historySwitch" $shapeNode[0]`;
+					}
+					string $cacheFileNode[] = `listConnections -s 1 -type "cacheFile" $hisSwitchNode[0]`;
+					setAttr -type "string" ($cacheFileNode[0] + ".cachePath")  $path ;
+					setAttr -type "string" ($cacheFileNode[0] + ".cacheName")  $objShape[0];
+				}
+			}
+		}
+	}
+}
+
+
+
+global proc cacheConnectWin (string $win)
+{
+	window -title "cacheConnectWin" $win;
+
+	string $MainFormLayoutList = `formLayout
+													-w 600 -h 400 `;
+
+//		string $parent = `columnLayout -adjustableColumn 1`;
+
+		string $rowLayoutList = `rowLayout -nc 3
+			-cw3 400 5 50
+			-adjustableColumn 1
+			-cal 1 "both"
+			-cal 2 "both"
+			-cal 3 "left"
+			-ct3 "both" "both" "left"
+			` ;
+
+			string $dirToUse = geomCacheGetCurrentDir();
+			textFieldGrp
+				-label (uiRes("m_performCreateGeometryCache.kCacheDirectory"))
+				-tx $dirToUse
+				-cc ( "cacheSetDirOptionVar" )
+				-adjustableColumn 2
+				cacheDir ;
+
+			separator -w 5 -style "none";
+			symbolButton -image "navButtonBrowse.xpm"
+								-c ( "cacheBrowseForFolder" )
+								cacheDirBrowser ;
+
+
+//			symbolButton -e -c (" cacheBrowseForFolder" + $cacheDir )
+//							$cacheBrowerList ;
+
+			setParent ..;				// rowLayer
+		string $parent = `columnLayout -adjustableColumn 1`;
+
+			separator -w 10 -style "none";
+
+			radioButtonGrp  -nrb 2
+									-label "operator"
+									-labelArray2 "import_cache" "connect_cache"
+									-select 1
+									opRadioButton_name;
+
+			radioButtonGrp  -nrb 2
+									-label "platform"
+									-labelArray2 "maya" "max"
+									-select 1
+									platRadioButton_name;
+
+			textScrollList  -en on
+								-nr 10
+								-ams true
+								multiObjScrollList;
+
+			scriptJob -parent $parent -event "SelectionChanged" getSelect ;
+
+			button -label "import cacheData"
+					-h 50
+					-c ("import_multiObjs")
+					cmdButton_name;
+
+			setParent ..;				// column_Layer
+
+			setParent..;				// mainFormLayout
+
+		formLayout -e
+			-attachForm $rowLayoutList "top" 5
+			-attachForm $rowLayoutList "left" 2
+			-attachForm $rowLayoutList "right" 2
+
+			-attachControl $parent "top"  5 $rowLayoutList
+			-attachForm $parent "left" 2
+			-attachForm $parent "right" 2
+//			-attachNone $radioColl_name "bottom"
+/*
+
+			-attachControl $radioColl_name "top"  5 $rowLayoutList
+//			-attachNone $radioColl_name "bottom"
+
+
+			-attachControl $textScrollList_name "top" 5 $radioColl_name
+//			-attachNone $textScrollList_name "bottom"
+			-attachForm $textScrollList_name "left" 2
+			-attachForm $textScrollList_name "right" 2
+*/
+			$MainFormLayoutList ;
+
+
+		showWindow $win;
+}
+
+
+global proc cacheConnect()
+{
+	string $win = "cacheConnectWin";
+	if ( `window -exists $win` != 0 ) deleteUI $win;
+	cacheConnectWin $win;
+}

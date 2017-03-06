@@ -1,0 +1,40 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="shader">
+      <UniqueIdentifier>{86ad2cc8-e56b-40e0-9960-e2ca8c173b2a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="event">
+      <UniqueIdentifier>{0edae3a9-3fb4-4fe1-97f7-799bd90b32aa}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="shader.cpp">
+      <Filter>shader</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="Key.cpp">
+      <Filter>event</Filter>
+    </ClCompile>
+    <ClCompile Include="Mouse.cpp">
+      <Filter>event</Filter>
+    </ClCompile>
+    <ClCompile Include="Event.cpp">
+      <Filter>event</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="shader.h">
+      <Filter>shader</Filter>
+    </ClInclude>
+    <ClInclude Include="Key.h">
+      <Filter>event</Filter>
+    </ClInclude>
+    <ClInclude Include="Mouse.h">
+      <Filter>event</Filter>
+    </ClInclude>
+    <ClInclude Include="Event.h">
+      <Filter>event</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

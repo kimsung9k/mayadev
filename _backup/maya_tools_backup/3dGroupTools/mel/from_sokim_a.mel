@@ -1,0 +1,23 @@
+global proc string _combineMesh()
+{
+string $sels[] = `ls -sl`;
+int $i = 0;
+string $_combineMesh[] = `polyCube -n combineMesh -w 1 -h 1 -d 1 -sx 1 -sy 1 -sz 1 -ax 0 1 0 -cuv 4 -ch 1`;
+string $_uniteNode = `createNode polyUnite`;
+
+
+string $shapes[] = `listRelatives -s -f $_combineMesh[0]`;
+connectAttr -f ( $_uniteNode + ".output") ( $shapes[0] + ".inMesh");
+
+for ( $sti in $sels)
+{
+//string $sti = $sels[0];
+string $shapes[] = `listRelatives -s -f $sti`;
+connectAttr -f ( $shapes[0] + ".worldMatrix[0]") ( $_uniteNode + ".inputMat["+$i+"]");
+connectAttr -f ( $shapes[0] + ".outMesh") ( $_uniteNode + ".inputPoly["+$i+"]"); 
+
+$i++; 
+}
+return $_combineMesh[0];
+} 
+_combineMesh;

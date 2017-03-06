@@ -1,0 +1,26 @@
+//////////////////////////////////////////////////////////////////
+// Options.txt - These are the base options that you selected
+//////////////////////////////////////////////////////////////////
+
+You have selected to use Maya 2014
+
+Vendor Name is: sggim
+
+Verbose Comments ON
+
+Plug-in type number (0-Empty, 1-MEL, 2-MEL w/Undo, 3-DG Node)
+1
+
+Maya Type Name (Plug-in Name)
+createJoint
+
+Included Libraries:
+Foundation
+OpenMaya
+OpenMayaUI
+OpenMayaAnim
+OpenMayaFX
+OpenMayaRender
+Image
+libMocap
+OpenGL32

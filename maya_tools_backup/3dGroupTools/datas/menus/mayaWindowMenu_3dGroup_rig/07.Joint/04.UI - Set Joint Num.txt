@@ -1,0 +1,2 @@
+import sgPWindow_set_jointNum
+sgPWindow_set_jointNum.Window().show()

@@ -1,0 +1,36 @@
+import sgBFunction_dag
+import sgBFunction_connection
+
+sels = cmds.ls( sl=1 )
+
+gun = sels[0].split( '|' )[-1]
+
+gunNs = gun.split( ':' )[0]
+
+gunWorld = gunNs + ':Ctl_World'
+
+mmdc = cmds.listConnections( gunWorld+'.t', s=1, d=0 )[0]
+playerRoot = cmds.listConnections( mmdc, s=1, d=0 )[0]
+
+charNs = playerRoot.split( ':' )[0]
+
+cu2_R = charNs + ':Arm_R_CU2'
+cu2_L = charNs + ':Arm_L_CU2'
+
+pinHandle1 = gunNs + ':Ctl_PinHandle1'
+pinHandle2 = gunNs + ':Ctl_PinHandle2'
+constHandle1 = gunNs + ':ConstLoc_Ctl_Handle1'
+constHandle2 = gunNs + ':ConstLoc_Ctl_Handle2'
+
+pos_R = cmds.getAttr( cu2_R+'.wm' )
+pos_L = cmds.getAttr( cu2_L+'.wm' )
+cmds.xform( pinHandle1, ws=1, matrix=pos_L )
+cmds.xform( pinHandle2, ws=1, matrix=pos_R )
+
+try:sgBFunction_connection.constraint( cu2_R, constHandle2 )
+except:pass
+try:sgBFunction_connection.constraint( cu2_L, constHandle1 )
+except:pass
+
+try:cmds.setAttr( gunNs+':Ctl_Move.parent_handle2', 10 )
+except:pass

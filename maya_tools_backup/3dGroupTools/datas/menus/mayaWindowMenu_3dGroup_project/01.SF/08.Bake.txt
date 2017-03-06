@@ -1,0 +1,31 @@
+cmds.currentUnit( time='ntsc' )
+
+animCurves  = cmds.ls( type='animCurveTU' )
+animCurves += cmds.ls( type='animCurveTA' )
+animCurves += cmds.ls( type='animCurveTL' )
+
+maxFrame = 0
+for animCurve in animCurves:
+    times = cmds.keyframe( animCurve, q=1, tc=1 )
+    firstTime = int( times[0] )
+    offsetRate = 1-int( times[0] )
+    cmds.keyframe( animCurve, e=1, animation='keys', iub=True, r=1, o='over', tc=offsetRate, fc=offsetRate )
+    
+    if int( times[-1] ) > maxFrame:
+        maxFrame = int( times[-1] )
+
+minFrame = 1
+maxFrame = int( maxFrame ) + 1
+
+cmds.playbackOptions( min=1, max = maxFrame )
+
+ctls = cmds.ls( '*_CTL' )
+
+targetCtls = []
+for ctl in ctls:
+    if cmds.listConnections( ctl, s=1, d=0 ):
+        targetCtls.append( ctl )
+
+cmds.bakeResults( targetCtls, simulation = True, t=(minFrame, maxFrame ), sampleBy=1,
+                 disableImplicitControl=False, preserveOutsideKeys=False, sparseAnimCurveBake=False, removeBakedAttributeFromLayer=False,
+                 removeBakedAnimFromLayer=False, bakeOnOverrideLayer=False, minimizeRotation=False, controlPoints=False, shape=False )

@@ -1,0 +1,101 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{ec47803b-2f3b-49da-b717-e9292e1279fc}</UniqueIdentifier>
+      <Extensions>cpp</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{d4e60375-0996-4577-9897-68fb306cbe9d}</UniqueIdentifier>
+      <Extensions>h</Extensions>
+    </Filter>
+    <Filter Include="Miscellaneous Files">
+      <UniqueIdentifier>{4504cc62-39a3-4dec-9f0f-a8a9e150251d}</UniqueIdentifier>
+      <Extensions>txt</Extensions>
+    </Filter>
+    <Filter Include="Header Files\sgCurveEditBrush">
+      <UniqueIdentifier>{b03d8536-6cd9-4702-a0c5-e51b8b62a08f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\sgCurveEditBrush">
+      <UniqueIdentifier>{c40d5cd2-d2dd-4436-8ba3-56210781be22}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\createJoint">
+      <UniqueIdentifier>{527890c1-53a6-4408-acd2-cb0b262de380}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\createJoint">
+      <UniqueIdentifier>{31172acd-c2c9-4f15-bd8d-e3661912dc76}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\sgCurveDraw">
+      <UniqueIdentifier>{c6f64ee4-acc6-4cb1-8d8d-9d29bc2ff4b5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\sgCurveDraw">
+      <UniqueIdentifier>{82cb754f-7570-4762-99f7-2c7a0b49e652}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ReadMe.txt">
+      <Filter>Miscellaneous Files</Filter>
+    </None>
+    <None Include="Options.txt">
+      <Filter>Miscellaneous Files</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="pluginMain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="createJointContext.cpp">
+      <Filter>Source Files\createJoint</Filter>
+    </ClCompile>
+    <ClCompile Include="createJointContextCommand.cpp">
+      <Filter>Source Files\createJoint</Filter>
+    </ClCompile>
+    <ClCompile Include="createJointContextFunctions.cpp">
+      <Filter>Source Files\createJoint</Filter>
+    </ClCompile>
+    <ClCompile Include="sgCurveEditBrush_context.cpp">
+      <Filter>Source Files\sgCurveEditBrush</Filter>
+    </ClCompile>
+    <ClCompile Include="sgCurveEditBrush_manip.cpp">
+      <Filter>Source Files\sgCurveEditBrush</Filter>
+    </ClCompile>
+    <ClCompile Include="sgCurveEditBrush_contextCommand.cpp">
+      <Filter>Source Files\sgCurveEditBrush</Filter>
+    </ClCompile>
+    <ClCompile Include="sgCurveEditBrush_context_def.cpp">
+      <Filter>Source Files\sgCurveEditBrush</Filter>
+    </ClCompile>
+    <ClCompile Include="sgCurveDraw_context.cpp">
+      <Filter>Source Files\sgCurveDraw</Filter>
+    </ClCompile>
+    <ClCompile Include="sgCurveDraw_contextCommand.cpp">
+      <Filter>Source Files\sgCurveDraw</Filter>
+    </ClCompile>
+    <ClCompile Include="sgCurveDraw_context_def.cpp">
+      <Filter>Source Files\sgCurveDraw</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="createJointContextCommand.h">
+      <Filter>Header Files\createJoint</Filter>
+    </ClInclude>
+    <ClInclude Include="createJointContext.h">
+      <Filter>Header Files\createJoint</Filter>
+    </ClInclude>
+    <ClInclude Include="sgCurveEditBrush_context.h">
+      <Filter>Header Files\sgCurveEditBrush</Filter>
+    </ClInclude>
+    <ClInclude Include="sgCurveEditBrush_manip.h">
+      <Filter>Header Files\sgCurveEditBrush</Filter>
+    </ClInclude>
+    <ClInclude Include="sgCurveEditBrush_contextCommand.h">
+      <Filter>Header Files\sgCurveEditBrush</Filter>
+    </ClInclude>
+    <ClInclude Include="sgCurveDraw_context.h">
+      <Filter>Header Files\sgCurveDraw</Filter>
+    </ClInclude>
+    <ClInclude Include="sgCurveDraw_contextCommand.h">
+      <Filter>Header Files\sgCurveDraw</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

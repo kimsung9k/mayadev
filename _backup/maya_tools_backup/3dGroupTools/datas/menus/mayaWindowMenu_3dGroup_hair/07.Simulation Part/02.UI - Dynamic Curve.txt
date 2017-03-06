@@ -1,0 +1,2 @@
+import sgUIMakeCurveDynamic
+sgUIMakeCurveDynamic.Window().show()

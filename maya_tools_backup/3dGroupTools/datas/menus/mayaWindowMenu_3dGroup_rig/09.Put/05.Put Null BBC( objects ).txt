@@ -1,0 +1,8 @@
+import sgCFnc_dag
+
+bb = sgCFnc_dag.getMBoundingBoxFromSelection()
+bbc =  bb.center()
+
+putNode = cmds.createNode( 'transform' )
+cmds.setAttr( putNode+'.dh', 1 )
+cmds.move( bbc.x, bbc.y, bbc.z, putNode, ws=1 )

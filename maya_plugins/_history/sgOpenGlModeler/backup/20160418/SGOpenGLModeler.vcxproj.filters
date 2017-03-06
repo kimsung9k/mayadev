@@ -1,0 +1,118 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="SGOpenGLModeler.cpp" />
+    <ClCompile Include="SGPrintf\SGPrintf.cpp">
+      <Filter>SGPrintf</Filter>
+    </ClCompile>
+    <ClCompile Include="SGFunctions.cpp">
+      <Filter>SGM\SGFunctions</Filter>
+    </ClCompile>
+    <ClCompile Include="SGMainWindow.cpp">
+      <Filter>SGMainWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="SGGLWidget.cpp">
+      <Filter>SGGLWidget</Filter>
+    </ClCompile>
+    <ClCompile Include="SGMesh.cpp">
+      <Filter>SGM\SGMesh</Filter>
+    </ClCompile>
+    <ClCompile Include="SGVec3Array.cpp">
+      <Filter>SGArrays\SGVec3Array</Filter>
+    </ClCompile>
+    <ClCompile Include="SGIntArray.cpp">
+      <Filter>SGArrays\SGIntArray</Filter>
+    </ClCompile>
+    <ClCompile Include="SGVec3.cpp">
+      <Filter>SGVec3</Filter>
+    </ClCompile>
+    <ClCompile Include="SGCam.cpp">
+      <Filter>SGM\SGCam</Filter>
+    </ClCompile>
+    <ClCompile Include="SGShaderProgram.cpp">
+      <Filter>SGShaderProgram</Filter>
+    </ClCompile>
+    <ClCompile Include="shaderCode.cpp">
+      <Filter>SGShaderProgram</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="SGPrintf">
+      <UniqueIdentifier>{f632e16e-cbb4-4efe-8e14-cef568616060}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SGMainWindow">
+      <UniqueIdentifier>{52edbe4c-ecb9-4792-8c15-6b19fee9a8a1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SGGLWidget">
+      <UniqueIdentifier>{74cb3258-dc18-453d-b8a0-0785328b8b9d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SGBase">
+      <UniqueIdentifier>{042b88ec-7f12-47ac-8f68-28d51c6506a1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SGArrays">
+      <UniqueIdentifier>{e1a862b3-5288-45ad-b52c-581d0289099a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SGArrays\SGVec3Array">
+      <UniqueIdentifier>{4d8a6dc9-8df9-494f-8889-496d6e69b83f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SGArrays\SGIntArray">
+      <UniqueIdentifier>{f66877a6-b905-466e-b6b9-70cc9ef988f5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SGVec3">
+      <UniqueIdentifier>{cebea0b7-1903-4a79-88bb-995ee1070e0e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SGM">
+      <UniqueIdentifier>{bd72e5d8-fdd7-4e9a-99b2-498d435257a0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SGM\SGMesh">
+      <UniqueIdentifier>{788bc5f2-f0d4-429d-892c-1647bdc31703}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SGM\SGFunctions">
+      <UniqueIdentifier>{9879852e-105b-459e-a5e2-b66f5d531838}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SGM\SGCam">
+      <UniqueIdentifier>{06047a08-4e3c-46ad-9adc-b0ace3616c95}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SGShaderProgram">
+      <UniqueIdentifier>{87ce1b2c-40bb-4e55-bab4-4007f7bc14af}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="SGPrintf\SGPrintf.h">
+      <Filter>SGPrintf</Filter>
+    </ClInclude>
+    <ClInclude Include="SGMainWindow.h">
+      <Filter>SGMainWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="SGGLWidget.h">
+      <Filter>SGGLWidget</Filter>
+    </ClInclude>
+    <ClInclude Include="SGMesh.h">
+      <Filter>SGM\SGMesh</Filter>
+    </ClInclude>
+    <ClInclude Include="SGVec3Array.h">
+      <Filter>SGArrays\SGVec3Array</Filter>
+    </ClInclude>
+    <ClInclude Include="SGIntArray.h">
+      <Filter>SGArrays\SGIntArray</Filter>
+    </ClInclude>
+    <ClInclude Include="SGVec3.h">
+      <Filter>SGVec3</Filter>
+    </ClInclude>
+    <ClInclude Include="SGCam.h">
+      <Filter>SGM\SGCam</Filter>
+    </ClInclude>
+    <ClInclude Include="SGFunctions.h">
+      <Filter>SGM\SGFunctions</Filter>
+    </ClInclude>
+    <ClInclude Include="pixelformat.h">
+      <Filter>SGGLWidget</Filter>
+    </ClInclude>
+    <ClInclude Include="SGBase.h">
+      <Filter>SGBase</Filter>
+    </ClInclude>
+    <ClInclude Include="SGShaderProgram.h">
+      <Filter>SGShaderProgram</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

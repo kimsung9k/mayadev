@@ -1,0 +1,15 @@
+import maya.cmds as cmds
+import sgBFunction_dag
+
+sels = sgBFunction_dag.getChildrenCurveExists( cmds.ls( sl=1 ) )
+
+follicles =[]
+for sel in sels:
+    
+    follicle = sgBFunction_dag.getNodeFromHistory( sel, 'follicle' )
+    if not follicle:
+        selShape = sgBFunction_dag.getShape( sel )
+        follicle = cmds.listConnections( selShape+'.create' )
+    follicles += follicle
+    
+cmds.select( follicles )

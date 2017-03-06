@@ -1,0 +1,27 @@
+import maya.cmds as cmds
+import sgBFunction_dag
+
+def createInputCurve( curveObject ):
+    
+    import sgBFunction_dag
+    
+    curveShape = sgBFunction_dag.getShape( curveObject )
+    newShape = cmds.createNode( 'nurbsCurve' )
+    cmds.connectAttr( curveShape+'.local', newShape+'.create' )
+    
+    curveObjName = curveObject.split( '|' )[-1]
+    
+    newCurve = cmds.listRelatives( newShape, p=1, f=1 )[0]
+    newCurve = cmds.rename( newCurve, 'InputCurve_' + curveObjName )
+    
+    cmds.setAttr( curveObject+'.v', 0 )
+    return newCurve
+
+sels = sgBFunction_dag.getChildrenCurveExists( cmds.ls( sl=1 ) )
+
+newCurves = []
+
+for sel in sels:
+    newCurves.append( createInputCurve( sel ) )
+
+cmds.select( newCurves )

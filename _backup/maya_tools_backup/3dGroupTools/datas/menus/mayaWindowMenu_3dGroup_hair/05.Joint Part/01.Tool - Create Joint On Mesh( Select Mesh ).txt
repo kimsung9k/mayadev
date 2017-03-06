@@ -1,0 +1,8 @@
+import sgBFunction_base
+import maya.cmds as cmds
+import maya.mel as mel
+sgBFunction_base.autoLoadPlugin( 'sgTools' )
+
+if not cmds.contextInfo( "createJointContext1", ex=1 ):
+    mel.eval( 'createJointContext createJointContext1' )
+cmds.setToolTo( "createJointContext1" )

@@ -1,0 +1,3 @@
+import sgBFunction_joint
+sels = cmds.ls( sl=1 )
+sgBFunction_joint.createEditableJoints( sels )

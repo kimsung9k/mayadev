@@ -1,0 +1,33 @@
+import cPickle
+import os
+
+posDataPath = 'Z:/project_2015/cm_09/32_coc_loading_screen/dpt_cgi/scenes/sc001/ani/posData'
+assetFolder = 'Z:/project_2015/cm_09/32_coc_loading_screen/dpt_cgi/assets'
+
+assetNames  = []
+refNames = []
+
+for root, dirs, names in os.walk( posDataPath ):
+    names.sort()
+    
+    for name in names:
+        for i in range( len( name ) ):
+            if not name[-i-1].isdigit(): break
+        if i == 0:
+            assetName = name
+        else:
+            assetName = name[:-i]
+        characterFolderName = assetFolder + '/' + assetName
+        refName = characterFolderName + '/reference/' + assetName + '.mb'
+        refNames.append( refName )
+        assetNames.append( assetName )
+
+refNames = list( set( refNames ) )
+assetNames = list( set( assetNames ) )
+
+refNames.sort()
+assetNames.sort()
+
+for i in range( len( assetNames ) ):
+    #print assetNames[i], refNames[i]
+    cmds.file( refNames[i], r=1, type="mayaBinary", ignoreVersion=1, gl=1, mergeNamespacesOnClash=False, namespace=assetNames[i], options="v=0" )

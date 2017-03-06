@@ -1,0 +1,481 @@
+// Copyright (C) 1997-2004 Alias,
+// a division of Silicon Graphics Limited.
+// 
+// The information in this file is provided for the exclusive use of the
+// licensees of Alias.  Such users have the right to use, modify,
+// and incorporate this code into other products for purposes authorized
+// by the Alias license agreement, without fee.
+// 
+// ALIAS DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
+// INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
+// EVENT SHALL ALIAS BE LIABLE FOR ANY SPECIAL, INDIRECT OR
+// CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE,
+// DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+// TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+// PERFORMANCE OF THIS SOFTWARE.
+
+//****************************************************************************
+//	Maintains the mental ray photon attributes on Maya material nodes.
+//****************************************************************************
+
+global proc AEmentalraySurfaceAttrsCreate(string $messagePlug)
+{
+	warning("Calling an obsolete mel procedure AEmentalraySurfaceAttrsCreate.");
+}
+
+global proc AEmentalrayPhotonAttrsCreate(string $messagePlug)
+{
+	warning("Calling an obsolete mel procedure AEmentalrayPhotonAttrsCreate.");
+}
+
+global proc AEmentalrayRefractionBlurCallback(string $node)
+{
+	if (`attributeQuery -exists -node $node "miRefractionBlur"` &&
+	    `attributeQuery -exists -node $node "miRefractionRays"`)
+		editorTemplate
+			-dimControl $node "miRefractionRays"
+			( `getAttr ($node + " .miRefractionBlur")` == 0.0 );
+}
+
+global proc AEmentalrayReflectionBlurCallback(string $node)
+{
+	if (`attributeQuery -exists -node $node "miReflectionBlur"` &&
+	    `attributeQuery -exists -node $node "miReflectionRays"`)
+		editorTemplate
+			-dimControl $node "miReflectionRays"
+			( `getAttr ($node + " .miReflectionBlur")` == 0.0 );
+}
+
+global proc AEmentalrayPhotonAttrsActivate(string $node)
+{
+	if( `attrNavigationControlGrp -query -exists bumpMapCtrl` ) {
+
+		int $dimTemplate = `getAttr ($node + ".miDeriveFromMaya")`;
+		string $nodeType = `nodeType $node`;
+
+		if (`button -query -exists ($nodeType + "settingsButton")` &&
+			$nodeType != "layeredShader" &&
+			$nodeType != "rampShader"    &&
+			$nodeType != "shadingMap"    &&
+			$nodeType != "surfaceShader" &&
+			$nodeType != "useBackground") {
+				button  -edit
+				-enable (! $dimTemplate)
+				($nodeType + "settingsButton");
+			}
+		if ($nodeType != "lambert" &&
+			$nodeType != "anisotropic") { 
+			editorTemplate
+				-dimControl
+				$node "miShinyness" $dimTemplate;
+			}
+		if ($nodeType == "anisotropic"   ||
+			$nodeType == "layeredShader" ||
+			$nodeType == "shadingMap"    ||
+			$nodeType == "surfaceShader" ||
+			$nodeType == "useBackground") {
+			editorTemplate
+				-dimControl
+				$node "miAngle" $dimTemplate;
+			editorTemplate
+				-dimControl
+				$node "miSpreadX" $dimTemplate;
+			editorTemplate
+				-dimControl
+				$node "miSpreadY" $dimTemplate;
+			}
+		if ($nodeType == "phongE"        ||
+			$nodeType == "layeredShader" ||
+			$nodeType == "shadingMap"    ||
+			$nodeType == "surfaceShader" ||
+			$nodeType == "useBackground") {
+			editorTemplate
+				-dimControl
+				$node "miWhiteness" $dimTemplate;
+			}
+		if ($nodeType != "lambert") {
+			editorTemplate
+				-dimControl
+				$node "miSpecularColor" $dimTemplate;
+			editorTemplate
+				-dimControl
+				$node "miReflectivity" $dimTemplate;
+			}
+		editorTemplate
+			-dimControl
+			$node "miRefractiveIndex" $dimTemplate;
+		editorTemplate
+			-dimControl
+			$node "miRefractions" $dimTemplate;
+		editorTemplate
+			-dimControl
+			$node "miAbsorbs" $dimTemplate;
+		editorTemplate
+			-dimControl
+			$node "miDiffuse" $dimTemplate;
+		editorTemplate
+			-dimControl
+			$node "miColor" $dimTemplate;
+		editorTemplate
+			-dimControl
+			$node "miTransparency" $dimTemplate;
+		editorTemplate
+			-dimControl
+			$node "miTranslucence" $dimTemplate;
+		editorTemplate
+			-dimControl
+			$node "miTranslucenceFocus" $dimTemplate;
+		attrNavigationControlGrp
+			-edit -enable (! $dimTemplate) bumpMapCtrl;
+
+		if ((! $dimTemplate) &&
+			($nodeType == "layeredShader"  ||
+			 $nodeType == "shadingMap"     ||
+			 $nodeType == "surfaceShader"  ||
+			 $nodeType == "useBackground"))
+			AEmentalrayPhotonAttrsAnisoActivate($node);
+
+	}
+}
+
+global proc AEmentalrayPhotonAttrsAnisoActivate(string $node)
+{
+	int $dimTemplate = (`getAttr ($node + ".miShinyness")` > 0.0);
+
+	editorTemplate
+		-dimControl
+		$node "miAngle" $dimTemplate;
+	editorTemplate
+		-dimControl
+		$node "miSpreadX" $dimTemplate;
+	editorTemplate
+		-dimControl
+		$node "miSpreadY" $dimTemplate;
+}
+
+proc copyAttr(string $node, string $dstAttr, string $srcAttr, int $cpyAttr)
+{
+	string $dstPlug, $srcPlug;
+
+	$dstPlug = ( $node + "." + $dstAttr );
+	if (`connectionInfo -isDestination $dstPlug`) {
+		$srcPlug = `connectionInfo -sourceFromDestination $dstPlug`;
+		disconnectAttr $srcPlug $dstPlug;
+		}
+
+	if (! $cpyAttr)
+		return;
+
+	$srcPlug = ( $node + "." + $srcAttr );
+	if (`connectionInfo -isDestination $srcPlug`) {
+		$srcPlug = `connectionInfo -sourceFromDestination $srcPlug`;
+		connectAttr $srcPlug $dstPlug;
+		}
+	else {
+		string  $attrType = `getAttr -type $srcPlug`;
+		switch ($attrType) {
+			case "bool" :
+				int $resInt = `getAttr $srcPlug`;
+				setAttr $dstPlug $resInt;
+				break;
+			case "float" :
+				float $resFloat = `getAttr $srcPlug`;
+				float $range[] =
+					`attributeQuery -r -n $node $dstAttr`;
+
+				if ($resFloat < $range[0])
+					$resFloat = $range[0];
+					else
+					if ($resFloat > $range[1])
+						$resFloat = $range[1];
+
+				setAttr $dstPlug $resFloat;
+				break;
+			case "float3" :
+				float $resFloat3[3] = `getAttr $srcPlug`;
+				setAttr $dstPlug
+					-type "float3"
+						$resFloat3[0]
+						$resFloat3[1]
+						$resFloat3[2];
+				break;
+			}
+		}
+}
+
+global proc AEmentalrayPhotonAttrsFromMaya(string $node)
+{
+	string $nodeType = `nodeType $node`;
+
+	if ($nodeType == "layeredShader" ||
+	    $nodeType == "rampShader"    ||
+	    $nodeType == "shadingMap"    ||
+	    $nodeType == "surfaceShader" ||
+	    $nodeType == "useBackground")
+	    	return;
+
+	switch ($nodeType) {
+		case "anisotropic":
+			copyAttr($node, "miAngle", "angle", true);
+			copyAttr($node, "miSpreadX", "spreadX", true);
+			copyAttr($node, "miSpreadY", "spreadY", true);
+			break;
+		case "blinn":
+		case "oceanShader":
+			copyAttr($node, "miShinyness", "eccentricity", false);
+			float $shinyness = `getAttr ($node + ".eccentricity")`;
+			$shinyness = (1.0 - $shinyness) * 95.0 + 5.0;
+			setAttr ($node + ".miShinyness") $shinyness;
+			break;
+		case "hairTubeShader":
+			copyAttr($node, "miShinyness", "specularPower", true);
+			break;
+		case "phong":
+			copyAttr($node, "miShinyness", "cosinePower", true);
+			break;
+		case "phongE":
+			copyAttr($node, "miShinyness", "roughness",  false);
+			float $shinyness = `getAttr ($node + ".roughness")`;
+			$shinyness  = (1.0 - $shinyness) * 95.0 + 5.0;
+			setAttr ($node + ".miShinyness") $shinyness;
+			copyAttr($node, "miWhiteness", "whiteness", true);
+			break;
+		}
+	if ($nodeType != "lambert") {
+		copyAttr($node, "miSpecularColor", "specularColor", true);
+		copyAttr($node, "miReflectivity", "reflectivity", true);
+		}
+	copyAttr($node, "miRefractiveIndex", "refractiveIndex", true);
+	copyAttr($node, "miRefractions", "refractions", true);
+	setAttr ($node + ".miAbsorbs")  true;
+	copyAttr($node, "miDiffuse", "diffuse", true);
+	copyAttr($node, "miColor",
+		($nodeType == "oceanShader") ?
+			"waterColor" : "color", true);
+	copyAttr($node, "miTransparency", "transparency", true);
+	copyAttr($node, "miTranslucence", "translucence", true);
+	copyAttr($node, "miTranslucenceFocus", "translucenceFocus", true);
+	copyAttr($node, "miNormalCamera", "normalCamera", true);
+}
+
+global proc AEmentalrayPhotonAttrsButtonCreate(string $messagePlug)
+{
+	string $node;
+	string $buffer[];
+	tokenize($messagePlug, ".", $buffer);
+	$node = (size($buffer) > 0) ? $buffer[0] : "";
+	string $nodeType = `nodeType $node`;
+
+	separator
+		-style "none" -width 490 -height 10;
+	rowLayout
+		-numberOfColumns 2
+		-columnWidth 2 180;
+
+		text	-label "";
+		button	-label "Take Settings From Maya"
+			-command ( "AEmentalrayPhotonAttrsFromMaya " + $node )
+			($nodeType + "settingsButton");
+	setParent ..;
+
+	separator
+		-style "none" -width 490 -height 10;
+}
+
+global proc AEmentalrayPhotonAttrsButtonReplace(string $messagePlug)
+{
+	string $node;
+	string $buffer[];
+	tokenize($messagePlug, ".", $buffer);
+	$node = (size($buffer) > 0) ? $buffer[0] : "";
+	string $nodeType = `nodeType $node`;
+
+	button	-edit
+		-command ( "AEmentalrayPhotonAttrsFromMaya " + $node )
+		($nodeType + "settingsButton");
+}
+
+global proc AEmentalrayPhotonAttrsBumpMapCreate(string $attrName)
+{
+	attrNavigationControlGrp  -h 23 -dgc drag_ya -dpc drop_ya -label "Bump Mapping" -attribute $attrName bumpMapCtrl;
+		popupMenu -pmc ("popupItems " + $attrName + " pop_mr_bump") -p bumpMapCtrl pop_mr_bump;
+}
+
+global proc AEmentalrayPhotonAttrsBumpMapReplace(string $attrName)
+{
+	string $node;
+	string $buffer[];
+	tokenize($attrName, ".", $buffer);
+	$node = (size($buffer) > 0) ? $buffer[0] : "";
+
+	attrNavigationControlGrp -edit -dgc drag_ya -dpc drop_ya -attribute $attrName bumpMapCtrl;
+		popupMenu -e -pmc ("popupItems " + $attrName + " pop_mr_bump") -p bumpMapCtrl pop_mr_bump;
+
+	string $nodeType = `nodeType $node`;
+
+	if ($nodeType == "layeredShader" ||
+	    $nodeType == "shadingMap"    ||
+	    $nodeType == "surfaceShader" ||
+	    $nodeType == "useBackground")
+		scriptJob
+			-parent bumpMapCtrl -replacePrevious
+			-attributeChange ($node + ".miShinyness")
+			("AEmentalrayPhotonAttrsAnisoActivate " + $node);
+}
+
+global proc AEmentalrayPhotonAttrs(string $node)
+{
+	editorTemplate
+		-beginLayout "mental ray"
+		-collapse true;
+
+	string $nodeType = `nodeType $node`;
+
+	if ($nodeType == "anisotropic" ||
+		$nodeType == "blinn"       ||
+		$nodeType == "lambert"     ||
+		$nodeType == "oceanShader" ||
+		$nodeType == "hairTubeShader" ||
+		$nodeType == "phong"       ||
+		$nodeType == "phongE"      ||
+		$nodeType == "rampShader"  ||
+		$nodeType == "useBackground") {
+
+		if ($nodeType != "lambert") {
+
+			editorTemplate
+				-label "Reflection Blur"
+				-addControl "miReflectionBlur"
+				 "AEmentalrayReflectionBlurCallback";
+			editorTemplate
+				-label "Reflection Rays"
+				-addControl "miReflectionRays";
+
+			if ($nodeType != "useBackground")
+		        editorTemplate -addSeparator;
+
+		} // if ($nodeType != "lambert")
+
+		if ($nodeType != "useBackground") {
+
+		    editorTemplate
+			    -label "Refraction Blur"
+			    -addControl "miRefractionBlur"
+			    "AEmentalrayRefractionBlurCallback";
+		    editorTemplate
+			    -label "Refraction Rays"
+			    -addControl "miRefractionRays";
+
+		} // if ($nodeType != "useBackground")
+
+		if ($nodeType != "useBackground") {
+
+		    editorTemplate -addSeparator;
+
+		    editorTemplate
+			    -label "Irradiance"
+			    -addControl "miIrradiance";
+		    editorTemplate
+			    -label "Irradiance Color"
+			    -addControl "miIrradianceColor";
+
+		} // if ($nodeType != "useBackground")
+	}
+
+	editorTemplate
+		-beginLayout "Photon Attributes"
+		-collapse false;
+
+		editorTemplate
+			-label "Derive From Maya"
+			-addControl "miDeriveFromMaya"
+			"AEmentalrayPhotonAttrsActivate";
+
+		if ($nodeType != "layeredShader" &&
+			$nodeType != "rampShader"    &&
+			$nodeType != "shadingMap"    &&
+			$nodeType != "surfaceShader" &&
+			$nodeType != "useBackground") {
+			editorTemplate -callCustom
+				"AEmentalrayPhotonAttrsButtonCreate"
+				"AEmentalrayPhotonAttrsButtonReplace"
+				"message";
+			}
+
+		if ($nodeType != "lambert" &&
+			$nodeType != "anisotropic") {
+			editorTemplate
+				-label "Shinyness"
+				-addControl "miShinyness";
+			}
+		if ($nodeType == "anisotropic"   ||
+			$nodeType == "layeredShader" ||
+			$nodeType == "shadingMap"    ||
+			$nodeType == "surfaceShader" ||
+			$nodeType == "useBackground") {
+			editorTemplate
+				-label "Angle"
+				-addControl "miAngle";
+			editorTemplate
+				-label "Spread X"
+				-addControl "miSpreadX";
+			editorTemplate
+				-label "Spread Y"
+				-addControl "miSpreadY";
+			}
+		if ($nodeType == "phongE"        ||
+			$nodeType == "layeredShader" ||
+			$nodeType == "shadingMap"    ||
+			$nodeType == "surfaceShader" ||
+			$nodeType == "useBackground") {
+			editorTemplate
+				-label "Whiteness"
+				-addControl "miWhiteness";
+			}
+		if ($nodeType != "lambert") {
+			editorTemplate
+				-label "Specular Color"
+				-addControl "miSpecularColor";
+			editorTemplate
+				-label "Reflectivity"
+				-addControl "miReflectivity";
+
+			editorTemplate -addSeparator;
+			}
+
+		editorTemplate
+			-label "Refractive Index"
+			-addControl "miRefractiveIndex";
+		editorTemplate
+			-label "Refractions"
+			-addControl "miRefractions";
+		editorTemplate
+			-label "Absorbs"
+			-addControl "miAbsorbs";
+		editorTemplate
+			-label "Diffuse"
+			-addControl "miDiffuse";
+		editorTemplate
+			-label "Color"
+			-addControl "miColor";
+		editorTemplate
+			-label "Transparency"
+			-addControl "miTransparency";
+		editorTemplate
+			-label "Translucence"
+			-addControl "miTranslucence";
+		editorTemplate
+			-label "TranslucenceFocus"
+			-addControl "miTranslucenceFocus";
+
+		editorTemplate -callCustom
+			"AEmentalrayPhotonAttrsBumpMapCreate"
+			"AEmentalrayPhotonAttrsBumpMapReplace"
+			"miNormalCamera";
+		editorTemplate
+			-suppress "miNormalCamera";
+
+	editorTemplate -endLayout;
+	editorTemplate -endLayout;
+
+}

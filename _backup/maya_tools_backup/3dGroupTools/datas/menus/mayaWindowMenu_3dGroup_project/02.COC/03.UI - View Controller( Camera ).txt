@@ -1,0 +1,3 @@
+import sgPWindow_projCoc_translateCam
+reload( sgPWindow_projCoc_translateCam )
+sgPWindow_projCoc_translateCam.WinA().create()

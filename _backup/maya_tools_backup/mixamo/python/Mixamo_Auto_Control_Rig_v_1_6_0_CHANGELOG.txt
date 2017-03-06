@@ -1,0 +1,13 @@
+Changes in 1.6.0:
+    Automatic Creation of Facial Controls on FacePlus-compatible characters
+        -Osipa style controls with sync/etc
+        -Eye rotation and aim control
+        -Transfer of any existing facial animation data to the control rig on "Import Animation to Control Rig"
+        -Export of facial blendShape animation (must have export with mesh checked)
+            *works only on non-referenced rigs
+    Script Refactor: Part 1
+        -Separated sections of the script for easier upkeep
+        -Script must now be installed instead of just loaded into script editor
+    Exported Meshes now go back to bind pose before being created
+    Simplified Import Animation to Rig process
+    Separate Batcher sub-tabs for importing and exporting

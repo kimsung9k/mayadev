@@ -1,0 +1,13 @@
+import sgBFunction_dag
+
+sels = cmds.ls( sl=1 )
+
+first = sels[0]
+seconds = sels[1:]
+
+for second in seconds:
+    origShape = sgBFunction_dag.getOrigShape( second )
+    
+    firstShape = sgBFunction_dag.getShape( first )
+    
+    cmds.connectAttr( firstShape+'.outMesh', origShape+'.inMesh' )

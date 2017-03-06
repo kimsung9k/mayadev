@@ -1,0 +1,96 @@
+global proc colorOverrideProc(){
+
+if(`window -ex colorOverrideWin`) deleteUI colorOverrideWin ;
+
+int $winH = 245;
+int $winW = 150;
+
+window -t "color Override" -w $winH -h $winW colorOverrideWin;
+
+columnLayout;
+frameLayout -l "Color"
+-w 245
+-h 120
+-collapsable false fmColor;
+gridLayout -numberOfRows 4 -numberOfColumns 8 -cellWidthHeight 30 20;
+iconTextButton -bgc .467 .467 .467 -command "updateColor 1";
+iconTextButton -bgc .000 .000 .000 -command "updateColor 2";
+iconTextButton -bgc .247 .247 .247 -command "updateColor 3";
+iconTextButton -bgc .498 .498 .498 -command "updateColor 4";
+iconTextButton -bgc 0.608 0 0.157 -command "updateColor 5";
+iconTextButton -bgc 0 0.016 0.373 -command "updateColor 6";
+iconTextButton -bgc 0 0 1 -command "updateColor 7";
+iconTextButton -bgc 0 0.275 0.094 -command "updateColor 8";
+iconTextButton -bgc 0.145 0 0.263 -command "updateColor 9";
+iconTextButton -bgc 0.78 0 0.78 -command "updateColor 10";
+iconTextButton -bgc 0.537 0.278 0.2 -command "updateColor 11";
+iconTextButton -bgc 0.243 0.133 0.122 -command "updateColor 12";
+iconTextButton -bgc 0.6 0.145 0 -command "updateColor 13";
+iconTextButton -bgc 1 0 0 -command "updateColor 14";
+iconTextButton -bgc 0 1 0 -command "updateColor 15";
+iconTextButton -bgc 0 0.255 0.6 -command "updateColor 16";
+iconTextButton -bgc 1 1 1 -command "updateColor 17";
+iconTextButton -bgc 1 1 0 -command "updateColor 18";
+iconTextButton -bgc 0.388 0.863 1 -command "updateColor 19";
+iconTextButton -bgc 0.263 1 0.635 -command "updateColor 20";
+iconTextButton -bgc 1 0.686 0.686 -command "updateColor 21";
+iconTextButton -bgc 0.89 0.675 0.475 -command "updateColor 22";
+iconTextButton -bgc 1 1 0.384 -command "updateColor 23";
+iconTextButton -bgc 0 0.6 0.325 -command "updateColor 24";
+iconTextButton -bgc 0.627 0.412 0.188 -command "updateColor 25";
+iconTextButton -bgc 0.62 0.627 0.188 -command "updateColor 26";
+iconTextButton -bgc 0.408 0.627 0.188 -command "updateColor 27";
+iconTextButton -bgc 0.188 0.627 0.365 -command "updateColor 28";
+iconTextButton -bgc 0.188 0.627 0.627 -command "updateColor 29";
+iconTextButton -bgc 0.188 0.404 0.627 -command "updateColor 30";
+iconTextButton -bgc 0.435 0.188 0.627 -command "updateColor 31";
+iconTextButton -bgc 0.627 0.188 0.412 -command "updateColor 32";
+setParent..;
+setParent..;
+colorIndexSliderGrp -min 0 -max 32 -value 5 conColor;
+setParent..;
+rowColumnLayout -numberOfColumns 2;
+
+button -width 130 -height 35 -label "OK!" -command "doColorOverride";
+button -width 130 -height 35 -label "cancel" -command "deleteUI colorOverrideWin";
+showWindow colorOverrideWin ;
+}
+global proc doColorOverride() {
+
+string $selectedObjects[] = `ls -sl`;
+string $sourceConnection = "", $shapeNode[];
+int $color = `colorIndexSliderGrp -q -v conColor`;
+$color--;
+
+for ($currentObject in $selectedObjects) {
+
+select -r $currentObject;
+
+$sourceConnection = `connectionInfo -sourceFromDestination ($currentObject+ ".drawOverride")`;
+if ($sourceConnection != "") disconnectAttr $sourceConnection ($currentObject + ".drawOverride");
+
+$shapeNode = `listRelatives -s -f $currentObject`;
+
+for( $node in $shapeNode )
+{
+    $sourceConnection = `connectionInfo -sourceFromDestination ($node + ".drawOverride")`;
+    if ($sourceConnection != "") disconnectAttr $sourceConnection ($node + ".drawOverride");
+    
+    setAttr ($node + ".overrideEnabled") 1;
+    setAttr ($node + ".overrideColor") $color;
+}
+if( !size( $shapeNode ) )
+{
+    setAttr ($currentObject + ".overrideEnabled") 1;
+    setAttr ($currentObject + ".overrideColor") $color;
+}
+
+}
+
+}
+global proc updateColor (int $color)
+{
+
+colorIndexSliderGrp -e -value $color conColor;
+
+}

@@ -1,0 +1,3 @@
+import maya.cmds as cmds
+sceneName = cmds.file( q=1, sceneName=1 )[:-3]
+cmds.playblast( format='avi', filename = sceneName, forceOverwrite=1, sequenceTime=0, clearCache=1, viewer=1, showOrnaments=1, fp=4, percent=100, compression='MS-CRAM', quality=100 )

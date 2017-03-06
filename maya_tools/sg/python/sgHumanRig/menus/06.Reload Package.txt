@@ -1,0 +1,2 @@
+import sgHumanRig.file
+sgHumanRig.file.reloadModules()

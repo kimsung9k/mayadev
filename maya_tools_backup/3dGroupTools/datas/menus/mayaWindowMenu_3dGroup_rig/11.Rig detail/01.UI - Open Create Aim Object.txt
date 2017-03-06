@@ -1,0 +1,2 @@
+import rigObject.createAimObject.view
+rigObject.createAimObject.view.Window().create()

@@ -1,0 +1,45 @@
+import maya.cmds as cmds
+import sgBFunction_connection
+import sgBFunction_attribute
+
+sels = cmds.ls( sl=1 )
+
+for sel in sels:
+    selP = cmds.listRelatives( sel, p=1, f=1 )
+    
+    srcPoint = cmds.polyCube()[0]
+    cmds.xform( srcPoint, ws=1, matrix=cmds.getAttr( sel + '.wm' ) )
+    
+    if selP: srcPoint = cmds.parent( srcPoint, selP[0] )[0]
+    srcPointShape = cmds.listRelatives( srcPoint, s=1, f=1 )[0]
+    cmds.setAttr( srcPointShape + '.overrideEnabled', 1 )
+    cmds.setAttr( srcPointShape + '.overrideShading', 0 )
+    
+    sgBFunction_connection.getSourceConnection( sel, srcPoint )
+    
+    node = cmds.createNode( 'sgDynPointInMesh' )
+    dcmp = cmds.createNode( 'decomposeMatrix' )
+    vp   = cmds.createNode( 'vectorProduct' )
+    
+    cmds.connectAttr( srcPoint + '.wm', node + '.meshMatrix' )
+    cmds.connectAttr( srcPoint + '.wm', dcmp + '.imat' )
+    cmds.connectAttr( srcPointShape + '.outMesh', node + '.localMesh' )
+    cmds.connectAttr( dcmp + '.ot', node + '.inputPoint' )
+    cmds.connectAttr( 'time1.outTime', node + '.currentTime' )
+    
+    sgBFunction_attribute.addAttr( srcPoint, ln='dynamicOn',       cb=1, min=0, max=1, at='long' )
+    sgBFunction_attribute.addAttr( srcPoint, ln='attachPercent',   k=1, min=0, max=100, dv=10 )
+    sgBFunction_attribute.addAttr( srcPoint, ln='decreasePercent', k=1, min=0, max=100, dv=25 )
+    sgBFunction_attribute.addAttr( srcPoint, ln='bounce', k=1, min=0, max=100, dv=30 )
+    
+    for attr in ['dynamicOn', 'attachPercent', 'decreasePercent', 'bounce']:
+        cmds.connectAttr( srcPoint + '.' + attr, node + '.' + attr )
+
+    for attr in ['tx', 'ty', 'tz', 't']:    
+        tCons = cmds.listConnections( sel + '.' + attr, p=1, s=1, d=0 )
+        if tCons: cmds.disconnectAttr( tCons[0], sel + '.' + attr )
+    
+    cmds.connectAttr( sel + '.pim', vp + '.matrix' )
+    cmds.connectAttr( node + '.outputPoint', vp + '.input1' )
+    cmds.setAttr( vp + '.op', 4 )
+    cmds.connectAttr( vp + '.output', sel + '.t' )

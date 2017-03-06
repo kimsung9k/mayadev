@@ -1,0 +1,7 @@
+import sgCFnc_dag
+
+bb = sgCFnc_dag.getMBoundingBoxFromSelection()
+bbc =  bb.center()
+
+putNode = cmds.createNode( 'joint' )
+cmds.move( bbc.x, bbc.y, bbc.z, putNode, ws=1 )

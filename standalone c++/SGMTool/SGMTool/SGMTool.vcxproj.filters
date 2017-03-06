@@ -1,0 +1,178 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="리소스 파일">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="SGHeader">
+      <UniqueIdentifier>{b751fc52-691d-4b8b-ac44-373f14935e03}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SGCPP">
+      <UniqueIdentifier>{a4595788-e738-4299-86a1-13939ef7b4e7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SGBUFFER">
+      <UniqueIdentifier>{4a4b3fc1-1c65-4e37-982d-d220e553db0b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SGList">
+      <UniqueIdentifier>{28d7c0d2-a40e-4c44-9bf8-120224f49ffa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="MAIN">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="SGBase">
+      <UniqueIdentifier>{acdea465-c90b-49ec-90e3-5c0da5700be8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SGFile">
+      <UniqueIdentifier>{90b878d7-2e6d-4178-bff1-dd96f79f6e4d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SCENE">
+      <UniqueIdentifier>{c84e7ec2-a137-45bd-83c3-363c0c0d01c4}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="SGCam.h">
+      <Filter>SGHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="SGDagNodeMesh.h">
+      <Filter>SGHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="SGDagNodes.h">
+      <Filter>SGHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="SGFnPolygon.h">
+      <Filter>SGHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="SGIntArray.h">
+      <Filter>SGHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="SGIntPtrArray.h">
+      <Filter>SGHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="SGMatrix.h">
+      <Filter>SGHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="SGSelectInView.h">
+      <Filter>SGHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="SGUIBuffer.h">
+      <Filter>SGHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="SGVector.h">
+      <Filter>SGHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="SGVectorArray.h">
+      <Filter>SGHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="SGViewControl.h">
+      <Filter>SGHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="SGListDoubleLink.h">
+      <Filter>SGList</Filter>
+    </ClInclude>
+    <ClInclude Include="SGStringArray.h">
+      <Filter>SGHeader</Filter>
+    </ClInclude>
+    <ClInclude Include="precompile.h">
+      <Filter>MAIN</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>MAIN</Filter>
+    </ClInclude>
+    <ClInclude Include="SGGLWindow.h">
+      <Filter>SGBUFFER</Filter>
+    </ClInclude>
+    <ClInclude Include="SGDagNodeContainer.h">
+      <Filter>SGBase</Filter>
+    </ClInclude>
+    <ClInclude Include="SGShaderContainer.h">
+      <Filter>SGBase</Filter>
+    </ClInclude>
+    <ClInclude Include="SGFile.h">
+      <Filter>SGFile</Filter>
+    </ClInclude>
+    <ClInclude Include="SGFileController.h">
+      <Filter>SGFile</Filter>
+    </ClInclude>
+    <ClInclude Include="SGScene.h">
+      <Filter>SCENE</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="SGCam.cpp">
+      <Filter>SGCPP</Filter>
+    </ClCompile>
+    <ClCompile Include="SGDagNodeMesh.cpp">
+      <Filter>SGCPP</Filter>
+    </ClCompile>
+    <ClCompile Include="SGDagNodes.cpp">
+      <Filter>SGCPP</Filter>
+    </ClCompile>
+    <ClCompile Include="SGFnPolygon.cpp">
+      <Filter>SGCPP</Filter>
+    </ClCompile>
+    <ClCompile Include="SGIntArray.cpp">
+      <Filter>SGCPP</Filter>
+    </ClCompile>
+    <ClCompile Include="SGIntPtrArray.cpp">
+      <Filter>SGCPP</Filter>
+    </ClCompile>
+    <ClCompile Include="SGMatrix.cpp">
+      <Filter>SGCPP</Filter>
+    </ClCompile>
+    <ClCompile Include="SGSelectInView.cpp">
+      <Filter>SGCPP</Filter>
+    </ClCompile>
+    <ClCompile Include="SGUIBuffer.cpp">
+      <Filter>SGCPP</Filter>
+    </ClCompile>
+    <ClCompile Include="SGVector.cpp">
+      <Filter>SGCPP</Filter>
+    </ClCompile>
+    <ClCompile Include="SGVectorArray.cpp">
+      <Filter>SGCPP</Filter>
+    </ClCompile>
+    <ClCompile Include="SGViewControl.cpp">
+      <Filter>SGCPP</Filter>
+    </ClCompile>
+    <ClCompile Include="main_windows_api.cpp">
+      <Filter>MAIN</Filter>
+    </ClCompile>
+    <ClCompile Include="precompile.cpp">
+      <Filter>MAIN</Filter>
+    </ClCompile>
+    <ClCompile Include="shader.cpp">
+      <Filter>SGBUFFER</Filter>
+    </ClCompile>
+    <ClCompile Include="SGListDoubleLink.cpp">
+      <Filter>SGList</Filter>
+    </ClCompile>
+    <ClCompile Include="SGStringArray.cpp">
+      <Filter>SGCPP</Filter>
+    </ClCompile>
+    <ClCompile Include="SGGLWindow.cpp">
+      <Filter>SGBUFFER</Filter>
+    </ClCompile>
+    <ClCompile Include="SGDagNodeContainer.cpp">
+      <Filter>SGBase</Filter>
+    </ClCompile>
+    <ClCompile Include="SGShaderContainer.cpp">
+      <Filter>SGBase</Filter>
+    </ClCompile>
+    <ClCompile Include="SGFileController.cpp">
+      <Filter>SGFile</Filter>
+    </ClCompile>
+    <ClCompile Include="SGFile.cpp">
+      <Filter>SGFile</Filter>
+    </ClCompile>
+    <ClCompile Include="SGScene.cpp">
+      <Filter>SCENE</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="SGMTool.rc">
+      <Filter>리소스 파일</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+</Project>

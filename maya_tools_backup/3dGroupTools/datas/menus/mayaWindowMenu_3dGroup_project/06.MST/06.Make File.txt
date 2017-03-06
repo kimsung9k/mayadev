@@ -1,0 +1,4 @@
+import maya.cmds as cmds
+sceneName = '.'.join( cmds.file( q=1, sceneName=1 ).split( '.' )[:-1] ) + '.mb'
+cmds.file( rename= sceneName )
+cmds.file( f=1, save=1, options="v=0", type='mayaBinary' )

@@ -1,0 +1,6 @@
+import sg.file
+sg.file.reloadModules()
+import sg.Menu_popup_rig
+sg.Menu_popup_rig.create()
+import sg.Menu_mainMenu
+sg.Menu_mainMenu.create()

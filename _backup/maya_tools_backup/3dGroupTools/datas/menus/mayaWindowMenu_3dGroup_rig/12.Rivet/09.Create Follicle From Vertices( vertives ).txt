@@ -1,0 +1,2 @@
+import sgBFunction_rivet
+sgBFunction_rivet.createFollicleOnVertices( cmds.ls( sl=1 ) ) 

@@ -1,0 +1,23 @@
+import maya.cmds as cmds
+
+sels = cmds.ls( sl=1 )
+
+first = sels[0]
+second = sels[1]
+
+null = cmds.createNode( 'transform' )
+
+blendTwoMatrix = cmds.createNode( 'blendTwoMatrix' )
+mmdc = cmds.createNode( 'multMatrixDecompose' )
+
+cmds.connectAttr( first+'.wm', blendTwoMatrix+'.inMatrix1' )
+cmds.connectAttr( second+'.wm', blendTwoMatrix+'.inMatrix2' )
+
+cmds.connectAttr( blendTwoMatrix+'.outMatrix', mmdc+'.i[0]' )
+cmds.connectAttr( null+'.pim', mmdc+'.i[1]' )
+cmds.connectAttr( mmdc+'.ot', null+'.t' )
+cmds.connectAttr( mmdc+'.or', null+'.r' )
+
+cmds.setAttr( null+'.dh', 1 )
+
+cmds.select( null )

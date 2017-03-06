@@ -1,0 +1,46 @@
+import maya.cmds as cmds
+
+
+def addAngleDriver( sel ):
+    
+    import sgBFunction_attribute
+    
+    selP = cmds.listRelatives( sel, p=1, f=1 )[0]
+    selName = sel.split( '|' )[-1]
+    so = cmds.createNode( 'smartOrient', n= 'smartOrient_' + selName )
+    ad = cmds.createNode( 'angleDriver', n= 'angleDriver_' + selName )
+    visDcmp = cmds.createNode( 'decomposeMatrix', n= 'dcmp_' + selName )
+    mm = cmds.createNode( 'multMatrix', n='mm_' + selName )
+    
+    visTr = cmds.createNode( 'transform', n='angleVis_'+selName )
+    base = cmds.createNode( 'transform', n= 'angleBase_' + selName )
+
+    base = cmds.parent( base, selP )[0]
+    visTr = cmds.parent( visTr, base )[0]
+
+    cmds.xform( base, ws=1, matrix= cmds.getAttr( sel+'.wm' ) )
+    
+    cmds.connectAttr( sel+'.wm', mm+'.i[0]' )
+    cmds.connectAttr( base+'.wim', mm+'.i[1]' )
+    cmds.connectAttr( mm+'.matrixSum', so+'.inputMatrix' )
+    cmds.connectAttr( mm+'.matrixSum', ad+'.angleMatrix' )
+    cmds.connectAttr( so+'.outputMatrix', ad+'.upVectorMatrix' )
+    cmds.connectAttr( ad+'.outMatrix', visDcmp+'.imat' )
+    cmds.connectAttr( visDcmp+'.ot', visTr+'.t' )
+    cmds.connectAttr( visDcmp+'.or', visTr+'.r' )
+    
+    cmds.setAttr( visTr+'.dh', 1 )
+    cmds.setAttr( visTr+'.dla', 1 )
+    
+    sgBFunction_attribute.addAttr( visTr, ln='angleRate0', cb=1 )
+    sgBFunction_attribute.addAttr( visTr, ln='angleRate1', cb=1 )
+    sgBFunction_attribute.addAttr( visTr, ln='angleRate2', cb=1 )
+    cmds.connectAttr( ad+'.outDriver0', visTr+'.angleRate0' )
+    cmds.connectAttr( ad+'.outDriver1', visTr+'.angleRate1' )
+    cmds.connectAttr( ad+'.outDriver2', visTr+'.angleRate2' )
+
+
+sels = cmds.ls( sl=1 )
+
+for sel in sels:
+    addAngleDriver( sel )

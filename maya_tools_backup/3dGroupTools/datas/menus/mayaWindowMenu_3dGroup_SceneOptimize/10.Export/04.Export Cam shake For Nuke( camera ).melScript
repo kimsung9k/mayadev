@@ -1,0 +1,56 @@
+proc export_cam_shake_for_nuke()		
+{
+    //---------------- camera ratio and nuke_to_maya shake ratio----------------		
+    float $ratio_width_height = 1.7777777;
+    float $ratio_nuke_to_maya = 2/1.417  ;
+    
+    //----------- select camera-------------------
+    string $sels[] = `ls -sl`;
+    string $tmps[] = `listRelatives -s $sels[0]`;		
+    string $cam_shape = $tmps[0];
+    
+
+
+    //----------------- export file -------------------------
+    string $fileName = `file -q -sn`;
+    string $tmp = `file -q -shn -sn`;
+    string $export_file_prefix = "camera_shake";
+    
+    string $fileNameX = `substitute $tmp $fileName ""` + "tmp/"+$export_file_prefix+"X";
+    string $fileNameY = `substitute $tmp $fileName ""` + "tmp/"+$export_file_prefix+"Y";
+
+    string $folderName = `substitute $tmp $fileName ""` + "tmp";
+
+    python( "import os\n" );
+    python( "if not os.path.exists( '" + $folderName + "' ):" + "os.mkdir( '" + $folderName + "' )\n" );
+
+    //-------------  frame range---------------------
+    float $start_frame = `playbackOptions -q -min`;
+    float $end_frame = `playbackOptions -q -max`;
+
+
+    //------file open---------------
+    int $fileXId = `fopen $fileNameX "w"`;
+    int $fileYId = `fopen $fileNameY "w"`;
+
+    for ( $i = $start_frame ; $i <=  $end_frame ;$i++)
+    {
+        float $_valueXs[] = `keyframe -t $i -q -ev ($cam_shape + ".horizontalShake") `;
+        float $_valueYs[] = `keyframe -t $i -q -ev ($cam_shape + ".verticalShake") `; 
+         
+        float $_valueX = $_valueXs[0];
+        float $_valueY = $_valueYs[0];      
+        
+        $_valueX = $_valueX * $ratio_nuke_to_maya;
+        $_valueY = $_valueY * $ratio_nuke_to_maya;
+
+        fprint $fileXId ($_valueX + "\n");
+        fprint $fileYId ($_valueY + "\n");
+    }
+
+    fclose $fileXId;
+    fclose $fileYId;
+    
+    print( "Export Folder : " + $folderName + "\n" );
+}
+export_cam_shake_for_nuke();

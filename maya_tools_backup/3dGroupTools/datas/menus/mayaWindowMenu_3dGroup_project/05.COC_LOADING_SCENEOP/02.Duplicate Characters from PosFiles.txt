@@ -1,0 +1,57 @@
+import sgBFunction_dag
+import cPickle
+
+posDataPath = 'Z:/project_2015/cm_09/32_coc_loading_screen/dpt_cgi/scenes/sc001/ani/posData'
+assetFolder = 'Z:/project_2015/cm_09/32_coc_loading_screen/dpt_cgi/assets'
+
+def setCharacterPos( filePath ):
+
+    f = open( filePath, 'r' )
+    data = cPickle.load( f )
+    f.close()
+    
+    fileName = filePath.split( '/' )[-1]
+    for i in range( len( fileName ) ):
+        if not fileName[-i-1].isdigit(): break
+    if i == 0:
+        assetName = fileName
+    else:
+        assetName = fileName[:-i]
+    
+    print fileName, assetName
+    
+    setCtlsNum = 0
+    for ctl, attrs, values in data:
+        targetCtl = assetName + ':' + ctl
+        
+        for i in range( len( attrs ) ):
+            try:
+                cmds.setAttr( targetCtl + '.' + attrs[i], values[i] )
+                setCtlsNum +=1
+            except:
+                pass
+    return setCtlsNum
+
+for root, dirs, names in os.walk( posDataPath ):
+    names.sort()
+    
+    for name in names:
+        for i in range( len( name ) ):
+            if not name[-i-1].isdigit(): break
+        if i == 0:
+            assetName = name
+        else:
+            assetName = name[:-i]
+        characterFolderName = assetFolder + '/' + assetName
+        refName = characterFolderName + '/reference/' + assetName + '.mb'
+        
+        topMesh = cmds.ls( assetName + ':*_CHARACTER' )
+        returnValue = setCharacterPos( root + '/' + name )
+
+        if returnValue:
+            topMesh = cmds.duplicate( topMesh )[0]
+            topMeshChildren = cmds.listRelatives( topMesh, c=1, ad=1, type='transform' )
+            for meshChild in topMeshChildren:
+                cmds.rename( meshChild, name + '_' + meshChild )
+            topMesh = cmds.rename( topMesh, name + '_' + topMesh )
+            cmds.setAttr( topMesh + '.v', 1 )

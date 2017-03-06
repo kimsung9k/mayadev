@@ -1,0 +1,13 @@
+import sgBFunction_connection
+import sgBFunction_dag
+
+sels = cmds.ls( sl=1 )
+
+targetNs = 'VIEW_'
+srcNs = 'OUT_'
+
+for sel in sels:
+    selName = sel.split( '|' )[-1]
+    src = selName.replace( targetNs, srcNs )
+    
+    sgBFunction_connection.getSourceConnection( src, sel )

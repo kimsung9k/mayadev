@@ -1,0 +1,13 @@
+sels =cmds.ls( sl=1 )
+
+curves = sels[:-1]
+mesh = sels[-1]
+
+import sgBRig_hair
+import sgBFunction_dag
+
+curves = sgBFunction_dag.getChildrenSpecifyNodeTypes( curves, 'nurbsCurve' )
+
+sgBRig_hair.cutCurveToTarget( curves, mesh )
+
+cmds.select( curves )

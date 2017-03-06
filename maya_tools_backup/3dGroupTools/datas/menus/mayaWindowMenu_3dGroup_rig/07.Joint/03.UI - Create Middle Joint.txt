@@ -1,0 +1,2 @@
+import rigObject.createMiddleJoint.view
+rigObject.createMiddleJoint.view.Window().create()

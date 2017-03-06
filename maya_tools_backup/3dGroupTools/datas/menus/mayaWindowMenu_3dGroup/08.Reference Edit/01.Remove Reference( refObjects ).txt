@@ -1,0 +1,16 @@
+import maya.cmds as cmds
+
+refTargets = []
+for sel in cmds.ls( sl=1 ):
+    if not cmds.referenceQuery( sel, inr=1 ): continue
+    refName = cmds.referenceQuery( sel, rfn=1, orn=1 )
+    if not refName in refTargets:
+        refTargets.append( refName )
+
+if refTargets:
+    result = cmds.confirmDialog( title='Remove Reference', message='Removing %s is not undoable.' % refName, button=['Yes','No'] )
+    
+    if result == 'Yes':
+        for refTarget in refTargets:
+            print "Remove Reference :  %s" % refTarget
+            cmds.file( removeReference=1, referenceNode=refTarget )

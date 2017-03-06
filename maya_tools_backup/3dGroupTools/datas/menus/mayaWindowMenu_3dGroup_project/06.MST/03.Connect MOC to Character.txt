@@ -1,0 +1,20 @@
+import sgBProject_rv
+import chModules.ctls.allCtlsCmd
+
+import sgBFunction_dag
+
+trNodes = sgBFunction_dag.getTopTransformNodes()
+
+targetMoc = ''
+worldCtl = ''
+
+trs = cmds.ls( tr=1 )
+for tr in trs:
+    if tr[-7:] == 'All_Moc':
+        targetMoc = tr
+    elif tr[-9:] == 'World_CTL':
+        worldCtl = tr
+
+chModules.ctls.allCtlsCmd.World_CTL().connectMocapJoint( targetMoc, worldCtl )
+
+sgBProject_rv.connectOriginalMOC_to_chMOC( srcLoc, targetMoc )

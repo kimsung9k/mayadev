@@ -1,0 +1,30 @@
+import maya.cmds as cmds
+
+sels = cmds.ls( sl=1 )
+
+def mirrorObject( targets ):
+    
+    import sgBFunction_convert
+    
+    targets = sgBFunction_convert.singleToList( targets )
+    
+    mirrorObjs = []
+    for target in targets:
+        nodeType = cmds.nodeType( target )
+        mtx = cmds.getAttr( target+'.wm' )
+        mirrorMtx = sgBFunction_convert.mirrorMatrix( mtx )
+        
+        mirrorName = sgBFunction_convert.convertSide( target )
+        
+        tr = cmds.createNode( nodeType, n= mirrorName.split( '|' )[-1] )
+        cmds.xform( tr, ws=1, matrix=mirrorMtx )
+        
+        if nodeType != 'joint':
+            cmds.setAttr( tr+'.dh', 1 )
+        mirrorObjs.append( tr )
+    
+    return mirrorObjs         
+
+
+mirrorObjs = mirrorObject( sels )
+cmds.select( mirrorObjs )

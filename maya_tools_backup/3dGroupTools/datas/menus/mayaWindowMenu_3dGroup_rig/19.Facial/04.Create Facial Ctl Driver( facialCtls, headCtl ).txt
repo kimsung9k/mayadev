@@ -1,0 +1,39 @@
+import sgBFunction_attribute
+import sgBFunction_dag
+
+sels =cmds.ls( sl=1 )
+
+fCtls = sels[:-1]
+head  = sels[-1]
+
+initHead = 'Init_' + head
+if not cmds.objExists( initHead ):
+    initHead = cmds.createNode( 'transform', n=initHead )
+
+headPos = cmds.getAttr( head + '.wm' )
+cmds.xform( initHead, ws=1, matrix= headPos )
+
+for fCtl in fCtls:
+    fCtlShape = sgBFunction_dag.getShape( fCtl )
+    fCtlP = cmds.listRelatives( fCtl, p=1, f=1 )[0]
+    newCtlShape = cmds.createNode( 'nurbsCurve' )
+    
+    cmds.connectAttr( fCtlShape + '.local', newCtlShape + '.create' )
+    
+    newCtl = sgBFunction_dag.getTransform( newCtlShape )
+    
+    newCtl = cmds.rename( newCtl, 'Driver_' + fCtl )
+    pNewCtl = cmds.group( newCtl, n= 'P' + newCtl )
+    
+    mmdc = cmds.createNode( 'multMatrixDecompose' )
+    cmds.connectAttr( fCtlP + '.wm', mmdc + '.i[0]' )
+    cmds.connectAttr( initHead + '.wim', mmdc + '.i[1]' )
+    cmds.connectAttr( mmdc + '.ot', pNewCtl + '.t' )
+    cmds.connectAttr( mmdc + '.or', pNewCtl + '.r' )
+    
+    conedObj = sgBFunction_dag.getConstrainedObject( head )
+    cmds.parent( pNewCtl, conedObj )
+    
+    for attr in cmds.listAttr( fCtl, k=1 ):
+        sgBFunction_attribute.copyAttribute( fCtl + '.' + attr, newCtl )
+        cmds.connectAttr( newCtl + '.'+ attr, fCtl + '.' + attr, f=1 )

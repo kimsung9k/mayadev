@@ -1,0 +1,18 @@
+import maya.cmds as cmds
+import sgBFunction_attribute
+
+sels = cmds.ls( sl=1 )
+
+first = sels[0]
+seconds = sels[1:]
+
+attrs = sgBFunction_attribute.getChannelAttributeFromSelection()
+
+for second in seconds:
+   for attr in attrs:
+       md = cmds.createNode( 'multDoubleLinear' )
+       cmds.setAttr( md+'.input2', -1 )
+       cmds.connectAttr( first+'.'+attr, md+'.input1' )
+       cmds.connectAttr( md+'.output', second+'.' + attr )
+
+cmds.select( sels )

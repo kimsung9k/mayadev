@@ -1,0 +1,10 @@
+import sgBRig_hair
+import sgBFunction_dag
+
+sels = sgBFunction_dag.getChildrenCurveExists( cmds.ls( sl=1 ) )
+surfs = []
+for sel in sels:
+    surf = sgBRig_hair.createSurfaceFromCurve( sel )
+    surfs.append( surf )
+
+cmds.select( surfs )

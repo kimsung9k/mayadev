@@ -1,0 +1,4 @@
+import basic.skinCluster.ui.view
+inst = basic.skinCluster.ui.view.ShowSkinWeightEditUIControl()
+inst.setCmd()
+inst.showUI()

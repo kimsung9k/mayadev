@@ -1,0 +1,54 @@
+// Copyright (C) 1997-2004 Alias,
+// a division of Silicon Graphics Limited.
+// 
+// The information in this file is provided for the exclusive use of the
+// licensees of Alias.  Such users have the right to use, modify,
+// and incorporate this code into other products for purposes authorized
+// by the Alias license agreement, without fee.
+// 
+// ALIAS DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
+// INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
+// EVENT SHALL ALIAS BE LIABLE FOR ANY SPECIAL, INDIRECT OR
+// CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE,
+// DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+// TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+// PERFORMANCE OF THIS SOFTWARE.
+
+//
+//  Alias|Wavefront Script File
+//  MODIFY THIS AT YOUR OWN RISK
+//
+//  Creation Date:  28 June 1996
+//  Author:         jvs
+//
+//  Description:
+//      This is part of a set of methods for changing
+//		a property sheet to point to a new node.
+//		(A way of efficiently re-using existing controls)
+//		This method re-connects a boolean control.
+//
+//  Input Arguments:
+//      The name of the existing control
+//		The name of the new plug
+//		
+//  Return Value:
+//      None
+//
+
+global proc AEreplaceVector ( string $controlName, string $plugName, string $changedCommand )
+{
+	string $buffer_ya[];
+	tokenize $controlName "|" $buffer_ya;
+	$popName = ("pop_" + $buffer_ya[size($buffer_ya)-1]);
+	
+	attrFieldGrp -e -dgc drag_ya -dpc drop_ya -attribute $plugName $controlName;
+		popupMenu -e -pmc ("popupItems " + $plugName + " " + $popName) -p $controlName $popName;
+	
+	if ( $changedCommand != "" ) {
+		string $buffer[];
+		tokenize($plugName,".",$buffer);
+		string $cmd = $changedCommand+" \""+$buffer[0]+"\"";
+		scriptJob -p $controlName -rp -ac $plugName $cmd;
+	}
+
+}

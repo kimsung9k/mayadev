@@ -1,0 +1,29 @@
+global proc ArtPaintSkinWeightsTool_select_joint()
+{
+	global string $gArtSkinInfluencesList;
+	//----------------
+	string $sels[] = `ls -sl -tl 1 -type joint`;
+	string $_skin_jnt = $sels[0];
+
+	if (`nodeType $sels[0]` == "joint")
+	{
+		//----------find skin mesh-----
+		string $_skin_clusters[] = `listConnections -s 0 -d 1 -type skinCluster $_skin_jnt`;
+		string $_skin_clusterSets[] = `listConnections -type objectSet $_skin_clusters[0]`;
+		string $_skin_mesh[] = `listConnections -type mesh $_skin_clusterSets`;
+		select -r $_skin_mesh[0];
+		ArtPaintSkinWeightsTool;
+		//----------de-select joint in ArtPaintSkinWeightsTool;------------
+		string $_artSkinSelectd[] = `treeView -q -si $gArtSkinInfluencesList` ;
+		for ( $_tmp in $_artSkinSelectd)
+		{
+			treeView -e -si $_tmp 0 $gArtSkinInfluencesList;
+			artSkinInflListChanging $_tmp 0;
+		}
+		//----------select joint in ArtPaintSkinWeightsTool;-----------
+		treeView -e -si $_skin_jnt 1 $gArtSkinInfluencesList;
+		artSkinInflListChanging $_skin_jnt 1 ;
+		artSkinInflListChanged artAttrSkinPaintCtx;
+	}
+	//------------------------------
+}

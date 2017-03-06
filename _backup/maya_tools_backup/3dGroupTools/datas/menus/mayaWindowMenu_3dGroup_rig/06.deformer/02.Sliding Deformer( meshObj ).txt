@@ -1,0 +1,30 @@
+import maya.cmds as cmds
+
+def createSlidingDeformer( target ):
+    import sgBFunction_base
+    import sgBFunction_dag
+    
+    sgBFunction_base.autoLoadPlugin( 'sgRigAddition' )
+    targetShape = sgBFunction_dag.getShape( target )
+    
+    origSrcCons = cmds.listConnections( targetShape+'.inMesh', s=1 ,d=1 , p=1 )
+
+    node = cmds.deformer( target, type='sgSlidingDeformer' )[0]
+    moveMesh = cmds.createNode( 'mesh' )
+    moveMeshObj = sgBFunction_dag.getTransform( moveMesh )
+    cmds.xform( moveMeshObj, ws=1, matrix=cmds.getAttr( target+'.wm' ) )
+    
+    if not origSrcCons:
+        origShape = sgBFunction_dag.getOrigShape( target )
+        cmds.connectAttr( origShape+'.outMesh', node+'.slidingBaseMesh' )
+        cmds.connectAttr( origShape+'.outMesh', moveMesh+'.inMesh' )
+    else:
+        cmds.connectAttr( origSrcCons[0], node+'.slidingBaseMesh' )
+        cmds.connectAttr( origSrcCons[0], moveMesh+'.inMesh' )
+
+    cmds.connectAttr( moveMesh+'.outMesh', node+'.moveMesh' )
+
+
+sels = cmds.ls( sl=1 )
+
+createSlidingDeformer( sels[0] )

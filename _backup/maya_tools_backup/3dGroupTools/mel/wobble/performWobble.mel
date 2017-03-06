@@ -1,0 +1,389 @@
+/*
+  performWobble.mel
+  
+    Copyright (C) 2010 Felix Ulber
+  
+    wobble default options box.
+  
+  Creation:    21.02.2010
+  Last Change: 30.11.2010
+  
+  www.felix-ulber.com
+  
+*/
+
+proc setOptionVars(int $forceFactorySettings)
+{
+	// default options common to all deformers
+	//
+	if ($forceFactorySettings || !`optionVar -exists wobblePositioning`) {
+		optionVar -stringValue wobblePositioning "default";
+	}
+	
+	if ($forceFactorySettings || !`optionVar -exists wobbleExclusive`) {
+		// 0 == no exclusive
+		// 1 == exclusive with new name
+		// 2 == exclusive using an existing partition
+		//
+		optionVar -intValue wobbleExclusive 0;
+	}
+	if ($forceFactorySettings || !`optionVar -exists wobbleExclName`) {  
+		optionVar -stringValue wobbleExclName "deformPartition";
+	}
+}
+
+global proc wobbleSetup(   string $parent,
+					       int $forceFactorySettings)
+{
+	//	Retrieve the option settings
+	//
+	setOptionVars($forceFactorySettings);
+
+	setParent $parent;
+
+    // Positioning of the wobble deformer in the DG
+    //
+    string $positioning = `optionVar -query wobblePositioning`;
+    if (`optionMenuGrp -exists wobblePositioningWidget`) {
+        if ($positioning == "default") {
+            optionMenuGrp -edit -select 1 wobblePositioningWidget;
+        }
+        else if ($positioning == "before") {
+            optionMenuGrp -edit -select 2 wobblePositioningWidget;
+        }
+        else if ($positioning == "after") {
+            optionMenuGrp -edit -select 3 wobblePositioningWidget;
+        }
+        else if ($positioning == "split") {
+            optionMenuGrp -edit -select 4 wobblePositioningWidget;
+        }
+        else if ($positioning == "parallel") {
+            optionMenuGrp -edit -select 5 wobblePositioningWidget;
+        }
+        else {
+            optionMenuGrp -edit -select 1 wobblePositioningWidget;
+        }
+    }
+
+    int $exc=`optionVar -query wobbleExclusive`;
+    if (`checkBoxGrp -exists exclWidget`) {
+        checkBoxGrp -e -v1 $exc exclWidget;
+    }
+    string $exn=`optionVar -query wobbleExclName`;
+    if (`textFieldGrp -exists partitionNameWidget`) {
+        textFieldGrp -e -tx $exn -enable $exc partitionNameWidget;
+    }
+    if (`optionMenuGrp -exists partitionListWidget`) {
+        optionMenuGrp -e  -enable $exc partitionListWidget;
+    }
+}
+
+global proc wobbleCallback(string $parent, int $doIt)
+{
+	//	Set the optionVar's from the control values, and then
+	//	perform the command.
+	
+	// rather use  convenience functions like in perform primitives
+
+	// Positioning of the wobble deformer in the DG
+	//
+	string $positioning = "default";
+	if (`optionMenuGrp -exists wobblePositioningWidget`) {
+		if (`optionMenuGrp -query -select wobblePositioningWidget` == 1) {
+			$positioning = "default";
+		}
+		else if (`optionMenuGrp -query -select wobblePositioningWidget` == 2){
+			$positioning = "before";
+		}
+		else if (`optionMenuGrp -query -select wobblePositioningWidget` == 3){
+			$positioning = "after";
+		}
+		else if (`optionMenuGrp -query -select wobblePositioningWidget` == 4){
+			$positioning = "split";
+		}
+		else if (`optionMenuGrp -query -select wobblePositioningWidget` == 5){
+			$positioning = "parallel";
+		}
+	}
+	optionVar -stringValue wobblePositioning $positioning;
+
+	if (`checkBoxGrp -exists exclWidget`) {
+		optionVar -intValue wobbleExclusive `checkBoxGrp -q -v1 exclWidget`;
+	}
+	if (`optionMenuGrp -exists partitionListWidget`) {
+		string $partitionNameVal = `optionMenuGrp -q -v partitionListWidget`;
+		if ($partitionNameVal == "Create New Partition") {
+			if (`textFieldGrp -exists partitionNameWidget`) {
+				$partitionNameVal = `textFieldGrp -q -tx partitionNameWidget`;
+			}
+		} else {
+			// a value of 2 indicates that we use an existing partition
+			//
+			optionVar -intValue wobbleExclusive 2;
+		}
+
+		optionVar -stringValue wobbleExclName $partitionNameVal;
+	}
+
+	if ($doIt) {
+		performWobble 0;
+		addToRecentCommandQueue "performWobble 0" "Wobble";
+	}
+}
+
+proc wobbleOptions()
+{
+	//	Name of the command for this option box.
+	//
+	string $commandName = "deformer -type wobble";
+
+	//	Build the option box actions.
+	//
+	string $callback = ("wobbleCallback");
+	string $setup = ("wobbleSetup");
+
+	//	STEP 1:  Get the option box.
+	//	============================
+	//
+	//  The value returned is the name of the layout to be used as
+	//	the parent for the option box UI.
+	//
+	string $layout = getOptionBox();
+	setParent $layout;
+
+	//	STEP 2:  Pass the command name to the option box.
+	//	=================================================
+	//
+	//	Any default option box behaviour based on the command name is set
+	//	up with this call.  For example, updating the 'Help' menu item with
+	//	the name of the command.
+	//
+	setOptionBoxCommandName($commandName);
+
+	//	Activate the default UI template so that the layout of this
+    //	option box is consistent with the layout of the rest of the
+    //	application.
+    //
+    setUITemplate -pushTemplate DefaultTemplate;
+
+    //	Turn on the wait cursor.
+    //
+    waitCursor -state 1;
+    
+    //	Create UI for the second tab.
+    //
+    string $parent = `columnLayout -adjustableColumn true`;
+
+    // Positioning of the wobble deformer in the DG
+    optionMenuGrp -label "Deformation Order" wobblePositioningWidget;
+    menuItem -label "Default"       wobblePosItem1;
+    menuItem -label "Before"        wobblePosItem2;
+    menuItem -label "After"         wobblePosItem3;
+    menuItem -label "Split"         wobblePosItem4;
+    menuItem -label "Parallel"      wobblePosItem5;
+
+    separator;
+    checkBoxGrp
+        -numberOfCheckBoxes 1
+        -label ""
+        -label1 "Exclusive"
+        -v1 0
+        -on1 "optionMenuGrp -e -enable 1 partitionListWidget; updatePartitionNameWidget;"
+        -offCommand "optionMenuGrp -e -enable 0 partitionListWidget; updatePartitionNameWidget;"
+        exclWidget;
+
+
+    // Create an option menu listing the partitions
+    //
+    optionMenuGrp -l "Partition to Use" -enable `checkBoxGrp -q -v1 exclWidget`
+        -cc "updatePartitionNameWidget" partitionListWidget;
+
+    string $currentNameOption = "";
+    if (`optionVar -exists wobbleExclName`) {
+        $currentNameOption = `optionVar -q wobbleExclName`;
+    }
+
+    // add all the partitions to the menu
+    //
+    int $pp;
+    string $partitionArray[];
+    $partitionArray = `ls -type partition`;
+    int $partitionCount = size($partitionArray);
+    menuItem -l "Create new partition";
+    for ($pp = 0; $pp < $partitionCount; $pp++)
+    {
+        // Do not list the render partition as adding items to
+        // it is only going to cause confusion.
+        //
+        if ($partitionArray[$pp] != "renderPartition" &&
+            $partitionArray[$pp] != "characterPartition") {
+            menuItem -l $partitionArray[$pp];
+        }
+        if ($currentNameOption == $partitionArray[$pp]) {
+            optionVar -stringValue wobbleExclName "deformPartition";
+        }
+    }
+
+    textFieldGrp -l "New Partition Name" -enable `checkBoxGrp -q -v1 exclWidget`
+        -tx "deformPartition"
+        partitionNameWidget;
+
+    updatePartitionNameWidget;
+    
+    //	Update the control values to match the options.
+    //
+    eval (("wobbleSetup " + $parent + " " + 0));
+
+    //	Turn off the wait cursor.
+    //
+    waitCursor -state 0;
+
+    //	Deactivate the default UI template.
+    //
+    setUITemplate -popTemplate;
+
+	//	Step 6: Customize the buttons.
+	//	==============================
+	//
+	//	Provide more descriptive labels for the buttons.  This is not
+	//	necessary, but in some cases, for example, a button labelled
+	//	'Create' may be more meaningful to the user than one labelled
+	//	'Apply'.
+	//
+	//  Disable those buttons that are not applicable to the option box.
+	//
+	//	Attach actions to those buttons that are applicable to the option
+	//	box.  Note that the 'Close' button has a default action attached
+	//	to it that will hide the window.  If a a custom action is
+	//	attached to the 'Close' button then be sure to call the 'hide the
+	//	option box' procedure within the custom action so that the option
+	//	box is hidden properly.
+
+	//	'Apply' button.
+	//
+	string $applyBtn = getOptionBoxApplyBtn();
+	button -edit
+		-label "Create"
+		-command ($callback + " " + $parent + " " + 1)
+		$applyBtn;
+
+	//	'Save' button. - 'Create'
+	//
+	string $saveBtn = getOptionBoxSaveBtn();
+	button -edit
+		-command ($callback + " " + $parent + " " + 0 + "; hideOptionBox")
+		$saveBtn;
+
+	//	'Reset' button. - aka Close?
+	//
+	string $resetBtn = getOptionBoxResetBtn();
+	button -edit
+		-command ($setup + " " + $parent + " " + 1)
+		$resetBtn;
+
+	//	Step 7: Set the option box title.
+	//	=================================
+	//
+	setOptionBoxTitle("Create Wobble Deformer Options");
+
+	//	Step 8: Customize the 'Help' menu item text.
+	//	============================================
+	//
+	setOptionBoxHelpTag( "Wobble" );
+
+	//	Step 9: Set the current values of the option box.
+	//	=================================================
+	//
+	//	NOTE:  Can not do this here since we do not know what UI is
+	//	currently visible.  This is moved to where the UI is created.
+	//
+	//eval (($setup + " " + $tabLayout + " " + 0));
+
+	//	Step 10: Show the option box.
+	//	=============================
+	//
+	showOptionBox();
+}
+
+proc string wobbleHelp()
+{
+	return
+  	"  Command: wobble - creates a noise-driven deformation\n" +
+	"Selection: Deformable geometry.";
+}
+
+proc string assembleCmd()
+{
+	string $cmd = "deformer -type wobble ";
+        
+ 	// Build a positioning flag if needed
+	//
+	string $positioning = `optionVar -query wobblePositioning`;
+	if ($positioning != "default") {
+		$cmd += (" -" + $positioning);
+	}
+
+	int $exc=`optionVar -query wobbleExclusive`;
+	if ($exc) {
+		string $exn=`optionVar -query wobbleExclName`;
+		if ($exn!="") {
+			// make sure that we do not clash names with an existing
+			// partition when the user requested a new partition, even
+			// if the user may have entered a non-unique name
+			//
+			if ($exc == 1) 	$exn += "#";
+			$cmd += (" -exclusive \"" + $exn+"\"");
+		}
+	}
+
+    print "Assembled cmd: ";
+    print $cmd;
+    print "\nlala\n";
+    
+	return $cmd;
+}
+
+global proc string performWobble(int $action)
+{
+	string $cmd = "";
+
+	switch ($action) {
+
+		//	Execute the command.
+		//
+		case 0:
+			//	Retrieve the option settings
+			//
+			setOptionVars(false);
+
+			//	Get the command.
+			//
+			$cmd = assembleCmd();
+
+			//	Execute the command with the option settings.
+			//
+			evalEcho($cmd);
+            
+			break;
+
+		//	Show the option box.
+		//
+		case 1:
+			wobbleOptions;
+			break;
+
+		//	Return the command string.
+		//
+		case 2:
+			//	Retrieve the option settings.
+			//
+			setOptionVars (false);
+
+			//	Get the command.
+			//
+			$cmd = assembleCmd();
+			break;
+	}
+	return $cmd;
+}
+

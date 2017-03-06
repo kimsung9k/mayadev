@@ -1,0 +1,8 @@
+import sgBFunction_rivet
+
+follicleObjs = []
+for sel in cmds.ls( sl=1 ):
+    follicleObj = sgBFunction_rivet.createFollicleFromSurfacePoint( sel )
+    follicleObjs.append( follicleObj )
+
+cmds.select( follicleObjs )

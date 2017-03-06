@@ -1,0 +1,2 @@
+import sgPWindow_rig_makeCloneObject
+sgPWindow_rig_makeCloneObject.WinA().create()

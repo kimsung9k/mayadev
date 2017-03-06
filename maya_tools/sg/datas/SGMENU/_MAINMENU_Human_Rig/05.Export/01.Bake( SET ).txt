@@ -1,0 +1,3 @@
+import sg.Function_autoRig.export
+sels = cmds.ls( sl=1 )
+sg.Function_autoRig.export.bake( sels[0] )

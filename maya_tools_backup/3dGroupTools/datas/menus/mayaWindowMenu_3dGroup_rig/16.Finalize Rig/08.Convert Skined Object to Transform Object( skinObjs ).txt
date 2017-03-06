@@ -1,0 +1,46 @@
+import maya.cmds as cmds
+import sgBFunction_connection
+import sgBFunction_attribute
+import sgBFunction_dag
+
+sels = sgBFunction_dag.getChildrenMeshExists( cmds.ls( sl=1 ) )
+
+for sel in sels:
+    hists = cmds.listHistory( sel )
+    targetSkin = ''
+    for hist in hists:
+        if cmds.nodeType( hist ) == 'skinCluster':
+            targetSkin = hist
+    
+    mtxCons = cmds.listConnections( targetSkin + '.matrix' )
+    
+    jnt = mtxCons[0]
+    
+    trGeo = cmds.createNode( 'transformGeometry' )
+    mm = cmds.createNode( 'multMatrix' )
+    selShape = cmds.listRelatives( sel, s=1, f=1 )[0]
+    newMesh  = cmds.createNode( 'mesh' )
+    newMeshP = cmds.listRelatives( newMesh, p=1, f=1 )[0]
+    
+    cmds.connectAttr( selShape + '.outMesh', trGeo + '.inputGeometry' )
+    cmds.connectAttr( sel + '.wm', mm + '.i[0]' )
+    cmds.connectAttr( jnt + '.wim', mm+'.i[1]' )
+    cmds.setAttr( trGeo + '.transform', cmds.getAttr( mm + '.o' ), type='matrix' )
+    cmds.connectAttr( trGeo + '.outputGeometry', newMesh + '.inMesh' )
+    
+    dcmp = cmds.createNode( 'decomposeMatrix' )
+    cmds.connectAttr( jnt + '.wm', dcmp + '.imat' )
+    cmds.connectAttr( dcmp + '.ot', newMeshP + '.t' )
+    cmds.connectAttr( dcmp + '.or', newMeshP + '.r' )
+    cmds.connectAttr( dcmp + '.os', newMeshP + '.s' )
+    cmds.connectAttr( dcmp + '.osh', newMeshP + '.sh' )
+    
+    sgBFunction_connection.copyShader( sel, newMeshP )
+    sgBFunction_attribute.copyShapeAttr( sel, newMeshP )
+    
+    selP = cmds.listRelatives( sel, p=1, f=1 )
+    if selP:
+        newMeshP = cmds.parent( newMeshP, selP[0] )
+    cmds.refresh()
+    cmds.delete( sel )
+    cmds.rename( newMeshP, sel )

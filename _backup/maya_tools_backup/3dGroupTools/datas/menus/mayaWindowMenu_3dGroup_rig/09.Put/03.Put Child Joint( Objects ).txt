@@ -1,0 +1,15 @@
+import maya.cmds as cmds
+
+def putChildJoint( target ):
+    
+    cmds.select( target )
+    trObj = cmds.joint( n= 'JntChild_' + target )
+    
+    return trObj
+   
+
+putNulls = []
+for sel in cmds.ls( sl=1 ):
+    putNulls.append( putChildJoint( sel ) )
+
+cmds.select( putNulls )

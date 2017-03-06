@@ -1,0 +1,4 @@
+import sgBRig_hair
+
+for sel in cmds.ls( sl=1 ):
+    sgBRig_hair.createCurveFromJoint( sel )

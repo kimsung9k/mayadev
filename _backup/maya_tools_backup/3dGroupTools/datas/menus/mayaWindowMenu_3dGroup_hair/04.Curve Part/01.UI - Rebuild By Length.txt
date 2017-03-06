@@ -1,0 +1,2 @@
+import projectFunction.inni.rebuildByLength.view as rebuildByMeshUi
+rebuildByMeshUi.Window().create()

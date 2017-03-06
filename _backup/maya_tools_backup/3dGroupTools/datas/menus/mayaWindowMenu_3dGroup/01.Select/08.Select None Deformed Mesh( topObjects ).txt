@@ -1,0 +1,11 @@
+import sgBFunction_dag
+
+sels = sgBFunction_dag.getChildrenMeshExists( cmds.ls( sl=1 ) )
+
+targets = []
+for sel in sels:
+    selShape = sgBFunction_dag.getShape( sel )
+    if cmds.listConnections( selShape+'.inMesh' ): continue
+    targets.append( sel )
+
+cmds.select( targets )

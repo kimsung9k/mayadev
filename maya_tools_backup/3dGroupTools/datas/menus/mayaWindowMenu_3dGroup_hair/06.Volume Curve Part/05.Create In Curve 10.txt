@@ -1,0 +1,2 @@
+import sgBFunction_curve
+sgBFunction_curve.createInCurveFromCurve(10)

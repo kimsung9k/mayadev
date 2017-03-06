@@ -1,0 +1,13 @@
+import maya.cmds as cmds
+
+sels = cmds.ls( sl=1 )
+
+renamedChildren = []
+for sel in sels:
+    selName = sel.split( '|' )[-1]
+    children = cmds.listRelatives( sel, c=1, f=1 )
+    for i in range( len(children) ):
+        child = cmds.rename( children[i], selName+ '_c%02d' % i )
+        renamedChildren.append( child )
+
+cmds.select( renamedChildren )

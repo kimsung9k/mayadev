@@ -1,0 +1,27 @@
+import sgBFunction_dag
+
+sels = cmds.ls( sl=1 )
+
+topParent = sgBFunction_dag.getParents( sels[0] )[0]
+
+setName = topParent.split('|' )[-1]
+outName = ''
+viewName = ''
+
+if setName.find( 'SET' ) != -1:
+    viewName = setName.replace( 'SET', 'VIEW' )
+    outName = setName.replace( 'SET', 'OUT' )
+elif setName.find( 'VIEW' ) != -1:
+    viewName = setName
+    outName = setName.replace( 'VIEW', 'OUT' )
+elif setName.find( 'OUT' ) != -1:
+    viewName = setName.replace( 'OUT', 'VIEW' )
+    outName = setName
+
+if viewName and outName:
+    if cmds.getAttr( viewName+'.v' ):
+        cmds.setAttr( viewName + '.v', 0 )
+        cmds.setAttr( outName + '.v', 1 )
+    else:
+        cmds.setAttr( viewName + '.v', 1 )
+        cmds.setAttr( outName + '.v', 0 )

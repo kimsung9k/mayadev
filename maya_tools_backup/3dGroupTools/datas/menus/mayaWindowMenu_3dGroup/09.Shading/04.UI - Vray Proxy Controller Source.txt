@@ -1,0 +1,2 @@
+import shading.vrayProxyControllerSource
+mel.eval( shading.vrayProxyControllerSource.melString )

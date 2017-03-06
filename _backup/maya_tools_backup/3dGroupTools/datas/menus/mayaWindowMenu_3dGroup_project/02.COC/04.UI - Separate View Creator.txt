@@ -1,0 +1,5 @@
+import sgBProject_coc
+import sgPWindow_projCoc_createSeparateView
+reload( sgBProject_coc )
+reload( sgPWindow_projCoc_createSeparateView )
+sgPWindow_projCoc_createSeparateView.WinA().create()

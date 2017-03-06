@@ -1,0 +1,10 @@
+import sgBFunction_mscriptUtil
+import sgBFunction_rigObject
+reload( sgBFunction_mscriptUtil )
+reload( sgBFunction_rigObject )
+
+sels = cmds.ls( sl=1 )
+
+sgBFunction_rigObject.addSquashFromCurve( sels[0], sels[1] )
+
+cmds.select( sels[0] )

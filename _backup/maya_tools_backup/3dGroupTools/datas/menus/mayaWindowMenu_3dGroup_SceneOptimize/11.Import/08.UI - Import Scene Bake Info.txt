@@ -1,0 +1,2 @@
+import sgPWindow_file_sceneBakeInfo_import
+sgPWindow_file_sceneBakeInfo_import.WinA().create()

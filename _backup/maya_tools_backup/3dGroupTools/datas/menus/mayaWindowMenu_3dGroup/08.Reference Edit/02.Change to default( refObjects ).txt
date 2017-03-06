@@ -1,0 +1,32 @@
+import maya.cmds as cmds
+
+refTargets = []
+for sel in cmds.ls( sl=1 ):
+    if not cmds.referenceQuery( sel, inr=1 ): continue
+    refName = cmds.referenceQuery( sel, rfn=1, orn=1 )
+    if not refName in refTargets:
+        refTargets.append( refName )
+
+
+for refTarget in refTargets:
+    path = cmds.referenceQuery( refTarget, f=1 ).split( '{' )[0]
+    splits = path.split( '/' )
+
+    fileName = splits[-1]
+    
+    try:
+        onlyName, extension = fileName.split( '.' )
+        extension = '.' + extension
+    except:
+        onlyName = fileName
+        extension = ''
+
+    if onlyName[-3:].lower() != 'out' and onlyName[-4:].lower() != 'view': continue
+    targetPath = '/'.join( splits[:-1] ) + '/' + onlyName[:-4] + extension
+    if not os.path.exists( targetPath ):
+        targetPath = targetPath = '/'.join( splits[:-1] ) + '/' + onlyName[:-5] + extension
+    if not os.path.exists( targetPath ):
+        continue
+
+    print refTarget, 'is changing...', targetPath
+    cmds.file( targetPath, loadReferenceDepth="asPrefs", loadReference=refTarget )

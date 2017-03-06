@@ -1,0 +1,26 @@
+import sgBRig_connection
+import sgBFunction_convert
+import math
+reload( sgBRig_connection )
+sels = cmds.ls( sl=1 )
+
+lrTargets = []
+
+if len( sels ) != 2:
+    for sel in sels:
+        selPos = cmds.xform( sel, q=1, ws=1, t=1 )
+        if selPos[0] < 0: continue
+        for other in sels:
+            if sel == other: continue
+            otherPos = cmds.xform( other, q=1, ws=1, t=1 )
+            if math.fabs( otherPos[0] + selPos[0] ) > 0.001: continue
+            if math.fabs( otherPos[1] - selPos[1] ) > 0.001: continue
+            if math.fabs( otherPos[2] - selPos[2] ) > 0.001: continue
+            lrTargets += [ sel, other ]
+else:
+    lrTargets += [ sels[0], sels[1] ]
+
+for i in range( 0, len( lrTargets ), 2 ):
+    lTarget = lrTargets[i]
+    rTarget = lrTargets[i+1]
+    sgBRig_connection.mirrorCopyConvertedChannel( lTarget, rTarget )

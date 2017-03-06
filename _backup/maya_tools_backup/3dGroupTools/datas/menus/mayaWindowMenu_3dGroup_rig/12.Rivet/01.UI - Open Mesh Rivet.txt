@@ -1,0 +1,2 @@
+import rigObject.meshRivetConnect.view    
+rigObject.meshRivetConnect.view.Window().create()

@@ -1,0 +1,13 @@
+import sgBFunction_connection
+
+sels = cmds.ls( sl=1 )
+
+animCurves = []
+for sel in sels:
+    attrs = cmds.channelBox( 'mainChannelBox', q=1, sma=1 )
+    
+    for attr in attrs:
+        animCurve = sgBFunction_connection.convertConnectionAsAnimCurve( sel, attr )
+        animCurves.append( animCurve )
+
+cmds.select( sels )

@@ -1,0 +1,16 @@
+import sgBFunction_dag
+
+sels = cmds.ls( sl=1 )
+
+targetNs = 'VIEW_'
+srcNs = 'OUT_'
+
+for sel in sels:
+    selName = sel.split( '|' )[-1]
+    srcName = selName.replace( targetNs, srcNs )
+    
+    selShape = sgBFunction_dag.getShape( selName )
+    srcShape = sgBFunction_dag.getShape( srcName )
+    
+    if cmds.isConnected( srcShape+'.outMesh', selShape+'.inMesh' ): continue
+    cmds.connectAttr( srcShape+'.outMesh', selShape+'.inMesh' )

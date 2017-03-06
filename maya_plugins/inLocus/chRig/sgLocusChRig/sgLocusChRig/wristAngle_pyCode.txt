@@ -1,0 +1,50 @@
+import maya.OpenMaya as om
+import math
+
+object = cmds.ls( 'null1' )[0]
+
+axisNum = 2
+upAxisNum = ( axisNum+1 )%3;
+otherAxisNum = ( axisNum+2 )%3;
+
+unitMtx = om.MMatrix()
+inMtx = om.MMatrix()
+
+om.MScriptUtil.createMatrixFromList( cmds.getAttr( object+'.wm' ), inMtx )
+
+aimMtx = inMtx+unitMtx
+
+aimVector = om.MVector( aimMtx( axisNum, 0 ),aimMtx( axisNum, 1 ),aimMtx( axisNum, 2 ) )
+upVector = om.MVector( inMtx( upAxisNum, 0 ),inMtx( upAxisNum, 1 ),inMtx( upAxisNum, 2 ) )
+unitVector = om.MVector( 0,0,0 )
+
+print aimVector.x,aimVector.y,aimVector.z
+print upVector.x,upVector.y,upVector.z
+
+if upAxisNum == 0:
+    unitVector.x = 1
+elif upAxisNum == 1:
+    unitVector.y = 1
+else:
+    unitVector.z = 1
+    
+scalar = upVector*aimVector/ aimVector.length()**2
+projVector = aimVector*scalar;
+
+vtVector = om.MVector( upVector.x-projVector.x, upVector.y-projVector.y, upVector.z-projVector.z )
+
+print vtVector.x,vtVector.y,vtVector.z
+if axisNum == 0:
+    vtVector.x = 0
+elif axisNum == 1:
+    vtVector.y = 0
+else:
+    vtVector.z = 0
+    
+result = unitVector.angle( vtVector );
+
+if vtVector[ otherAxisNum ] < 0:
+    result *= -1
+
+strAxis = 'xyz'
+cmds.setAttr( 'null2.r'+strAxis[axisNum], math.degrees( result ) )

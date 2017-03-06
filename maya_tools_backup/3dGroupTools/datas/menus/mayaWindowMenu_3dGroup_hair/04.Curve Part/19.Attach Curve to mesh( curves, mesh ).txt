@@ -1,0 +1,5 @@
+import sgBRig_hair
+sels = cmds.ls( sl=1 )
+curves = sgBFunction_dag.getChildrenCurveExists( sels[:-1] )
+mesh = sels[-1] 
+sgBRig_hair.setStartPointAttachCurvesToMesh( curves, mesh )

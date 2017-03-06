@@ -1,0 +1,2 @@
+import basic.naming.ui.view
+basic.naming.ui.view.NumberingUI().show()

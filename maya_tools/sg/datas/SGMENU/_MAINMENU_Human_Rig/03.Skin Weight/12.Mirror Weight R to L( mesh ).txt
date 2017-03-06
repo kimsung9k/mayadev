@@ -1,0 +1,2 @@
+import sg.skinCluster
+sg.skinCluster.weightToL( cmds.ls( sl=1 )[0] )

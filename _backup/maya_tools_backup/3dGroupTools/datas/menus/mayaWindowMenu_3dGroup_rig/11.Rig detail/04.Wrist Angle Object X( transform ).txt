@@ -1,0 +1,25 @@
+import sgBFunction_dag
+import sgBFunction_value
+
+sels = cmds.ls( sl=1 )
+
+def getWristAngleObject( target, indexAxis=0 ):
+    
+    base = cmds.listRelatives( target, p=1, f=1 )[0]
+    
+    wristAngle = cmds.createNode( 'wristAngle' )
+    cmds.setAttr( wristAngle+'.axis', indexAxis )
+
+    returnObj = cmds.createNode( 'transform' )
+    returnObj = cmds.parent( returnObj, base )[0]
+    cmds.xform( returnObj, os=1, matrix= sgBFunction_value.getDefaultMatrix() )
+    
+    cmds.connectAttr( target+'.m', wristAngle+'.inputMatrix' )
+    
+    targetAttrs = [ 'rx', 'ry', 'rz', 'rx', 'ry', 'rz' ]
+    cmds.connectAttr( wristAngle+'.outAngle', returnObj+'.'+targetAttrs[ indexAxis ] )
+    
+    return returnObj
+
+for sel in sels:
+    getWristAngleObject( first, 0 )

@@ -1,0 +1,2 @@
+import sgHumanRig.skinCluster
+sgHumanRig.skinCluster.toolHardBrush()

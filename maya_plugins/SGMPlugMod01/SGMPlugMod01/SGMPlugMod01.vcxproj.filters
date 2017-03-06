@@ -1,0 +1,240 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="CONTROL">
+      <UniqueIdentifier>{330b2f90-e75b-4011-a90a-cd9a27990fa7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CONTROL\SGEvent">
+      <UniqueIdentifier>{ac5e5fe8-7325-4843-a525-cee9c8cf15e9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CONTROL\SGFunction">
+      <UniqueIdentifier>{f1ad7476-493f-41a7-a2e3-9d973033eebd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CONTROL\SGCommand">
+      <UniqueIdentifier>{26e7d4ac-861a-448f-ba9e-7680428e7332}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="BASE">
+      <UniqueIdentifier>{37b8d9e3-2306-47ad-a9f8-a1831af4f560}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="BASE\SGBase">
+      <UniqueIdentifier>{2cb87793-faa5-4a0f-b666-1a4b59aee008}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="BASE\SGToolContext">
+      <UniqueIdentifier>{c2d4d0f5-74fa-4812-8615-374a43612559}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="BASE\SGFile">
+      <UniqueIdentifier>{c6c18c64-1aa2-435a-95e8-1f653a67fa42}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="BASE\SGPermit">
+      <UniqueIdentifier>{3c5e5890-91ae-4a03-a158-c5e9f11c16cf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CONTROL\SGTransformManip">
+      <UniqueIdentifier>{4a1c099a-7513-47c8-b4d4-57f2c3652487}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CONTROL\SGNormalManip">
+      <UniqueIdentifier>{37d1b7ec-da3b-4237-9a70-9c9530405544}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CONTROL\SGSoftSelectionManip">
+      <UniqueIdentifier>{7d2dc1ec-b383-4dea-91aa-6f5e4b82fc0a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CONTROL\SGPolySplitManip">
+      <UniqueIdentifier>{fe621602-12b0-42ea-9886-f2ab572c7249}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CONTROL\SGGeneralManip">
+      <UniqueIdentifier>{9f8cd084-259f-4c86-a195-ef63fa6ca4d5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CONTROL\SGPolygonManip">
+      <UniqueIdentifier>{4682f048-b53f-412e-991d-e01c7bead7ad}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CONTROL\SGIntersectFunction">
+      <UniqueIdentifier>{9f0afe20-129f-4b12-83a1-bb92d9a870d8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="BASE\SGWidget">
+      <UniqueIdentifier>{88262696-f619-40a7-b6dd-3ffa77ce7d25}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CONTROL\SGDragSelectionManip">
+      <UniqueIdentifier>{eddf2997-fd96-4748-a87f-29c1a109429e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="BASE\SGColor">
+      <UniqueIdentifier>{43f580d0-8eef-4382-bb8c-cf03635bbc3c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CONTROL\SGMoveBrushManip">
+      <UniqueIdentifier>{06ffdb55-814f-4793-94ec-6aab4a1bc170}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="precompile.h">
+      <Filter>BASE\SGBase</Filter>
+    </ClInclude>
+    <ClInclude Include="SGToolContext.h">
+      <Filter>BASE\SGToolContext</Filter>
+    </ClInclude>
+    <ClInclude Include="SGToolContextCommand.h">
+      <Filter>BASE\SGToolContext</Filter>
+    </ClInclude>
+    <ClInclude Include="SGMouse.h">
+      <Filter>CONTROL\SGEvent</Filter>
+    </ClInclude>
+    <ClInclude Include="SGKey.h">
+      <Filter>CONTROL\SGEvent</Filter>
+    </ClInclude>
+    <ClInclude Include="SGEvent.h">
+      <Filter>CONTROL\SGEvent</Filter>
+    </ClInclude>
+    <ClInclude Include="SGFunction.h">
+      <Filter>CONTROL\SGFunction</Filter>
+    </ClInclude>
+    <ClInclude Include="SGFile.h">
+      <Filter>BASE\SGFile</Filter>
+    </ClInclude>
+    <ClInclude Include="SGWidget.h">
+      <Filter>BASE\SGWidget</Filter>
+    </ClInclude>
+    <ClInclude Include="SGCommand.h">
+      <Filter>CONTROL\SGCommand</Filter>
+    </ClInclude>
+    <ClInclude Include="SGNodeControl.h">
+      <Filter>CONTROL\SGCommand</Filter>
+    </ClInclude>
+    <ClInclude Include="SGMarkingMenu.h">
+      <Filter>CONTROL\SGFunction</Filter>
+    </ClInclude>
+    <ClInclude Include="SGMMCommand.h">
+      <Filter>CONTROL\SGCommand</Filter>
+    </ClInclude>
+    <ClInclude Include="SGPermit.h">
+      <Filter>BASE\SGPermit</Filter>
+    </ClInclude>
+    <ClInclude Include="SGTransformManip.h">
+      <Filter>CONTROL\SGTransformManip</Filter>
+    </ClInclude>
+    <ClInclude Include="SGNormalManip.h">
+      <Filter>CONTROL\SGNormalManip</Filter>
+    </ClInclude>
+    <ClInclude Include="SGSoftSelectionManip.h">
+      <Filter>CONTROL\SGSoftSelectionManip</Filter>
+    </ClInclude>
+    <ClInclude Include="SGPolySplitManip.h">
+      <Filter>CONTROL\SGPolySplitManip</Filter>
+    </ClInclude>
+    <ClInclude Include="SGGeneralManip.h">
+      <Filter>CONTROL\SGGeneralManip</Filter>
+    </ClInclude>
+    <ClInclude Include="SGPolygonManip.h">
+      <Filter>CONTROL\SGPolygonManip</Filter>
+    </ClInclude>
+    <ClInclude Include="SGIntersectFunction.h">
+      <Filter>CONTROL\SGIntersectFunction</Filter>
+    </ClInclude>
+    <ClInclude Include="Names.h">
+      <Filter>BASE\SGBase</Filter>
+    </ClInclude>
+    <ClInclude Include="SGDragSelectionManip.h">
+      <Filter>CONTROL\SGDragSelectionManip</Filter>
+    </ClInclude>
+    <ClInclude Include="SGMainWindowEvent.h">
+      <Filter>BASE\SGWidget</Filter>
+    </ClInclude>
+    <ClInclude Include="SGColor.h">
+      <Filter>BASE\SGColor</Filter>
+    </ClInclude>
+    <ClInclude Include="SGToolCondition.h">
+      <Filter>BASE\SGToolContext</Filter>
+    </ClInclude>
+    <ClInclude Include="SGMoveBrushManip.h">
+      <Filter>CONTROL\SGMoveBrushManip</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="precompile.cpp">
+      <Filter>BASE\SGBase</Filter>
+    </ClCompile>
+    <ClCompile Include="plugMain.cpp">
+      <Filter>BASE\SGBase</Filter>
+    </ClCompile>
+    <ClCompile Include="SGToolContext.cpp">
+      <Filter>BASE\SGToolContext</Filter>
+    </ClCompile>
+    <ClCompile Include="SGToolContextCommand.cpp">
+      <Filter>BASE\SGToolContext</Filter>
+    </ClCompile>
+    <ClCompile Include="SGMouse.cpp">
+      <Filter>CONTROL\SGEvent</Filter>
+    </ClCompile>
+    <ClCompile Include="SGKey.cpp">
+      <Filter>CONTROL\SGEvent</Filter>
+    </ClCompile>
+    <ClCompile Include="SGEvent.cpp">
+      <Filter>CONTROL\SGEvent</Filter>
+    </ClCompile>
+    <ClCompile Include="SGFunction.cpp">
+      <Filter>CONTROL\SGFunction</Filter>
+    </ClCompile>
+    <ClCompile Include="SGFile.cpp">
+      <Filter>BASE\SGFile</Filter>
+    </ClCompile>
+    <ClCompile Include="SGWidget.cpp">
+      <Filter>BASE\SGWidget</Filter>
+    </ClCompile>
+    <ClCompile Include="SGCommand.cpp">
+      <Filter>CONTROL\SGCommand</Filter>
+    </ClCompile>
+    <ClCompile Include="SGCommand_def.cpp">
+      <Filter>CONTROL\SGCommand</Filter>
+    </ClCompile>
+    <ClCompile Include="SGNodeControl.cpp">
+      <Filter>CONTROL\SGCommand</Filter>
+    </ClCompile>
+    <ClCompile Include="SGMarkingMenu.cpp">
+      <Filter>CONTROL\SGFunction</Filter>
+    </ClCompile>
+    <ClCompile Include="SGMMCommand.cpp">
+      <Filter>CONTROL\SGCommand</Filter>
+    </ClCompile>
+    <ClCompile Include="SGPermit.cpp">
+      <Filter>BASE\SGPermit</Filter>
+    </ClCompile>
+    <ClCompile Include="SGTransformManip.cpp">
+      <Filter>CONTROL\SGTransformManip</Filter>
+    </ClCompile>
+    <ClCompile Include="SGNormalManip.cpp">
+      <Filter>CONTROL\SGNormalManip</Filter>
+    </ClCompile>
+    <ClCompile Include="SGSoftSelectionManip.cpp">
+      <Filter>CONTROL\SGSoftSelectionManip</Filter>
+    </ClCompile>
+    <ClCompile Include="SGPolySplitManip.cpp">
+      <Filter>CONTROL\SGPolySplitManip</Filter>
+    </ClCompile>
+    <ClCompile Include="SGGeneralManip.cpp">
+      <Filter>CONTROL\SGGeneralManip</Filter>
+    </ClCompile>
+    <ClCompile Include="SGPolygonManip.cpp">
+      <Filter>CONTROL\SGPolygonManip</Filter>
+    </ClCompile>
+    <ClCompile Include="SGIntersectFunction.cpp">
+      <Filter>CONTROL\SGIntersectFunction</Filter>
+    </ClCompile>
+    <ClCompile Include="Names.cpp">
+      <Filter>BASE\SGBase</Filter>
+    </ClCompile>
+    <ClCompile Include="SGDragSelectionManip.cpp">
+      <Filter>CONTROL\SGDragSelectionManip</Filter>
+    </ClCompile>
+    <ClCompile Include="globalValues.cpp">
+      <Filter>CONTROL</Filter>
+    </ClCompile>
+    <ClCompile Include="SGMainWindowEvent.cpp">
+      <Filter>BASE\SGWidget</Filter>
+    </ClCompile>
+    <ClCompile Include="SGColor.cpp">
+      <Filter>BASE\SGColor</Filter>
+    </ClCompile>
+    <ClCompile Include="SGToolCondition.cpp">
+      <Filter>BASE\SGToolContext</Filter>
+    </ClCompile>
+    <ClCompile Include="SGMoveBrushManip.cpp">
+      <Filter>CONTROL\SGMoveBrushManip</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

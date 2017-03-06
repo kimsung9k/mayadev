@@ -1,0 +1,21 @@
+import sgBFunction_dag
+import sgBFunction_connection
+
+sels = cmds.ls( sl=1 )
+
+gun = sels[0].split( '|' )[-1]
+
+gunNs = gun.split( ':' )[0]
+
+constHandle1 = gunNs + ':ConstLoc_Ctl_Handle1'
+constHandle2 = gunNs + ':ConstLoc_Ctl_Handle2'
+pCtlMove     = gunNs + ':PCtl_Move'
+
+targets = [ constHandle1, constHandle2, pCtlMove ]
+
+minFrame = cmds.playbackOptions( q=1, min=1 )
+maxFrame = cmds.playbackOptions( q=1, max=1 )
+
+cmds.bakeResults( targets, simulation = True, t=(minFrame, maxFrame ), sampleBy=1,
+                 disableImplicitControl=False, preserveOutsideKeys=False, sparseAnimCurveBake=False, removeBakedAttributeFromLayer=False,
+                 removeBakedAnimFromLayer=False, bakeOnOverrideLayer=False, minimizeRotation=False, controlPoints=False, shape=False )

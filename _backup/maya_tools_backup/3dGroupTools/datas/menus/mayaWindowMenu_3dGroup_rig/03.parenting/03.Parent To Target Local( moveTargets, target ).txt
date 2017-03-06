@@ -1,0 +1,12 @@
+import maya.cmds as cmds
+
+sels = cmds.ls( sl=1 )
+
+moveTargets = sels[:-1]
+target = sels[-1]
+
+targetP = cmds.listRelatives( target, p=1, f=1 )[0]
+for moveTarget in moveTargets:
+    try:cmds.parent( moveTarget, targetP )
+    except:
+        cmds.warning( "%s can't not parent to %s" % ( moveTarget, targetP ) )

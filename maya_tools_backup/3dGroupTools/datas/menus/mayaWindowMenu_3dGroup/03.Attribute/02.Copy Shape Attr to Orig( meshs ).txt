@@ -1,0 +1,18 @@
+import sgBFunction_attribute
+import sgBFunction_dag
+
+sels = sgBFunction_dag.getChildrenMeshExists( cmds.ls( sl=1 ) )
+
+for sel in sels:
+    selShapes = cmds.listRelatives( sel, s=1 )
+    
+    defaultShape = ''
+    origShape    = ''
+    for selShape in selShapes:
+        if cmds.getAttr( selShape + '.io' ):
+            origShape = selShape
+        else:
+            defaultShape = selShape
+
+    sgBFunction_attribute.copyShapeAttr( defaultShape, origShape )
+    cmds.setAttr( origShape + '.io', 1 )
