@@ -99,3 +99,19 @@ def cmd_sgAverageVertex( *args, **kwargs ):
     cmds.sgAverageVertex( *args, **kwargs )
 
 
+
+def cmd_putObjectAtGround( *args, **kwargs ):
+    
+    if not cmds.pluginInfo( "sgPutObjectAtGround_test", q=1, l=1 ):
+        cmds.loadPlugin( 'sgPutObjectAtGround_test' )
+    
+    name = ''
+    source = ''
+    
+    if kwargs.has_key( 'n' ):
+        name = kwargs['n']
+    if kwargs.has_key( 's' ):
+        source = kwargs[ 's' ]
+    
+    mel.eval( "sgPutObjectAtGroundCommand -s %s -n %s" %( source, name ) )
+

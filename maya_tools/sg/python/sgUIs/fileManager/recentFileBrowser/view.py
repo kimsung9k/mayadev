@@ -165,7 +165,6 @@ class Window:
         
         def cmdMain( *args ):
             path = cmds.textFieldGrp( self.tf_targetPath, q=1, tx=1 )
-            print path
             if path.endswith( '.mb' ):
                 cmds.file( path, f=1, options="v=0;", ignoreVersion=True, esn=False,  typ="mayaBinary", o=1 )
                 mel.eval( 'addRecentFile("%s", "mayaBinary")' % path )

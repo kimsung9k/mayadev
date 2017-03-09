@@ -1,9 +1,7 @@
 from sgModules import sgdata
-from sgModules import sgcommands
-from maya import cmds
+from sgModules import sgRig
 
 sels = cmds.ls( sl=1 )
-mtx = sgcommands.getMatrixFromSelection( sels )
-curve = sgcommands.makeController( sgdata.Controllers.pinPoints )
-curve.xform( ws=1, matrix=mtx )
+for sel in sels:
+    sgRig.putControllerToGeo( sel, sgdata.Controllers.pinPoints, 1.1 )
 sgcommands.select( curve )

@@ -139,6 +139,34 @@ def rotateToMatrix( rotation ):
 
 
 
+
+def setAttrDefault( sels, **options ):
+    
+    attrs = []
+    targetIsKeyAttrs = False
+    
+    if options.has_key( 'attrs' ):
+        attrs = options['attrs']
+    if options.has_key( 'k' ):
+        if options['k']:
+            targetIsKeyAttrs = True
+    
+    for sel in sels:
+        if targetIsKeyAttrs:
+            keyAttrs = cmds.listAttr( sel, k=1 )
+            for attr in keyAttrs:
+                defaultValue = cmds.attributeQuery( attr, node=sel, ld=1 )
+                try:cmds.setAttr( sel + '.' + attr, defaultValue[0] )
+                except:pass
+        for attr in attrs:
+            defaultValue = cmds.attributeQuery( attr, node=sel, ld=1 )
+            try:cmds.setAttr( sel + '.' + attr, defaultValue[0] )
+            except:pass
+
+
+
+
+
 def convertSideString( string ):
     
     import copy
@@ -2361,6 +2389,20 @@ def transformGeometryControl( controller, mesh ):
     
 
 
+
+def setPntsZero( targetMesh ):
+    
+    meshShape = convertSg( targetMesh ).shape()
+    fnMesh = OpenMaya.MFnMesh( getMObject( meshShape.name() ) )
+    numVertices = fnMesh.numVertices()
+    
+    meshName = meshShape.name()
+    for i in range( numVertices ):
+        cmds.setAttr( meshName + '.pnts[%d]' % i, 0,0,0 )
+
+
+
+
 @convertSg_dec
 def updateFollicleConnection( follicleTr ):
     
@@ -2592,7 +2634,7 @@ def getMatrixFromSelection( *sels ):
         if sels[0].find( '.' ) == -1:
             if cmds.objExists( sels[0] ) and cmds.nodeType( sels[0] ) in ['mesh', 'transform']:
                 isTransform = True
-
+            
     if sels:
         if isTransform:
             return convertSg( sels[0] ).wm.get()
@@ -3109,7 +3151,7 @@ def createPointOnCurve( curve ):
     trNode.addAttr( ln='parameter', k=1, 
                     min=selShape.attr( 'minValue' ).get(), max=selShape.attr( 'maxValue' ).get() )
     trNode.parameter >> pointInfoNode.parameter
-    return trNode
+    return trNode.name()
 
 
 
@@ -3984,4 +4026,46 @@ def makeCurveInfoTransforms( curve ):
     return targets
 
 
+
+def makeFloorResult( tr, floorTr ):
+
+    resultTr = createNode( 'transform' )
+    condition = createNode( 'condition' ).setAttr( 'operation', 2 ).setAttr( 'colorIfFalseR', 0 )
+    composeMtx = createNode( 'composeMatrix' )
+    localDcmp = getDecomposeMatrix( getLocalMatrix( tr, floorTr ) )
+    
+    localDcmp.oty >> condition.firstTerm
+    localDcmp.oty >> condition.colorIfTrueR
+    
+    localDcmp.otx >> composeMtx.itx
+    condition.outColorR >> composeMtx.ity
+    localDcmp.otz >> composeMtx.itz
+    
+    mm = createNode( 'multMatrix' )
+    composeMtx.outputMatrix >> mm.i[0]
+    convertSg( floorTr ).wm >> mm.i[1]
+    resultTr.pim >> mm.i[2]
+    dcmp = getDecomposeMatrix( mm )
+    
+    dcmp.ot >> resultTr.t
+    
+    
+    
+def setGeometryMatrixToTarget( geo, matrixTarget ):
+    
+    geo = convertSg( geo )
+    matrixTarget = convertSg( matrixTarget )
+    geoShape = geo.shape()
+    ioShape = addIOShape( geo )
+    
+    geoMatrix    = listToMatrix( geo.wm.get() )
+    targetMatrix = listToMatrix( matrixTarget.wm.get() )
+    
+    trGeo = createNode( 'transformGeometry' )
+    ioShape.outMesh >> trGeo.inputGeometry
+    trGeo.outputGeometry >> geoShape.inMesh
+    trGeo.transform.set( matrixToList(geoMatrix * targetMatrix.inverse()), type='matrix' )
+    
+    geo.xform( ws=1, matrix= matrixTarget.wm.get() )
+    setPntsZero( geo )
 

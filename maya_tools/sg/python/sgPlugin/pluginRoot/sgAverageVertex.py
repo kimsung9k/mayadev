@@ -152,9 +152,6 @@ class SGAverageVertex( OpenMayaMPx.MPxCommand ):
     def isUndoable(self):
         return True
 
-    
-    
-
 
 
 

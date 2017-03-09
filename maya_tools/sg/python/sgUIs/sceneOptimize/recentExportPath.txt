@@ -1,1 +1,1 @@
-{"abcPath": "pingo_ep008_c001.abc", "sceneInfoPath": "pingo_ep008_c001.sceneInfo", "rootPath": "A:/@@TEMP@@/sceneOptimize/scenes/pingo_ep008_c001"}
+{"abcPath": "animationTEst.abc", "sceneInfoPath": "animationTEst.sceneInfo", "rootPath": "D:/PRIVATE/TEMP/animationTEst"}
