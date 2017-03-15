@@ -361,9 +361,9 @@ def makeController( pointList, defaultScaleMult = 1, **options ):
     else:
         name = None
     
-    jnt = pymel.core.createNode( 'joint' )
-    jnt.setAttr( 'drawStyle', 2 )
-    jnt.setAttr( 'segmentScaleCompensate', 0 )
+    jnt = pymel.core.createNode( 'transform' )
+    #jnt.setAttr( 'drawStyle', 2 )
+    #jnt.setAttr( 'segmentScaleCompensate', 0 )
     if name: jnt.rename( name )
     pymel.core.parent( crvShape, jnt, add=1, shape=1 )
     pymel.core.parent( ioCrvShape, jnt, add=1, shape=1 )
@@ -389,7 +389,7 @@ def makeController( pointList, defaultScaleMult = 1, **options ):
     jnt.shape_sy >> composeMatrix.inputScaleY
     jnt.shape_sz >> composeMatrix.inputScaleZ
     trGeo = pymel.core.createNode( 'transformGeometry' )
-    jnt.attr( 'radius' ).set( 0 )
+    #jnt.attr( 'radius' ).set( 0 )
 
     ioCrvShape.local >> trGeo.inputGeometry
     composeMatrix.outputMatrix >> trGeo.transform
@@ -495,7 +495,6 @@ def putControllerToGeo( target, points, multSize = 1.0 ):
     targetP = target.getParent()
     parentMatrix = OpenMaya.MMatrix()
     if targetP:
-        print targetP.wm.get()
         parentMatrix = listToMatrix( cmds.getAttr( targetP.wm.name() ) )
     
     bbmin = target.boundingBoxMin.get()
@@ -516,9 +515,6 @@ def putControllerToGeo( target, points, multSize = 1.0 ):
     targetCtl.shape_sz.set( sizeZ )
 
     worldCenter = OpenMaya.MPoint( *center ) * parentMatrix
-
-    print center
-    print worldCenter.x, worldCenter.y, worldCenter.z
 
     targetCtl.t.set( worldCenter.x, worldCenter.y, worldCenter.z )
     makeParent( targetCtl )

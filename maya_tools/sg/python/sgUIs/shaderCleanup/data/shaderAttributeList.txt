@@ -1,0 +1,18 @@
+RedshiftArchitectural	RedshiftSkin	mia_material_x_passes	mia_material_x	lambert	blinn	phong	phongE	anisotropic	mib_illum_blinn
+diffuse	<?xml version="1.0" encoding="UTF-8"?> <data>   <attr>shallow_color</attr>   <src>      <node>plusMinusAverage</node>      <input>input3D[0]</input>      <set>          <attrName>input3D[1]</attrName>          <value>0.0234375,0.0234375,0.0234375</value>      </set>      <output>output3D</output>   </src>   <src>      <node>RedshiftFresnel</node>      <input>facing_color</input>      <output>outColor</output>   </src> </data>	diffuse	diffuse	color	color	color	color	color	diffuse
+diffuse_weight	shallow_weight	diffuse_weight	diffuse_weight	diffuse	diffuse	diffuse	diffuse	diffuse	
+diffuse	mid_color	diffuse	diffuse	color	color	color	color	color	
+diffuse_weight	mid_weight	diffuse_weight	diffuse_weight	diffuse	diffuse	diffuse	diffuse	diffuse	
+diffuse	<?xml version="1.0" encoding="UTF-8"?> <data>   <attr>deep_color</attr>   <src>      <node>multiplyDivide</node>      <input>input1</input>      <set>          <attrName>input2</attrName>          <value>0.31640625,0.1328125,0.09765625</value>      </set>      <output>output</output>   </src> </data>	diffuse	diffuse	color	color	color	color	color	
+diffuse_weight	deep_weight	diffuse_weight	diffuse_weight	diffuse	diffuse	diffuse	diffuse	diffuse	
+diffuse_roughness	diffuse_roughness	diffuse_roughness	diffuse_roughness						roughness
+refl_color	deep_weight	refl_color	refl_color	specularColor	specularColor	specularColor	specularColor	specularColor	specular
+reflectivity	refl_weight0	reflectivity	reflectivity	reflectivity	reflectivity	reflectivity	reflectivity	reflectivity	
+refl_gloss	refl_gloss0	refl_gloss	refl_gloss						
+transparency		transparency	transparency	transparency	transparency	transparency	transparency	transparency	
+refr_color		refr_color	refr_color						
+refr_gloss		refr_gloss	refr_gloss	lightAbsorbance	lightAbsorbance	lightAbsorbance	lightAbsorbance	lightAbsorbance	
+		refr_ior	refr_ior	refractiveIndex	refractiveIndex	refractiveIndex	refractiveIndex	refractiveIndex	ior
+refr_gloss_samples		refr_gloss_samples	refr_gloss_samples						
+<?xml version="1.0" encoding="UTF-8"?> <data>   <attr>bump_input</attr> </data>	<?xml version="1.0" encoding="UTF-8"?> <data>   <attr>bump_input</attr> </data>	standard_bump	standard_bump	normalCamera	normalCamera	normalCamera	normalCamera	normalCamera	
+				ambientColor	ambientColor	ambientColor	ambientColor	ambientColor	ambient

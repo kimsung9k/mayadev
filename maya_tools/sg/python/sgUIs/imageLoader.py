@@ -124,7 +124,6 @@ class Window_global:
             
             cuIndex = data[5]
             Window_global.mainGui.tabWidget.setCurrentIndex( cuIndex )
-            
         except:
             pass
 

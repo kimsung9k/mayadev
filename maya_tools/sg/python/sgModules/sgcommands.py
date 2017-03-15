@@ -2270,18 +2270,32 @@ def putObject( putTargets, typ='joint', putType='boundingBoxCenter' ):
 @convertSg_dec
 def addIOShape( target ):
     
-    targetTr    = target.transform()
-    targetShape = target.shape()
-    newShape = createNode( targetShape.nodeType() )
-    newShapeTr = newShape.transform()
-    targetShape.outputGeometry() >> newShape.inputGeometry()
-    cmds.refresh()
-    targetShape.outputGeometry() // newShape.inputGeometry()
-    newShape.attr( 'io' ).set( 1 )
-    newShapeName = newShape.name()
-    cmds.parent( newShapeName, targetTr.name(), add=1, shape=1 )
-    cmds.delete( newShapeTr.name() )
-    return convertSg( newShapeName )
+    if target.nodeType() == 'transform':
+        targetTr    = target.transform()
+        targetShape = target.shape()
+        newShape = createNode( targetShape.nodeType() )
+        newShapeTr = newShape.transform()
+        targetShape.outputGeometry() >> newShape.inputGeometry()
+        cmds.refresh()
+        targetShape.outputGeometry() // newShape.inputGeometry()
+        newShape.attr( 'io' ).set( 1 )
+        newShapeName = newShape.name()
+        cmds.parent( newShapeName, targetTr.name(), add=1, shape=1 )
+        cmds.delete( newShapeTr.name() )
+        return convertSg( newShapeName )
+    else:
+        targetTr = target.transform()
+        newShape = createNode( target.nodeType() )
+        newShapeTr = newShape.transform()
+        target.outputGeometry() >> newShape.inputGeometry()
+        cmds.refresh()
+        target.outputGeometry() // newShape.inputGeometry()
+        newShape.attr( 'io' ).set( 1 )
+        newShapeName = newShape.name()
+        cmds.parent( newShapeName, targetTr.name(), add=1, shape=1 )
+        cmds.delete( newShapeTr.name() )
+        return convertSg( newShapeName )
+        
 
 
 def curve( **options ):
@@ -2391,14 +2405,23 @@ def transformGeometryControl( controller, mesh ):
 
 
 def setPntsZero( targetMesh ):
-    
-    meshShape = convertSg( targetMesh ).shape()
-    fnMesh = OpenMaya.MFnMesh( getMObject( meshShape.name() ) )
-    numVertices = fnMesh.numVertices()
-    
-    meshName = meshShape.name()
-    for i in range( numVertices ):
-        cmds.setAttr( meshName + '.pnts[%d]' % i, 0,0,0 )
+    shapes = convertSg( targetMesh ).listRelatives( s=1 )
+    for shape in shapes:
+        if shape.attr( 'io' ).get(): continue
+        if shape.nodeType() == 'mesh':
+            fnMesh = OpenMaya.MFnMesh( getMObject( shape.name() ) )
+            numVertices = fnMesh.numVertices()
+            
+            meshName = shape.name()
+            for i in range( numVertices ):
+                cmds.setAttr( meshName + '.pnts[%d]' % i, 0,0,0 )
+        elif shape.nodeType() == 'nurbsCurve':
+            fnNurbsCurve = OpenMaya.MFnNurbsCurve( getMObject(shape.name()) )
+            numCVs = fnNurbsCurve.numCVs()
+            
+            curveName = shape.name()
+            for i in range( numCVs ):
+                cmds.setAttr( curveName + '.controlPoints[%d]' % i, 0,0,0 )
 
 
 
@@ -4048,23 +4071,34 @@ def makeFloorResult( tr, floorTr ):
     dcmp = getDecomposeMatrix( mm )
     
     dcmp.ot >> resultTr.t
-    
-    
-    
+
+
+
 def setGeometryMatrixToTarget( geo, matrixTarget ):
     
     geo = convertSg( geo )
     matrixTarget = convertSg( matrixTarget )
-    geoShape = geo.shape()
-    ioShape = addIOShape( geo )
+    geoShapes = geo.listRelatives( s=1 )
     
     geoMatrix    = listToMatrix( geo.wm.get() )
     targetMatrix = listToMatrix( matrixTarget.wm.get() )
     
-    trGeo = createNode( 'transformGeometry' )
-    ioShape.outMesh >> trGeo.inputGeometry
-    trGeo.outputGeometry >> geoShape.inMesh
-    trGeo.transform.set( matrixToList(geoMatrix * targetMatrix.inverse()), type='matrix' )
+    outputAttr = ''
+    inputAttr = ''
+    
+    for geoShape in geoShapes:
+        ioShape = addIOShape( geoShape )
+        if geoShape.nodeType() == 'mesh':
+            outputAttr = 'outMesh'
+            inputAttr = 'inMesh'
+        elif geoShape.nodeType() in ['nurbsCurve', 'nurbsSurface']:
+            outputAttr = 'local'
+            inputAttr = 'create'
+        
+        trGeo = createNode( 'transformGeometry' )
+        ioShape.attr( outputAttr ) >> trGeo.inputGeometry
+        trGeo.outputGeometry >> geoShape.attr( inputAttr )
+        trGeo.transform.set( matrixToList(geoMatrix * targetMatrix.inverse()), type='matrix' )
     
     geo.xform( ws=1, matrix= matrixTarget.wm.get() )
     setPntsZero( geo )

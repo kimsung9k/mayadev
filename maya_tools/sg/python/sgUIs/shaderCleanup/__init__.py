@@ -5,6 +5,7 @@ import maya.OpenMaya as OpenMaya
 import PySide.QtGui
 import pymel.core
 import os
+from sgUIs.putObjectAtGround import Window_cmd
 
 
 class Window_global:
@@ -13,7 +14,27 @@ class Window_global:
     title = "UI - Shader Cleanup"
     wh = [430,300]
     
-    matAttrFile = os.path.dirname( __file__ ) + '/data/shaderAttributeList.tsv'
+    targetFolder = 'D:/PINGO_SERVER/pingo_server1/@@DEV@@/maya_tools_data/shaderCleanup'
+    matAttrFile = ''
+    if os.path.exists( targetFolder ):
+        for root, dirs, names in os.walk( targetFolder ):
+            if names:
+                matAttrFile = root + '/' + names[0]
+            break
+    #if not matAttrFile:
+    matAttrFile = os.path.dirname( __file__ ) + '/data/shaderAttributeList.txt'
+    
+    #print "mat attr path : ", matAttrFile
+    matAttrs = {}
+    
+    @staticmethod
+    def loadPlugins():
+        
+        pluginList = ['redshift4maya.mll', 'Mayatomr.mll']
+        for plugin in pluginList:
+            if cmds.pluginInfo( plugin, q=1, l=1 ): continue
+            cmds.loadPlugin( plugin )
+        
     
     @staticmethod
     def updateMatAttrs():
@@ -37,72 +58,6 @@ class Window_global:
                 Window_global.matAttrs.update( {shaders[i]: shaderAttrs[i]} )
 
 
-    matAttrs = {'lambert' :['color', 'transparency', 'ambientColor', 'incandescence', 
-                             'diffuse', 'translucence', 'translucenceDepth', 'translucenceFocus', 
-                             'glowIntensity', 'matteOpacityMode', 'matteOpacity',
-                             'refractions','refractiveIndex','refractionLimit', 'lightAbsorbance', 'surfaceThickness',
-                             'shadowAttenuation','chromaticAberration', 
-                             'normalCamera',
-                             '', '', '' ],
-                'blinn'   :['color', 'transparency', 'ambientColor', 'incandescence', 
-                             'diffuse', 'translucence', 'translucenceDepth', 'translucenceFocus', 
-                             'glowIntensity', 'matteOpacityMode', 'matteOpacity',
-                             'refractions','refractiveIndex','refractionLimit', 'lightAbsorbance', 'surfaceThickness',
-                             'shadowAttenuation','chromaticAberration',
-                             'normalCamera',
-                             'specularColor', 'reflectivity', 'reflectedColor' ],
-                'phong'   :['color', 'transparency', 'ambientColor', 'incandescence', 
-                             'diffuse', 'translucence', 'translucenceDepth', 'translucenceFocus', 
-                             'glowIntensity', 'matteOpacityMode', 'matteOpacity',
-                             'refractions','refractiveIndex','refractionLimit', 'lightAbsorbance', 'surfaceThickness',
-                             'shadowAttenuation','chromaticAberration',
-                             'normalCamera',
-                             'specularColor', 'reflectivity', 'reflectedColor' ],
-                'phongE'   :['color', 'transparency', 'ambientColor', 'incandescence', 
-                             'diffuse', 'translucence', 'translucenceDepth', 'translucenceFocus', 
-                             'glowIntensity', 'matteOpacityMode', 'matteOpacity',
-                             'refractions','refractiveIndex','refractionLimit', 'lightAbsorbance', 'surfaceThickness',
-                             'shadowAttenuation','chromaticAberration',
-                             'normalCamera',
-                             'specularColor', 'reflectivity', 'reflectedColor' ],
-                'surfaceShader'   :['outColor', 'outTransparency', '', '', 
-                             '', '', '', '', 
-                             '', '', '',
-                             '','','', '', '',
-                             '','',
-                             'normalCamera',
-                             '', '', '' ],
-                'mia_material_x_passes' :['diffuse', 'transparency', '', '', 
-                             'diffuse_weight', '', '', '', 
-                             '', '', '',
-                             '','','', '', '',
-                             '','',
-                             'standard_bump',
-                             'refl_color', 'reflectivity', 'refl_gloss', 
-                             'refr_ior'
-                             'diffuse_roughness',
-                             'refl_gloss_samples' ],
-                'mia_material_x' :['diffuse', 'transparency', '', '', 
-                             'diffuse_weight', '', '', '', 
-                             '', '', '',
-                             '','','', '', '',
-                             '','',
-                             'standard_bump',
-                             'refl_color', 'reflectivity', 'refl_gloss', 
-                             'refr_ior', 'refr_gloss'
-                             'diffuse_roughness',
-                             'refl_gloss_samples' ],
-                'RedshiftArchitectural'   :['diffuse', 'transparency', '', 'additional_color', 
-                             'diffuse_weight', '', '', '', 
-                             '', '', '',
-                             '','','', '', '',
-                             '','',
-                             'bump_input',
-                             'refl_color', 'reflectivity', 'refl_gloss', 
-                             'refr_ior', 'refr_gloss'
-                             'diffuse_roughness',
-                             'refl_gloss_samples' ] }
-    
     op_shaderType = ''
     tsl_shaderList = ''
     bt_combine = ''
@@ -274,6 +229,8 @@ class Window_cmds:
     @staticmethod
     def combineShader( shaderList ):
         
+        cmds.undoInfo( ock=1 )
+        
         targetObjs = []
         for shader in shaderList:
             cmds.hyperShade( objects = shader )
@@ -294,6 +251,8 @@ class Window_cmds:
                 cmds.delete( shader, shadingEngines )
         
         Window_global.nodeInfomation = {}
+        
+        cmds.undoInfo( cck=1 )
         
     
     
@@ -333,8 +292,134 @@ class Window_cmds:
 
 
     @staticmethod
+    def getAttrObjectFromXml( data ):
+        import xml.etree.ElementTree as ET
+        
+        etdata = ET.fromstring( data )
+        
+        droot = {'src':[]}
+        
+        for child in etdata.getchildren():
+            if child.tag == 'attr':
+                droot.update( {child.tag:child.text} )
+            elif child.tag == 'src':
+                dsrc = {'set':[]}
+                for srcChild in child.getchildren():
+                    if srcChild.tag in ['node','input','output']:
+                        dsrc.update( {srcChild.tag:srcChild.text} )
+                    if srcChild.tag == 'set':
+                        dset = {}
+                        for setChild in srcChild.getchildren():
+                            dset.update( {setChild.tag: setChild.text} )
+                        dsrc['set'].append( dset )
+                droot['src'].append( dsrc )
+        return droot
+
+    
+    @staticmethod
+    def getAttrFromAttrObject( xmlObject ):
+        
+        print "xml object : ", xmlObject
+        
+        attr = xmlObject['attr']
+        srcs = xmlObject['src']
+        
+        beforeInputAttr = ''
+        beforeOutputAttr = ''
+        beforeNode = ''
+        
+        resultInput = ''
+        resultOutput = ''
+        
+        def stringValueToValue( strValue ):
+            if strValue.find( ',' ) != -1:
+                splitValues = strValue.split( ',' )
+                numValues = []
+                for splitValue in splitValues:
+                    numValues.append( float( splitValue ) )
+                return numValues
+            else:
+                return float( strValue )
+            
+        
+        for src in srcs:
+            nodeType = src['node']
+            inputAttr = src['input']
+            outputAttr = src['output']
+            lsets = src['set']
+            
+            shadingNode = cmds.shadingNode( nodeType, asUtility=1 )
+            
+            for lset in lsets:
+                attrName = lset['attrName']
+                value    = lset['value']
+                try:cmds.setAttr( shadingNode + '.' + attrName,  stringValueToValue( value ) )
+                except:cmds.setAttr( shadingNode + '.' + attrName,  *stringValueToValue( value ) )
+            
+            if beforeNode:
+                cmds.connectAttr( beforeNode + '.' + beforeOutputAttr, shadingNode + '.' + inputAttr )
+            else:
+                resultInput = shadingNode + '.' + inputAttr
+            beforeNode = shadingNode
+            beforeInputAttr = inputAttr
+            beforeOutputAttr = outputAttr
+            resultOutput = shadingNode + '.' +  outputAttr
+        
+        return resultInput, resultOutput
+    
+    
+    
+    @staticmethod
+    def tryConnect( srcAttr, dstAttr ):
+        if not cmds.isConnected( srcAttr, dstAttr ):
+            try:
+                cmds.connectAttr( srcAttr, dstAttr, f=1 )
+            except:
+                pymelAttr = pymel.core.ls( srcAttr )[0]
+                if not cmds.isConnected( pymelAttr.name(), dstAttr ):
+                    try:cmds.connectAttr( pymelAttr.name(), dstAttr, f=1 )
+                    except:pass
+    
+    
+    @staticmethod
+    def trySet( srcAttr, targetAttr ):
+        try:cmds.setAttr( targetAttr, cmds.getAttr( srcAttr ) )
+        except:
+            try:cmds.setAttr( targetAttr, *cmds.getAttr( srcAttr ) )
+            except:
+                try:
+                    attrValue = cmds.getAttr( srcAttr )
+                    cmds.setAttr( targetAttr, attrValue, attrValue, attrValue )
+                except:
+                    pass
+    
+    
+    @staticmethod
+    def convertBump( shader ):
+        
+        shader = pymel.core.ls( shader )[0]
+        if shader.type().find( 'Redshift' ) != -1:
+            hists = shader.history()
+            for hist in hists:
+                if hist.type() != 'bump2d': continue
+                if hist.bumpInterp.get() == 0:
+                    redshiftBump = pymel.core.shadingNode( 'RedshiftBumpMap', asUtility=1 )
+                    redshiftBump.out >> shader.bump_input
+                    srcNode = hist.bumpValue.listConnections( s=1, d=0 )
+                    if srcNode:
+                        srcNode[0].outColor >> redshiftBump.input
+                elif hist.bumpInterp.get() == 1:
+                    redshiftBump = pymel.core.shadingNode( 'RedshiftNormalMap', asUtility=1 )
+                    redshiftBump.outDisplacementVector >> shader.bump_input
+                    srcNode = hist.bumpValue.listConnections( s=1, d=0, type='file' )
+                    if srcNode:
+                        redshiftBump.tex0.set( srcNode[0].fileTextureName.get() )
+    
+
+    @staticmethod
     def convertTo( matType ):
         
+        cmds.undoInfo( ock=1 )
         def getReverseValue( value, rev ):
             if rev:
                 if type( value ) in [tuple,list]:
@@ -372,37 +457,40 @@ class Window_cmds:
             newShader = cmds.shadingNode( matType, asShader=1 )
             
             for i in range( lenAttrs ):
-                sourceSplits = sourceMatAttrs[i].split( ',' )
-                targetSplits = targetMatAttrs[i].split( ',' )
-                
-                sourceAttr = sourceSplits[0]
-                targetAttr = targetSplits[0]
-                
-                reverseValue = False
-                if len( sourceSplits ) > 1:
-                    if sourceSplits[1] == 'reverse':
-                        reverseValue = not reverseValue
-                if len( targetSplits ) > 1:
-                    if targetSplits[1] == 'reverse':
-                        reverseValue = not reverseValue
+                sourceAttr = sourceMatAttrs[i]
+                targetAttr = targetMatAttrs[i]
                 
                 if not sourceAttr or not targetAttr: continue
+                if sourceAttr.find( '<?xml' ) != -1:
+                    sourceAttr = Window_cmds.getAttrObjectFromXml(sourceAttr)['attr']
+                
                 if not cmds.attributeQuery( sourceAttr, node=shader, ex=1 ):continue
-                sourceAttrCons = cmds.listConnections( shader + '.' + sourceAttr, s=1, p=1 )
+                
+                fullSourceAttrName = shader    + '.' + sourceAttr
+                fullTargetAttrName = newShader + '.' + targetAttr
+                
+                sourceAttrCons = cmds.listConnections( fullSourceAttrName, s=1, p=1 )
+                
                 if sourceAttrCons:
-                    cmds.connectAttr( sourceAttrCons[0], newShader + '.' + targetAttr )
+                    if targetAttr.find( '<?xml' ) != -1:
+                        attrObject = Window_cmds.getAttrObjectFromXml(targetAttr)
+                        resultInput, resultOutput = Window_cmds.getAttrFromAttrObject( attrObject )
+                        if not resultOutput:
+                            fullTargetAttrName = newShader + '.' + attrObject['attr']
+                        else:
+                            cmds.connectAttr( resultOutput, newShader + '.' + attrObject['attr'] )
+                            fullTargetAttrName = resultInput
+                    Window_cmds.tryConnect( sourceAttrCons[0], fullTargetAttrName )
                 else:
-                    try:cmds.setAttr( newShader + '.' + targetAttr, getReverseValue( cmds.getAttr( shader + '.' + sourceAttr ), reverseValue ) )
-                    except:
-                        try:cmds.setAttr( newShader + '.' + targetAttr, *getReverseValue( cmds.getAttr( shader + '.' + sourceAttr )[0], reverseValue ) )
-                        except:
-                            try:cmds.setAttr( newShader + '.' + targetAttr, getReverseValue( cmds.getAttr( shader + '.' + sourceAttr )[0][0], reverseValue ) )
-                            except:
-                                try:
-                                    value = getReverseValue( cmds.getAttr( shader + '.' + sourceAttr ), reverseValue )
-                                    cmds.setAttr( newShader + '.' + targetAttr, value, value, value )
-                                except:
-                                    pass
+                    if targetAttr.find( '<?xml' ) != -1:
+                        attrObject = Window_cmds.getAttrObjectFromXml(targetAttr)
+                        fullTargetAttrName = newShader + '.' + attrObject['attr']
+                    Window_cmds.trySet( fullSourceAttrName, fullTargetAttrName )
+                    
+                targetAttrHists = pymel.core.ls( fullTargetAttrName )[0].history()
+                for hist in targetAttrHists:
+                    if hist.type() == 'file':
+                        hist.colorSpace.set( 'Raw' )
             
             cmds.hyperShade( objects=shader )
             selObjs = cmds.ls( sl=1 )
@@ -413,6 +501,10 @@ class Window_cmds:
             
             newShader = cmds.rename( newShader, shader+'_convert' )
             newShaders.append( newShader )
+            
+            Window_cmds.convertBump( newShader )
+            
+            
 
         materials = Window_cmds.getMaterials()
         firstMat = None
@@ -422,6 +514,7 @@ class Window_cmds:
             cmds.textScrollList( Window_global.tsl_shaderList, e=1, a=material )
 
         cmds.select( newShaders )
+        cmds.undoInfo( cck=1 )
         
         Window_global.nodeInfomation = {}
     
@@ -432,6 +525,15 @@ class Window_cmds:
         
         selectedItems = cmds.textScrollList( Window_global.tsl_shaderList, q=1, si=1 )
         cmds.select( selectedItems )
+    
+    
+    @staticmethod
+    def updateList( evt=0 ):
+        
+        materials = Window_cmds.getMaterials()
+        cmds.textScrollList( Window_global.tsl_shaderList, e=1, ra=1 )
+        for material in materials:
+            cmds.textScrollList( Window_global.tsl_shaderList, e=1, a=material )
 
 
 
@@ -530,9 +632,12 @@ class UI_shaderLister:
         cmds.swatchDisplayPort( Window_global.swatch, e=1, wh=(64,64), sn=selList[0] )
         cmds.button( Window_global.bt_combine, e=1, en=0 )
         
-        cmds.scriptJob( k=Window_global.scriptJop )
+        '''
+        cmds.scriptJob( k=Window_global.scriptJob )
+        Window_global.scriptJob = cmds.scriptJob( e=['SelectionChanged', Window_cmds.selectionChanged ], parent= Window_global.name )
+        '''
+        
         Window_cmds.selectObjectByMaterials( selList )
-        Window_global.scriptJop = cmds.scriptJob( e=['SelectionChanged', Window_cmds.selectionChanged ], parent= Window_global.name )
         
         if len( selList ) > 1 and Window_cmds.isSameMaterials( selList ):
             cmds.button( Window_global.bt_combine, e=1, en=1 )
@@ -605,6 +710,7 @@ class UI_combine:
             cmds.textScrollList( Window_global.tsl_shaderList, e=1, a=material )
         cmds.textScrollList( Window_global.tsl_shaderList, e=1, si=targetShader )
         Window_cmds.selectObjectByMaterials( [targetShader] )
+    
 
 
 
@@ -662,13 +768,16 @@ class Window:
     def show(self, evt=0 ):
         
         Window_global.selectIndex = 0
+        Window_global.loadPlugins()
         Window_global.updateMatAttrs()
         
         if cmds.window( Window_global.name, ex=1 ):
             cmds.deleteUI( Window_global.name, wnd=1 )
         cmds.window( Window_global.name, title=Window_global.title )
         
-        Window_global.scriptJop = cmds.scriptJob( e=['SelectionChanged', Window_cmds.selectionChanged ], parent= Window_global.name )
+        #Window_global.scriptJob = cmds.scriptJob( e=['SelectionChanged', Window_cmds.selectionChanged ], parent= Window_global.name )
+        #cmds.scriptJob( e=['Undo', Window_cmds.updateList], parent= Window_global.name )
+        #cmds.scriptJob( e=['Redo', Window_cmds.updateList], parent= Window_global.name )
         
         form = cmds.formLayout()
         shaderType    = self._ui_shaderTypeLister.create()
@@ -687,7 +796,7 @@ class Window:
                               (shader, 'bottom', 3, combineShader ),
                               (combineShader, 'bottom', 3, convert ) ] )
         
-        cmds.window( Window_global.name, e=1, wh= Window_global.wh, rtf=1 )
+        cmds.window( Window_global.name, e=1, rtf=1 )
         cmds.showWindow( Window_global.name )
         
         #Window_cmds.getAllNodeInfomation()

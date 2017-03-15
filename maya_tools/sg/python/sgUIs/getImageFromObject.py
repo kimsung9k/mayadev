@@ -1,12 +1,10 @@
 import maya.cmds as cmds
-import maya.mel as mel
 import maya.OpenMayaUI
 from PySide import QtGui, QtCore
 import shiboken as shiboken
 import os, sys
 import json
 from functools import partial
-from test.test_imageop import getimage
 
 
 
@@ -45,10 +43,6 @@ def makeFile( filePath ):
 
 
 
-
-
-
-
 class Window_global:
     
     mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QtGui.QWidget )
@@ -67,26 +61,32 @@ class Window_global:
     
     lineEditObjectName = 'sgui_getImageFromObject_lineEdit'
     listWidgetObjectName = 'sgui_getImageFromObject_listWidget'
+    getImageObjectName = 'sgui_getImageFromObject_getButton'
+    removeImageObjectName = 'sgui_getImageFromObject_removeButton'
     tabObjectName = 'sgui_getImageFromObject_tab'
-    
+
+
     @staticmethod
     def saveInfo2(filePath=None):
         if not filePath:
             filePath = Window_global.infoPath2
         
-        leftSplitterSize = Window_global.leftSplitter.sizes()
-        splitterSize = Window_global.splitter.sizes()
+        verticalSplitterSize = Window_global.verticalSplitter.sizes()
+        horizonSplitter1Size = Window_global.horizonSplitter1.sizes()
+        horizonSplitter2Size = Window_global.horizonSplitter2.sizes()
         numTab = Window_global.tabWidget.count()
         lineEditTextList = []
+        selIndex = Window_global.tabWidget.currentIndex()
         for i in range( numTab ):
             tabElement = Window_global.tabWidget.widget( i )
             targetLineEdit = tabElement.findChild( QtGui.QLineEdit, Window_global.lineEditObjectName )
             lineEditTextList.append( targetLineEdit.text() )
         
         f = open( filePath, 'w' )
-        json.dump( [ leftSplitterSize, splitterSize, lineEditTextList ], f, True, False, False )
+        json.dump( [ verticalSplitterSize, horizonSplitter1Size, horizonSplitter2Size, lineEditTextList, selIndex ], f, True, False, False )
         f.close()
-    
+
+
     @staticmethod
     def loadInfo2( filePath=None ):
         if not filePath:
@@ -96,20 +96,26 @@ class Window_global:
         data = json.load( f )
         f.close()
         
-        leftSplitterSize    = data[0]
-        splitterSize        = data[1]
-        lineEditTextList    = data[2]
+        verticalSplitterSize = data[0]
+        horizonSplitter1Size = data[1]
+        horizonSplitter2Size = data[2]
+        lineEditTextList    = data[3]
+        currentIndex        = data[4]
         
-        Window_global.leftSplitter.setSizes( leftSplitterSize )
-        Window_global.splitter.setSizes( splitterSize )
+        Window_global.verticalSplitter.setSizes( verticalSplitterSize )
+        Window_global.horizonSplitter1.setSizes( horizonSplitter1Size )
+        Window_global.horizonSplitter2.setSizes( horizonSplitter2Size )
+        
+        for i in range( Window_global.tabWidget.count() ):
+            Window_global.tabWidget.removeTab( i )
         
         for i in range( len( lineEditTextList ) ):
-            Window_global.tabWidget.addTab( 'tab' )
+            Window_global.tabWidget.addTab( 'newTab' )
             addedLineEdit = Window_global.tabWidget.widget(i).findChild( QtGui.QLineEdit, Window_global.lineEditObjectName )
             addedLineEdit.setText( lineEditTextList[i] )
-            Window_global.tabWidget.widget(i)
-            Functions.updateList()
-        
+            Window_global.tabWidget.setCurrentIndex( i )
+            Functions.updateList()  
+        Window_global.tabWidget.setCurrentIndex( currentIndex )
     
 
     @staticmethod
@@ -161,9 +167,8 @@ class Window_global:
         except:
             pass
 
-
-
-
+        
+        
 class ImageBaseTranslateInfo():
     
     def __init__(self ):
@@ -263,6 +268,7 @@ class ImageBaseTranslateInfo():
 
 
 
+
 class ImageBase(QtGui.QLabel):
 
     def __init__(self, *args, **kwargs):
@@ -277,10 +283,19 @@ class ImageBase(QtGui.QLabel):
         self.label = QtGui.QLabel(self)
         self.imagePath = ""
         self.aspect = 1
+        self.imageClean = True
+    
+    
+    def clearImage(self):
         
+        self.label.clear()
+        self.imageClean = True
+
+    
     
     def loadImage(self, filePath ):
         
+        self.imageClean = False
         if self.imagePath == filePath: return None
         self.imagePath = filePath
         
@@ -288,7 +303,7 @@ class ImageBase(QtGui.QLabel):
         if self.image.load(filePath): pass
         self.transInfo.setDefault()
 
-        widgetSize = self.parentWidget().sizes()[1]
+        widgetSize = min( self.parentWidget().width(), self.parentWidget().height()  ) * 0.9
         imageWidth = self.image.width()
         
         self.transInfo.scale = widgetSize / float( imageWidth )
@@ -296,6 +311,8 @@ class ImageBase(QtGui.QLabel):
         
 
     def resize(self):
+        
+        if self.imageClean: return None
         
         trValue = QtGui.QTransform().scale( self.transInfo.scaleX(), self.transInfo.scaleY() )
         trValue *= QtGui.QTransform().rotate( self.transInfo.rotValue )
@@ -311,6 +328,7 @@ class ImageBase(QtGui.QLabel):
         marginTop  = (self.height() - imageHeight)/2.0
         
         self.label.setGeometry( marginLeft + self.transInfo.x,marginTop + self.transInfo.y, imageWidth, imageHeight )
+        self.label.paintEvent(QtGui.QPaintEvent(QtCore.QRect( 0,0,self.width(), self.height() )))
         
         
     def flip(self, pressX ):
@@ -409,23 +427,143 @@ class Functions:
                 if not extension in targetExtensions: continue
                 listWidget.addItem( name )
             break
+    
+    
+    @staticmethod
+    def updateSelTextureList( evt=0 ):
+        
+        import pymel.core
+        for i in range( Window_global.selTextureList.count() ):
+            Window_global.selTextureList.takeItem(0)
+        
+        sels = pymel.core.ls( sl=1 )
+        Window_global.imageBaseSelArea.clearImage()
+        
+        textureList = []
+        for sel in sels:
+            try:
+                sel.getShape()
+            except:
+                continue
+            shadingGroups = sel.getShape().listConnections( type='shadingEngine' )
+            for shadingGroup in shadingGroups:
+                hists = shadingGroup.history()
+                if not hists: continue
+                for hist in hists:
+                    if hist.type() != 'file': continue
+                    fileTextureName = hist.fileTextureName.get()
+                    if not os.path.exists( fileTextureName ): continue
+                    if fileTextureName in textureList: continue
+                    textureList.append( fileTextureName )
+        
+        for textureName in textureList:
+            Window_global.selTextureList.addItem( textureName )
         
             
     
     @staticmethod
-    def loadImage( evt=0 ):
+    def loadImagePathArea( evt=0 ):
+        
+        selItems = Functions.currentTextList().selectedItems()
+        if selItems:
+            Window_global.removeImageButton.setEnabled( True )
+        else:
+            Window_global.removeImageButton.setEnabled( False )
+        
         folderName = Functions.currentLineEdit().text()
         try:
             selItem = Functions.currentTextList().currentItem().text()
             if os.path.isfile( folderName + '/' + selItem ):
-                Window_global.imageBase.loadImage( folderName + '/' + selItem )
+                Window_global.imageBasePathArea.loadImage( folderName + '/' + selItem )
+        except:
+            pass
+    
+    
+    
+    @staticmethod
+    def loadImageSelArea( evt=0 ):
+        
+        selItems = Window_global.selTextureList.selectedItems()
+        if selItems:
+            Window_global.getImageButton.setEnabled( True )
+        else:
+            Window_global.getImageButton.setEnabled( False )
+        
+        try:
+            selItem = Window_global.selTextureList.currentItem().text()
+            if os.path.isfile( selItem ):
+                Window_global.imageBaseSelArea.loadImage( selItem )
         except:
             pass
     
     
     @staticmethod
     def getImage( evt=0 ):
-        pass
+        import shutil
+        folderName = Functions.currentLineEdit().text()
+        selItems = Window_global.selTextureList.selectedItems()
+
+        existsPaths = []        
+        sourcePaths = []
+        targetPaths = []
+        for selItem in selItems:
+            srcPath = selItem.text()
+            if not os.path.exists( srcPath ): continue
+            srcPath = srcPath.replace( '\\', '/' )
+            targetPath = folderName + '/' + srcPath.split( '/' )[-1]
+            
+            if srcPath in sourcePaths: continue
+            
+            sourcePaths.append( srcPath )
+            targetPaths.append( targetPath )
+            if os.path.exists( targetPath ):
+                existsPaths.append( targetPath )
+
+        if existsPaths:
+            warnString = ''
+            for existPath in existsPaths:
+                warnString += existPath + ',\n'
+            warnString += 'Aleady Exists.'
+            warnString += 'Do you want to replace it?'
+            result = cmds.confirmDialog( title='Confirm', message=warnString, button=['Yes','No'], defaultButton='Yes', cancelButton='No', dismissString='No' )
+            if result != 'Yes': return None
+
+        for i in range( len( sourcePaths ) ):
+            shutil.copy2( sourcePaths[i], targetPaths[i] )
+        
+        Functions.updateList()
+
+
+    @staticmethod
+    def removeImage( evt=0 ):
+        
+        folderName = Functions.currentLineEdit().text()
+        selItems = Functions.currentTextList().selectedItems()
+        
+        delTargets = []
+        
+        for selItem in selItems:
+            fileName = selItem.text()
+            filePath = folderName + '/' + fileName
+            if not os.path.exists( filePath ) : continue
+            delTargets.append( filePath )
+        
+        if not delTargets: return None
+        
+        warnString = ''
+        for delTarget in delTargets:
+            warnString += delTarget + ',\n'
+        warnString += 'will be deleted.'
+        warnString += 'Are you sure?'
+        
+        result = cmds.confirmDialog( title='Confirm', message=warnString, button=['Yes','No'], defaultButton='Yes', cancelButton='No', dismissString='No' )
+        if result == 'Yes':
+            for delTarget in delTargets:
+                os.remove( delTarget )
+            
+        Functions.updateList()
+        
+        
     
     
     @staticmethod
@@ -489,20 +627,42 @@ class Functions:
             break
         
         Functions.updateList()
+        
+            
+    
+    @staticmethod
+    def splitterMoved1( *args ):
+        sizes = Window_global.horizonSplitter1.sizes()
+        Window_global.horizonSplitter2.setSizes( sizes ) 
     
     
-class lineEditEventFilter( QtCore.QObject ):
+    @staticmethod
+    def splitterMoved2( *args ):
+        sizes = Window_global.horizonSplitter2.sizes()
+        Window_global.horizonSplitter1.setSizes( sizes )
+    
+    
+    
+    @staticmethod
+    def lineEdited( *args ):
+        Functions.updateList()
+        Window_global.saveInfo2()
+    
+
+
+
+
+class SplitterEventFilter( QtCore.QObject ):
     
     def __init__(self):
         QtCore.QObject.__init__( self )
     
-    def eventFilter( self, *args, **kwarngs ):
+    def eventFilter(self, *args, **kwarngs ):
         event = args[1]
-        if event.type() == QtCore.QEvent.KeyRelease:
-            path = Functions.currentLineEdit().text()
-            if os.path.exists( path ):
-                try:Window_global.saveInfo2()
-                except:pass
+        if event.type() == QtCore.QEvent.Paint:
+            #Functions.splitterMoved()
+            pass
+
 
 
 
@@ -521,10 +681,9 @@ class Tab( QtGui.QTabWidget ):
         
         setFolderLayout = QtGui.QHBoxLayout()
         listWidget = QtGui.QListWidget()
-        getImageButton = QtGui.QPushButton( 'Get Image' )
+        listWidget.setSelectionMode( QtGui.QAbstractItemView.ExtendedSelection )
         vLayout.addLayout( setFolderLayout )
         vLayout.addWidget( listWidget )
-        vLayout.addWidget( getImageButton )
         
         lineEdit = QtGui.QLineEdit()
         setFolderButton = QtGui.QPushButton( 'Set Folder' )
@@ -533,24 +692,19 @@ class Tab( QtGui.QTabWidget ):
         setFolderLayout.addWidget( setFolderButton )
         
         QtCore.QObject.connect( setFolderButton, QtCore.SIGNAL( 'clicked()' ),  Functions.setFolder )
-        QtCore.QObject.connect( listWidget, QtCore.SIGNAL( 'itemSelectionChanged()' ),  Functions.loadImage )
-        QtCore.QObject.connect( getImageButton,  QtCore.SIGNAL( 'clicked()' ),  Functions.getImage  )
+        QtCore.QObject.connect( listWidget, QtCore.SIGNAL( 'itemSelectionChanged()' ),  Functions.loadImagePathArea )
+        QtCore.QObject.connect( lineEdit, QtCore.SIGNAL( 'textChanged()' ), Functions.lineEdited )
         
         listWidget.setObjectName( Window_global.listWidgetObjectName )
-        
         lineEdit.setContextMenuPolicy( QtCore.Qt.NoContextMenu )
         lineEdit.setObjectName( Window_global.lineEditObjectName )
-        Window_global.popupMenu = cmds.popupMenu( p=lineEdit.objectName() )
+        
+        lineEdit.returnPressed.connect( Functions.lineEdited )
         
         super( Tab, self ).addTab( layoutWidget, label )
-        
-        self.lineEditEvnetFilter = lineEditEventFilter()
-        lineEdit.installEventFilter( self.lineEditEvnetFilter )
     
         
         
-        
-
 
 class Window( QtGui.QMainWindow ):
     
@@ -560,53 +714,92 @@ class Window( QtGui.QMainWindow ):
         self.installEventFilter( self )
         #self.setWindowFlags( QtCore.Qt.Drawer )
         self.setWindowTitle( Window_global.title )
+
+        verticalSplitter = QtGui.QSplitter(QtCore.Qt.Vertical)
+        self.setCentralWidget( verticalSplitter )
         
-        splitter = QtGui.QSplitter()
-        self.setCentralWidget( splitter )
+        horizonSplitter1 = QtGui.QSplitter(QtCore.Qt.Horizontal)
+        horizonSplitter2 = QtGui.QSplitter(QtCore.Qt.Horizontal)
         
-        leftSplitter = QtGui.QSplitter(); leftSplitter.setOrientation( QtCore.Qt.Vertical )
-        imageBase = ImageBase()
-        splitter.addWidget( leftSplitter )
-        splitter.addWidget( imageBase )
+        verticalSplitter.addWidget( horizonSplitter1 )
+        verticalSplitter.addWidget( horizonSplitter2 )
         
-        widgetSelArea = QtGui.QWidget()
-        layoutSelArea = QtGui.QVBoxLayout(widgetSelArea)
+        widgetSelArea  = QtGui.QWidget()
+        layoutSelArea  = QtGui.QVBoxLayout(widgetSelArea)
+        labelSelTextList = QtGui.QLabel( 'Images from Selection' )
+        selTextureList = QtGui.QListWidget()
+        selTextureList.setSelectionMode( QtGui.QAbstractItemView.ExtendedSelection )
+        layoutSelArea.addWidget( labelSelTextList )
+        layoutSelArea.addWidget( selTextureList )
+        imageBaseSelArea = ImageBase()
+        
+        horizonSplitter1.addWidget( widgetSelArea )
+        horizonSplitter1.addWidget( imageBaseSelArea )        
+        
         widgetPathArea = QtGui.QWidget()
         layoutPathArea = QtGui.QVBoxLayout( widgetPathArea )
-        leftSplitter.addWidget( widgetSelArea )
-        leftSplitter.addWidget( widgetPathArea )
+        layoutAddTab = QtGui.QHBoxLayout()
+        removeTabButton = QtGui.QPushButton( 'Remove Tab' )
+        addTabButton = QtGui.QPushButton( 'Add Tab' )
+        self.tabWidget = Tab()
+        buttonLayout = QtGui.QHBoxLayout()
+        getImageButton = QtGui.QPushButton( 'Get Image' )
+        removeImageButton   = QtGui.QPushButton( 'Remove Image' )
+        layoutPathArea.addLayout( layoutAddTab )
+        layoutPathArea.addWidget( self.tabWidget )
+        layoutPathArea.addLayout( buttonLayout )
+        imageBasePathArea = ImageBase()
+        layoutAddTab.addWidget( removeTabButton )
+        layoutAddTab.addWidget( addTabButton )
+        buttonLayout.addWidget( getImageButton )
+        buttonLayout.addWidget( removeImageButton )
         
-        labelSelTextList = QtGui.QLabel( 'Images from Selection' )
-        selTextList = QtGui.QListWidget()
-        layoutSelArea.addWidget( labelSelTextList )
-        layoutSelArea.addWidget( selTextList )
+        horizonSplitter2.addWidget( widgetPathArea )
+        horizonSplitter2.addWidget( imageBasePathArea )        
         
-        tab = Tab()
-        tab.setObjectName( Window_global.tabObjectName )
-        layoutPathArea.addWidget( tab )
-        self.tabWidget = tab
-        cmds.popupMenu( p=tab.objectName() )
-        cmds.menuItem( l='Add Tab', c= self.addTab )
-        cmds.menuItem( l='Remove Tab', c= self.removeTab )
+        Window_global.selTextureList  = selTextureList
+        Window_global.imageBaseSelArea = imageBaseSelArea
+        Window_global.imageBasePathArea = imageBasePathArea
+        Window_global.verticalSplitter = verticalSplitter
+        Window_global.horizonSplitter1 = horizonSplitter1
+        Window_global.horizonSplitter2 = horizonSplitter2
+        Window_global.getImageButton = getImageButton
+        Window_global.removeImageButton = removeImageButton
+        Window_global.tabWidget = self.tabWidget
+        Window_global.tabWidget.addTab( 'newTab' )
         
-        Window_global.imageBase  = imageBase
-        Window_global.splitter   = splitter
-        Window_global.leftSplitter = leftSplitter
-        Window_global.tabWidget  = tab
-        
-        splitter.setSizes( [100,100] )
-        leftSplitter.setSizes( [100,100] )
+        verticalSplitter.setSizes( [100,100] )
+        horizonSplitter1.setSizes( [100,100] )
+        horizonSplitter2.setSizes( [100,100] )
         
         Window_global.loadInfo()
         try:Window_global.loadInfo2()
         except:pass
-    
-    
+        Functions.updateSelTextureList()
+        
+        QtCore.QObject.connect( addTabButton,    QtCore.SIGNAL( 'clicked()' ), self.addTab )
+        QtCore.QObject.connect( removeTabButton, QtCore.SIGNAL( 'clicked()' ), self.removeTab )
+        QtCore.QObject.connect( Window_global.selTextureList, QtCore.SIGNAL( 'itemSelectionChanged()' ),  Functions.loadImageSelArea )
+        QtCore.QObject.connect( Window_global.horizonSplitter1, QtCore.SIGNAL( 'splitterMoved(int,int)' ),  Functions.splitterMoved1 )
+        QtCore.QObject.connect( Window_global.horizonSplitter2, QtCore.SIGNAL( 'splitterMoved(int,int)' ),  Functions.splitterMoved2 )
+        QtCore.QObject.connect( getImageButton,  QtCore.SIGNAL( 'clicked()' ),  Functions.getImage  )
+        QtCore.QObject.connect( removeImageButton,  QtCore.SIGNAL( 'clicked()' ),  Functions.removeImage  )
+        
+        imageBaseSelArea.clear()
+        imageBasePathArea.clear()
+        
+        getImageButton.setEnabled( False )
+        removeImageButton.setEnabled( False )
+        
+        
     def addTab(self, evt=0 ):
         self.tabWidget.addTab( 'newTab' )
+        self.tabWidget.setCurrentIndex( self.tabWidget.count()-1 )
 
 
     def removeTab(self, evt=0):
+        result = cmds.confirmDialog( title='Confirm', message="Delete the current tab?", button=['Ok', 'Cancel'], defaultButton='Ok', cancelButton='Cancel', dismissString='Cancel' )
+        if result != 'Ok': return None
         self.tabWidget.removeTab( self.tabWidget.currentIndex() )
         
 
@@ -627,6 +820,8 @@ def show( evt=0 ):
     Window_global.mainGui = Window(Window_global.mayaWin)
     Window_global.mainGui.setObjectName( Window_global.objectName )
     Window_global.mainGui.resize( Window_global.width, Window_global.height )
+    
+    cmds.scriptJob( e=['SelectionChanged', Functions.updateSelTextureList ], p=Window_global.mainGui.objectName() )
     
     Window_global.loadInfo()
     Window_global.mainGui.show()

@@ -8,11 +8,6 @@ import json
 from functools import partial
 
 
-lineEditName = "sgui_putObjectAtGround_lineEdit"
-listWidgetName = "sgui_putObjectAtGround_listWidget"
-
-
-
 
 def appendPluginPath():
 
@@ -77,7 +72,6 @@ def makeFile( filePath ):
 class Window_global:
     
     mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QtGui.QWidget )
-    objectName = "sgui_putObjectAtGround"
     title = "Put Object At Ground"
     width = 300
     height = 300
@@ -87,6 +81,45 @@ class Window_global:
     
     mainGui = QtGui.QMainWindow()
     listItems = []
+
+    objectName = 'sgui_putObjectAtGround'
+    listWidgetPutName     =  objectName + "_listPut"
+    listWidgetGroundName  =  objectName + "_listGround"
+    randomOptionRotName   =  objectName + "_randomRot"
+    randomOptionScaleName =  objectName + "_randomScale"
+    randomOptionRotAName   = objectName + "_randomRotAll"
+    randomOptionScaleAName = objectName + "_randomScaleAll"
+    offsetByObjectName     = objectName + '_offsetObject'
+    offsetByGroundName     = objectName + '_offsetGround'
+    
+    
+    
+    @staticmethod
+    def saveInfo2( filePath = None ):
+        
+        if not filePath:
+            filePath = Window_global.infoPath2
+        
+        rotateChecked = ''
+        
+        '''
+        f = open( filePath, "w" )
+        json.dump( , f, True, False, False )
+        f.close()
+        '''
+    
+    @staticmethod
+    def loadInfo2( filePath = None ):
+        
+        if not filePath:
+            filePath = Window_global.infoPath2
+        
+        f = open( filePath, 'r')
+        try:data = json.load( f )
+        except: f.close(); return None
+        f.close()
+    
+    
 
     @staticmethod
     def saveInfo( filePath = None ):
@@ -186,8 +219,7 @@ class Window_cmd:
     
     @staticmethod
     def setTool_putObjectAtGround( evt=0 ):
-        ground = cmds.textField( Window_global.txf_ground, q=1, tx=1 )
-        cmds.select( ground )
+
         if not cmds.pluginInfo( 'sgPutObjectAtGround', q=1, l=1 ):
             appendPluginPath()
             cmds.loadPlugin( 'sgPutObjectAtGround' )
@@ -197,106 +229,369 @@ class Window_cmd:
 
 
 
+class UI_objectList( QtGui.QWidget ):
+    
+    def __init__(self ):
+        
+        QtGui.QWidget.__init__( self )
+        layout = QtGui.QVBoxLayout( self )
+        
+        label = QtGui.QLabel()
+        listWidget = QtGui.QListWidget()
+        listWidget.setSelectionMode( QtGui.QAbstractItemView.ExtendedSelection )
+        hLayout = QtGui.QHBoxLayout()
+        buttonLoad   = QtGui.QPushButton( "LOAD")
+        buttonRemove = QtGui.QPushButton( "REMOVE")
+        hLayout.addWidget( buttonLoad )
+        hLayout.addWidget( buttonRemove )
+        
+        layout.addWidget( label )
+        layout.addWidget( listWidget )
+        layout.addLayout( hLayout )
+        
+        self.label = label
+        self.listWidget = listWidget
+        self.buttonLoad = buttonLoad
+        self.buttonRemove = buttonRemove
+        
+        QtCore.QObject.connect( self.buttonLoad, QtCore.SIGNAL( 'clicked()' ), self.loadCommand )
+        QtCore.QObject.connect( self.buttonRemove, QtCore.SIGNAL( 'clicked()' ), self.removeCommand )
+        
 
-class UI_ground:
+    def loadCommand(self, evt=0 ):
+
+        count = self.listWidget.count()
+        existItems = []
+        for i in range( count ):
+            existItem = self.listWidget.item( i ).text()
+            existItems.append( existItem )
+
+        sels = cmds.ls( sl=1 )
+        for sel in sels:
+            if cmds.nodeType( sel ) != 'transform': continue
+            if sel in existItems: continue
+            self.listWidget.addItem( sel )
+        
+    
+    
+    def removeCommand(self, evt=0 ):
+        
+        selItems = self.listWidget.selectedItems()
+        
+        for selItem in selItems:
+            self.listWidget.takeItem( self.listWidget.row( selItem ) )
+        
+    
+
+
+
+class UI_radomLabel( QtGui.QWidget ):
     
     def __init__(self):
         
-        pass
-    
-    
-    def create(self):
+        QtGui.QWidget.__init__( self )
+        layout = QtGui.QHBoxLayout( self )
         
-        form = cmds.formLayout()
-        txf_ground = cmds.textField( lineEditName, h=25 )
-        bt_ground  = cmds.button( l='Load ground', h=25 )
-        cmds.setParent( '..' )
+        label = QtGui.QLabel()
+        label.setFixedWidth( 120 )
         
-        cmds.formLayout( form, e=1, 
-                         af = [(txf_ground, 'top', 0), (txf_ground, 'left', 0),
-                               (bt_ground, 'top', 0 ), ( bt_ground, 'right', 0 )],
-                         ac = [ (txf_ground, 'right', 5, bt_ground) ] )
-        
-        
-        Window_global.txf_ground = txf_ground
-        Window_global.bt_ground = bt_ground
-        
-        return form
-
-
-
-
-class UI_buttons:
-    
-    def __init__(self):
-        
-        pass
-    
-    
-    def create(self):
-        
-        form = cmds.formLayout()
-        bt_add = cmds.button( l='Add Objects' )
-        bt_remove = cmds.button( l='Remove Object' )
-        bt_tool   = cmds.button( l='Put Object' )
-        cmds.setParent( '..' )
-        
-        cmds.formLayout( form, e=1,
-                         af = [( bt_add, 'top', 0 ), ( bt_add, 'left', 0 ),
-                               ( bt_remove, 'top', 0 ), ( bt_remove, 'right', 0 ),
-                               ( bt_tool, 'left', 0 ), ( bt_tool, 'right', 0 )],
-                         ap = [(bt_add, 'right', 3, 50 ), (bt_remove, 'left', 3, 50 )],
-                         ac = [(bt_tool, 'top', 5, bt_add )])
-        
-        
-        Window_global.bt_add = bt_add
-        Window_global.bt_remove = bt_remove
-        Window_global.bt_tool = bt_tool
-        
-        return form
+        layout.addWidget( label )
+        labelX = QtGui.QLabel( 'X Range' )
+        labelY = QtGui.QLabel( 'Y Range' )
+        labelZ = QtGui.QLabel( 'Z Range' )
+        labelX.setAlignment( QtCore.Qt.AlignCenter )
+        labelY.setAlignment( QtCore.Qt.AlignCenter )
+        labelZ.setAlignment( QtCore.Qt.AlignCenter )
+        layout.addWidget( labelX )
+        layout.addWidget( labelY )
+        layout.addWidget( labelZ )
 
 
 
 
 
 
-class Window:
+class UI_randomOption( QtGui.QWidget ):
     
-    def __init__(self):
+    def __init__(self, text, validator, minValue, maxValue ):
+    
+        QtGui.QWidget.__init__( self )
+        layout = QtGui.QHBoxLayout( self )
         
-        self.ui_ground = UI_ground()
-        self.ui_buttons = UI_buttons()
-    
-    
-    def create(self):
+        checkBox = QtGui.QCheckBox()
+        checkBox.setFixedWidth( 115 )
+        checkBox.setText( text )
         
-        if cmds.window( Window_global.objectName, q=1, ex=1 ):
-            cmds.deleteUI( Window_global.objectName )
-        cmds.window( Window_global.objectName, title= Window_global.title )
+        layout.addWidget( checkBox )
         
-        form = cmds.formLayout()
-        ui_ground = self.ui_ground.create()
-        scrollList = cmds.textScrollList( listWidgetName )
-        ui_buttons = self.ui_buttons.create()
-        cmds.setParent( '..' )
+        hLayoutX = QtGui.QHBoxLayout()
+        lineEditXMin = QtGui.QLineEdit()
+        lineEditXMax = QtGui.QLineEdit()
+        hLayoutX.addWidget( lineEditXMin )
+        hLayoutX.addWidget( lineEditXMax )
+        lineEditXMin.setValidator( validator )
+        lineEditXMax.setValidator( validator )
+        lineEditXMin.setText( str( minValue ) )
+        lineEditXMax.setText( str( maxValue ) )
         
-        cmds.formLayout( form, e=1, 
-                         af=[(ui_ground, 'top', 5), (ui_ground, 'left', 5), (ui_ground, 'right', 5),
-                             (scrollList, 'left', 5), (scrollList, 'right', 5),
-                             (ui_buttons, 'bottom', 5), (ui_buttons, 'left', 5), (ui_buttons, 'right', 5) ],
-                         ac = [( scrollList, 'top', 5, ui_ground), ( scrollList, 'bottom', 5, ui_buttons)])
+        layout.addLayout( hLayoutX )
         
-        #cmds.window( Window_global.objectName, e=1, w= Window_global.width, h= Window_global.height )
-        cmds.showWindow( Window_global.objectName )
-        Window_global.scrollList = scrollList
+        self.checkBox      = checkBox
+        self.lineEditX_min = lineEditXMin
+        self.lineEditX_max = lineEditXMax
+        self.lineEdits = [ lineEditXMin, lineEditXMax ]
+
+        QtCore.QObject.connect( checkBox, QtCore.SIGNAL( "clicked()" ), self.updateEnabled )
+        self.updateEnabled()
+    
+    
+    def updateEnabled(self, *args, **kwargs ):
+
+        enabledValue = False
+        if self.checkBox.isChecked():
+            enabledValue = True
         
-        cmds.button( Window_global.bt_ground, e=1, c=Window_cmd.loadGround )
-        cmds.button( Window_global.bt_add,    e=1, c=Window_cmd.addObject )
-        cmds.button( Window_global.bt_remove, e=1, c=Window_cmd.removeObject )
-        cmds.button( Window_global.bt_tool,   e=1, c=Window_cmd.setTool_putObjectAtGround )
+        for lineEdit in self.lineEdits:
+            lineEdit.setEnabled( enabledValue )
+
+
+    def eventFilter(self, *args, **kwargs):
+        
+        return QtGui.QWidget.eventFilter(self, *args, **kwargs)
+    
+
+
+
+
+
+
+class UI_randomOption2( QtGui.QWidget ):
+    
+    def __init__(self, text, validator, minValue, maxValue ):
+        
+        QtGui.QWidget.__init__( self )
+        layout = QtGui.QHBoxLayout( self )
+        
+        checkBox = QtGui.QCheckBox()
+        checkBox.setFixedWidth( 115 )
+        checkBox.setText( text )
+        
+        layout.addWidget( checkBox )
+        
+        hLayoutX = QtGui.QHBoxLayout()
+        lineEditXMin = QtGui.QLineEdit()
+        lineEditXMax = QtGui.QLineEdit()
+        hLayoutX.addWidget( lineEditXMin )
+        hLayoutX.addWidget( lineEditXMax )
+        lineEditXMin.setValidator( validator )
+        lineEditXMax.setValidator( validator )
+        lineEditXMin.setText( str( minValue ) )
+        lineEditXMax.setText( str( maxValue ) )
+        
+        hLayoutY = QtGui.QHBoxLayout()
+        lineEditYMin = QtGui.QLineEdit()
+        lineEditYMax = QtGui.QLineEdit()
+        hLayoutY.addWidget( lineEditYMin )
+        hLayoutY.addWidget( lineEditYMax )
+        lineEditYMin.setValidator( validator )
+        lineEditYMax.setValidator( validator )
+        lineEditYMin.setText( str( minValue ) )
+        lineEditYMax.setText( str( maxValue ) )
+        
+        hLayoutZ = QtGui.QHBoxLayout()
+        lineEditZMin = QtGui.QLineEdit()
+        lineEditZMax = QtGui.QLineEdit()
+        hLayoutZ.addWidget( lineEditZMin )
+        hLayoutZ.addWidget( lineEditZMax )
+        lineEditZMin.setValidator( validator )
+        lineEditZMax.setValidator( validator )
+        lineEditZMin.setText( str( minValue ) )
+        lineEditZMax.setText( str( maxValue ) )
+        
+        layout.addLayout( hLayoutX )
+        layout.addLayout( hLayoutY )
+        layout.addLayout( hLayoutZ )
+        
+        self.checkBox      = checkBox
+        self.lineEditX_min = lineEditXMin
+        self.lineEditX_max = lineEditXMax
+        self.lineEditY_min = lineEditYMin
+        self.lineEditY_max = lineEditYMax
+        self.lineEditZ_min = lineEditZMin
+        self.lineEditZ_max = lineEditZMax
+        self.lineEdits = [ lineEditXMin, lineEditXMax, lineEditYMin, lineEditYMax, lineEditZMin, lineEditZMax ]
+
+        QtCore.QObject.connect( checkBox, QtCore.SIGNAL( "clicked()" ), self.updateEnabled )
+        self.updateEnabled()
+
+
+    def updateEnabled(self, *args, **kwargs ):
+
+        enabledValue = False
+        if self.checkBox.isChecked():
+            enabledValue = True
+        
+        for lineEdit in self.lineEdits:
+            lineEdit.setEnabled( enabledValue )
+
+
+    def eventFilter(self, *args, **kwargs):
+        
+        return QtGui.QWidget.eventFilter(self, *args, **kwargs)
+
+
+
+
+
+
+class UI_OffsetSlider( QtGui.QWidget ):
+    
+    def __init__(self, text, minValue, maxValue, defaultValue ):
+        
+        QtGui.QWidget.__init__( self )
+        
+        validator = QtGui.QDoubleValidator(minValue, maxValue, 2, self )
+        mainLayout = QtGui.QHBoxLayout( self )
+        
+        checkBox = QtGui.QCheckBox()
+        checkBox.setFixedWidth( 115 )
+        checkBox.setText( text )
+        
+        lineEdit = QtGui.QLineEdit()
+        lineEdit.setValidator( validator )
+        lineEdit.setText( str(defaultValue) )
+        
+        slider = QtGui.QSlider( QtCore.Qt.Horizontal )
+        slider.setMinimum( minValue*100 )
+        slider.setMaximum( maxValue*100 )
+        slider.setValue( defaultValue )
+        
+        mainLayout.addWidget( checkBox )
+        mainLayout.addWidget( lineEdit )
+        mainLayout.addWidget( slider )
+        
+        QtCore.QObject.connect( slider, QtCore.SIGNAL( 'valueChanged(int)' ), self.syncWidthLineEdit )
+        QtCore.QObject.connect( lineEdit, QtCore.SIGNAL( 'textChanged(QString)' ), self.syncWidthSlider )
+        QtCore.QObject.connect( checkBox, QtCore.SIGNAL( "clicked()" ), self.updateEnabled )
+        
+        self.checkBox = checkBox
+        self.slider = slider
+        self.lineEdit = lineEdit
+        
+        self.updateEnabled()
     
     
     
-def show():
+    def updateEnabled(self, *args, **kwargs ):
+
+        enabledValue = False
+        if self.checkBox.isChecked():
+            enabledValue = True
+        self.lineEdit.setEnabled( enabledValue )
+        self.slider.setEnabled( enabledValue )
     
-    Window().create()
+
+
+    def syncWidthLineEdit(self, *args ):
+        
+        self.lineEdit.setText( str(args[0]/100.0) )
+    
+    
+    
+    def syncWidthSlider(self, *args ):
+        
+        try:self.slider.setValue( float( self.lineEdit.text() )*100 )
+        except:pass
+
+
+
+    def eventFilter(self, *args, **kwargs):
+        return QtGui.QWidget.eventFilter(self, *args, **kwargs)
+        
+
+
+
+
+
+
+class Window( QtGui.QMainWindow ):
+    
+    def __init__(self, *args, **kwargs ):
+        
+        QtGui.QMainWindow.__init__( self, *args, **kwargs )
+        self.installEventFilter( self )
+        self.setWindowTitle( Window_global.title )
+        
+        mainWidget = QtGui.QWidget()
+        self.setCentralWidget( mainWidget )
+        
+        vLayout = QtGui.QVBoxLayout( mainWidget )
+        
+        hLayoutListWidget = QtGui.QHBoxLayout()
+        widgetPutList  = UI_objectList()
+        widgetBaseList = UI_objectList()
+        widgetPutList.label.setText( 'Put Object List' )
+        widgetBaseList.label.setText( 'Ground Object List' )
+        buttonPut = QtGui.QPushButton( 'Put Object' )
+        widgetPutList.listWidget.setObjectName( Window_global.listWidgetPutName )
+        widgetBaseList.listWidget.setObjectName( Window_global.listWidgetGroundName )
+        
+        hLayoutListWidget.addWidget( widgetPutList )
+        hLayoutListWidget.addWidget( widgetBaseList )
+        
+        rotateValidator = QtGui.QDoubleValidator(-1000000, 1000000, 2, self )
+        scaleValidator  = QtGui.QDoubleValidator( 0.0, 100, 2, self )
+        
+        randomLabel   = UI_radomLabel()
+        randomOptionR = UI_randomOption2( 'Rotate', rotateValidator, -45, 45 )
+        randomOptionS = UI_randomOption2( 'Scale', scaleValidator, 0.8, 1.2 )
+        randomOptionRA = UI_randomOption( 'Rotate All', rotateValidator, -45, 45 )
+        randomOptionSA = UI_randomOption( 'Scale All', scaleValidator, 0.8, 1.2 )
+        randomOptionR.setObjectName( Window_global.randomOptionRotName )
+        randomOptionS.setObjectName( Window_global.randomOptionScaleName )
+        randomOptionRA.setObjectName( Window_global.randomOptionRotAName )
+        randomOptionSA.setObjectName( Window_global.randomOptionScaleAName )
+        
+        offsetSlider1 = UI_OffsetSlider( "Offset By Object",  -1, 1, 0 )
+        offsetSlider2 = UI_OffsetSlider( "Offset By Ground",  -100, 100, 0 )
+        offsetSlider1.setObjectName( Window_global.offsetByObjectName )
+        offsetSlider2.setObjectName( Window_global.offsetByGroundName )
+        
+        vLayout.addLayout( hLayoutListWidget )
+        vLayout.addWidget( randomLabel )
+        vLayout.addWidget( randomOptionR )
+        vLayout.addWidget( randomOptionS )
+        vLayout.addWidget( randomOptionRA )
+        vLayout.addWidget( randomOptionSA )
+        vLayout.addWidget( offsetSlider1 )
+        vLayout.addWidget( offsetSlider2 )
+        vLayout.addWidget( buttonPut )
+        Window_global.loadInfo()
+        
+        QtCore.QObject.connect( buttonPut, QtCore.SIGNAL( 'clicked()' ), Window_cmd.setTool_putObjectAtGround )
+        
+        
+    
+    def eventFilter( self, *args, **kwargs):
+        event = args[1]
+        if event.type() in [QtCore.QEvent.LayoutRequest,QtCore.QEvent.Move,QtCore.QEvent.Resize] :
+            Window_global.saveInfo()
+        
+        
+        
+    
+
+def show( evt=0 ):
+    
+    if cmds.window( Window_global.objectName, ex=1 ):
+        cmds.deleteUI( Window_global.objectName )
+    
+    Window_global.mainGui = Window(Window_global.mayaWin)
+    Window_global.mainGui.setObjectName( Window_global.objectName )
+    Window_global.mainGui.resize( Window_global.width, Window_global.height )
+    
+    Window_global.loadInfo()
+    Window_global.mainGui.show()
+
+
+

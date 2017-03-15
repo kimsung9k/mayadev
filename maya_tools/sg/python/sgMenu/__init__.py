@@ -54,7 +54,7 @@ class SGFileBaseMenu:
         if not splits[0].isdigit():
             return SGFileBaseMenu.getAnableUIName( menuUiName +'_'+ name ), name
         targetName = splits[1]
-        return SGFileBaseMenu.getAnableUIName( menuUiName +'_'+ targetName), targetName
+        return SGFileBaseMenu.getAnableUIName( menuUiName +'_'+ '_'.join( splits[:2] ) ), targetName
 
 
     @staticmethod
@@ -62,7 +62,7 @@ class SGFileBaseMenu:
         splits = folderName.split( '.' )
         if not splits[0].isdigit():
             return SGFileBaseMenu.getAnableUIName( menuUiName +'_'+ folderName )
-        targetName = splits[1]
+        targetName = '_'.join( splits[:2] )
         return SGFileBaseMenu.getAnableUIName( menuUiName +'_'+ targetName)
 
 
@@ -614,37 +614,34 @@ class MenuController:
                        image=os.path.dirname( __file__ ) + '/icons/list.png' )
         cmds.menuItem( d=1, dl="Main Menu", p=self.mainMenu )
         
-        try:
-            for menuPath in getMenuPaths( Menu_Global.menuListFile ):
-                menuChecked = self.isMenuChecked( menuPath )
-                dirname = Menu_Global.getMenuLabel( menuPath.split( '/' )[-1] )
-                menuName = cmds.menuItem( l= dirname, p= self.mainMenu, cb=menuChecked )
-                cmds.menuItem( menuName, e=1, c= partial( self.selectMenu, menuName, menuPath ) )
-                if menuChecked: self.selectMenu( menuName, menuPath )
-            
-            cmds.menuItem( d=1, dl="Popup Menu( Shift + alt + RMB )", p=self.mainMenu )
-            popupShiftAlt = cmds.menuItem( l="Popup Menu( Shift + alt + RMB )", p=self.mainMenu, sm=1 )
-            cmds.radioMenuItemCollection( p = popupShiftAlt )
-            cmds.menuItem( l= "Clear", p= popupShiftAlt, rb=1, c=self.clearPopupSa )
-            for menuPath in getMenuPaths( Menu_Global.popupListFile_sa ):
-                popupChecked = self.isPopupChecked( menuPath, 'sa' )
-                dirname = Menu_Global.getMenuLabel( menuPath.split( '/' )[-1] )
-                popupName = cmds.menuItem( l= dirname, p= popupShiftAlt, rb=popupChecked )
-                cmds.menuItem( popupName, e=1, c= partial( self.selectPopup, menuPath, 'sa' ), p=popupShiftAlt )
-                if popupChecked: self.selectPopup( menuPath, 'sa' )
-            
-            cmds.menuItem( d=1, dl="Popup Menu( Ctrl + alt + RMB )", p=self.mainMenu )
-            popupCtrlAlt = cmds.menuItem( l="Popup Menu( Shift + alt + RMB )", p=self.mainMenu, sm=1 )
-            cmds.radioMenuItemCollection( p = popupCtrlAlt )
-            cmds.menuItem( l= "Clear", p= popupCtrlAlt, rb=1, c=self.clearPopupCa )
-            for menuPath in getMenuPaths( Menu_Global.popupListFile_ca ):
-                popupChecked = self.isPopupChecked( menuPath, 'ca' )
-                dirname = Menu_Global.getMenuLabel( menuPath.split( '/' )[-1] )
-                popupName = cmds.menuItem( l= dirname, p= popupCtrlAlt, rb=popupChecked )
-                cmds.menuItem( popupName, e=1, c= partial( self.selectPopup, menuPath, 'ca' ) )
-                if popupChecked: self.selectPopup( menuPath, 'ca' )
-        except:
-            pass
+        for menuPath in getMenuPaths( Menu_Global.menuListFile ):
+            menuChecked = self.isMenuChecked( menuPath )
+            dirname = Menu_Global.getMenuLabel( menuPath.split( '/' )[-1] )
+            menuName = cmds.menuItem( l= dirname, p= self.mainMenu, cb=menuChecked )
+            cmds.menuItem( menuName, e=1, c= partial( self.selectMenu, menuName, menuPath ) )
+            if menuChecked: self.selectMenu( menuName, menuPath )
+        
+        cmds.menuItem( d=1, dl="Popup Menu( Shift + alt + RMB )", p=self.mainMenu )
+        popupShiftAlt = cmds.menuItem( l="Popup Menu( Shift + alt + RMB )", p=self.mainMenu, sm=1 )
+        cmds.radioMenuItemCollection( p = popupShiftAlt )
+        cmds.menuItem( l= "Clear", p= popupShiftAlt, rb=1, c=self.clearPopupSa )
+        for menuPath in getMenuPaths( Menu_Global.popupListFile_sa ):
+            popupChecked = self.isPopupChecked( menuPath, 'sa' )
+            dirname = Menu_Global.getMenuLabel( menuPath.split( '/' )[-1] )
+            popupName = cmds.menuItem( l= dirname, p= popupShiftAlt, rb=popupChecked )
+            cmds.menuItem( popupName, e=1, c= partial( self.selectPopup, menuPath, 'sa' ), p=popupShiftAlt )
+            if popupChecked: self.selectPopup( menuPath, 'sa' )
+        
+        cmds.menuItem( d=1, dl="Popup Menu( Ctrl + alt + RMB )", p=self.mainMenu )
+        popupCtrlAlt = cmds.menuItem( l="Popup Menu( Shift + alt + RMB )", p=self.mainMenu, sm=1 )
+        cmds.radioMenuItemCollection( p = popupCtrlAlt )
+        cmds.menuItem( l= "Clear", p= popupCtrlAlt, rb=1, c=self.clearPopupCa )
+        for menuPath in getMenuPaths( Menu_Global.popupListFile_ca ):
+            popupChecked = self.isPopupChecked( menuPath, 'ca' )
+            dirname = Menu_Global.getMenuLabel( menuPath.split( '/' )[-1] )
+            popupName = cmds.menuItem( l= dirname, p= popupCtrlAlt, rb=popupChecked )
+            cmds.menuItem( popupName, e=1, c= partial( self.selectPopup, menuPath, 'ca' ) )
+            if popupChecked: self.selectPopup( menuPath, 'ca' )
         
         cmds.menuItem( d=1, dl="", p=self.mainMenu )
         cmds.menuItem( l="Get Icon", p=self.mainMenu, c="import webbrowser;url = 'http://www.flaticon.com/';webbrowser.open_new_tab( url )",
