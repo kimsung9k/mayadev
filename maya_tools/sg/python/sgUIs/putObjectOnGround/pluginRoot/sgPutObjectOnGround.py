@@ -14,15 +14,19 @@ class Window_global:
     
     mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QtGui.QWidget )
 
-    objectName = 'sgui_putObjectAtGround'
+    objectName = 'sgui_putObjectOnGround'
     listWidgetPutName      =  objectName + "_listPut"
     listWidgetGroundName   =  objectName + "_listGround"
     randomOptionRotName    =  objectName + "_randomRot"
-    randomOptionScaleName  =  objectName + "_randomScale"
     randomOptionRotAName   =  objectName + "_randomRotAll"
+    randomOptionScaleName  =  objectName + "_randomScale"
     randomOptionScaleAName =  objectName + "_randomScaleAll"
-    offsetByObjectName = objectName + '_offsetObject'
-    offsetByGroundName = objectName + '_offsetGround'
+    offsetByObjectName     = objectName + '_offsetObject'
+    offsetByGroundName     = objectName + '_offsetGround'
+    checkNormalOrientName  = objectName + '_checkNormalOrient'
+    orientEditModeName     = objectName + '_orientEditMode'
+    duGroupListName        = objectName + '_duGroupList'
+    componentCheckName         = objectName + '_componentCheck'
     
     windowObject = None
     ui_listWidgetPut = None
@@ -33,18 +37,26 @@ class Window_global:
     ui_randomOptionScaleA = None
     ui_offsetByObject = None
     ui_offsetByGround = None
+    ui_checkNormalOrient = None
+    ui_orientEditMode    = None
+    ui_duGroupList = None
+    ui_componentCheck = None
     
     @staticmethod
     def getUIObjects():        
-        windowObject        = Window_global.mayaWin.findChild( QtGui.QMainWindow, Window_global.objectName )
-        ui_listWidgetPut    = windowObject.findChild( QtGui.QWidget, Window_global.listWidgetPutName )
-        ui_listWidgetGround = windowObject.findChild( QtGui.QWidget, Window_global.listWidgetGroundName )
-        ui_randomOptionRot   = windowObject.findChild( QtGui.QWidget, Window_global.randomOptionRotName )
-        ui_randomOptionScale = windowObject.findChild( QtGui.QWidget, Window_global.randomOptionScaleName )
+        windowObject          = Window_global.mayaWin.findChild( QtGui.QMainWindow, Window_global.objectName )
+        ui_listWidgetPut      = windowObject.findChild( QtGui.QWidget, Window_global.listWidgetPutName )
+        ui_listWidgetGround   = windowObject.findChild( QtGui.QWidget, Window_global.listWidgetGroundName )
+        ui_randomOptionRot    = windowObject.findChild( QtGui.QWidget, Window_global.randomOptionRotName )
+        ui_randomOptionScale  = windowObject.findChild( QtGui.QWidget, Window_global.randomOptionScaleName )
         ui_randomOptionRotA   = windowObject.findChild( QtGui.QWidget, Window_global.randomOptionRotAName )
         ui_randomOptionScaleA = windowObject.findChild( QtGui.QWidget, Window_global.randomOptionScaleAName )
-        ui_offsetByObject = windowObject.findChild( QtGui.QWidget, Window_global.offsetByObjectName )
-        ui_offsetByGround = windowObject.findChild( QtGui.QWidget, Window_global.offsetByGroundName )
+        ui_offsetByObject     = windowObject.findChild( QtGui.QWidget, Window_global.offsetByObjectName )
+        ui_offsetByGround     = windowObject.findChild( QtGui.QWidget, Window_global.offsetByGroundName )
+        ui_checkNormalOrient  = windowObject.findChild( QtGui.QWidget, Window_global.checkNormalOrientName )
+        ui_orientEditMode     = windowObject.findChild( QtGui.QWidget, Window_global.orientEditModeName )
+        ui_duGroupList        = windowObject.findChild( QtGui.QWidget, Window_global.duGroupListName )
+        ui_componentCheck         = windowObject.findChild( QtGui.QWidget, Window_global.componentCheckName)
 
         Window_global.windowObject = windowObject
         Window_global.ui_listWidgetPut       = ui_listWidgetPut
@@ -55,6 +67,10 @@ class Window_global:
         Window_global.ui_randomOptionScaleA  = ui_randomOptionScaleA
         Window_global.ui_offsetByObject      = ui_offsetByObject
         Window_global.ui_offsetByGround      = ui_offsetByGround
+        Window_global.ui_checkNormalOrient   = ui_checkNormalOrient
+        Window_global.ui_orientEditMode      = ui_orientEditMode
+        Window_global.ui_duGroupList         = ui_duGroupList
+        Window_global.ui_componentCheck          = ui_componentCheck
         
 
 
@@ -180,9 +196,17 @@ class Tool_global:
     rotatedMatrix = OpenMaya.MMatrix()
     normalRotMatrix  = OpenMaya.MMatrix()
     randomMatrix  = OpenMaya.MMatrix()
+    transMatrix = OpenMaya.MMatrix()
+    scaleEditMatrix = OpenMaya.MMatrix()
+    rotationEditMatrix = OpenMaya.MMatrix()
+    rotationYEditMatrix = OpenMaya.MMatrix()
+    
+    randomMatrixExists = False
     
     targetViewSize = None
     instancePoints = OpenMaya.MPointArray()
+    
+    beforeInstObj = None
     
     @staticmethod
     def setDefault():
@@ -191,6 +215,10 @@ class Tool_global:
         Tool_global.intersectOffset = OpenMaya.MPoint()
         Tool_global.defaultMatrix = OpenMaya.MMatrix()
         Tool_global.rotatedMatrix = OpenMaya.MMatrix()
+        Tool_global.beforeInstObj = None
+        Tool_global.randomMatrixExists = False
+        Tool_global.targetViewSize = None
+        Tool_global.instancePoints = OpenMaya.MPointArray()
 
 
 
@@ -392,16 +420,26 @@ class Functions:
     @staticmethod
     def copyObject( src ):
         
-        dst = cmds.createNode( 'transform', n=src + '_du' )
-        srcShape = cmds.listRelatives( src, s=1, f=1 )[0]
-        OpenMaya.MFnMesh().copy( getMObject( srcShape ), getMObject( dst ) )
-        dstShape = cmds.listRelatives( dst, s=1, f=1 )[0]
+        numGroups = Window_global.ui_duGroupList.count()
         
-        shadingEngine = cmds.listConnections( srcShape, s=0, d=1, type='shadingEngine' )
-        if not shadingEngine: 
-            cmds.sets( dstShape, e=1, forceElement='initialShadingGroup' )
-        else:
-            cmds.sets( dstShape, e=1, forceElement=shadingEngine[0] )
+        if numGroups:
+            for i in range( numGroups ):
+                targetItem = Window_global.ui_duGroupList.item(i)
+                if not cmds.objExists( targetItem.text() ):
+                    Window_global.ui_duGroupList.takeItem( Window_global.ui_duGroupList.row(targetItem) )
+            numGroups = Window_global.ui_duGroupList.count()
+        
+        if not numGroups:
+            newGroup = cmds.group( em=1, n='CopyedObjectList' )
+            Window_global.ui_duGroupList.addItem( newGroup )
+        
+        cuItem = Window_global.ui_duGroupList.currentItem()
+        if not cuItem:
+            Window_global.ui_duGroupList.setCurrentRow( 0 )
+        cuItem = Window_global.ui_duGroupList.currentItem()
+        
+        duObject = cmds.duplicate( src, n= src+'_du' )[0]
+        return cmds.parent( duObject, cuItem.text() )[0]
     
     
     @staticmethod
@@ -464,7 +502,7 @@ class Functions:
         wx = vector.x
         wy = vector.y
         wz = vector.z
-        r = rotValue
+        r = math.radians( rotValue )
         
         rotMatrixList = [ cos( r ) - ( cos(r)-1 )*wx*wx, ( 1 - cos(r) )*wx*wy - sin(r)*wz, sin(r)*wy - ( cos(r) - 1 )*wx*wz, 0,
                          (1-cos(r))*wx*wy + sin(r)*wz, cos(r)-(cos(r)-1)*wy*wy, -sin(r)*wx-(cos(r)-1)*wy*wz, 0,
@@ -486,8 +524,11 @@ class Functions:
     
     @staticmethod
     def getRotationMatrixFromNormal( normalVector ):
-        yVector = OpenMaya.MVector( 0,1,0 )
-        return yVector.rotateTo( normalVector ).asMatrix()
+        
+        if Window_global.ui_checkNormalOrient.isChecked():
+            yVector = OpenMaya.MVector( 0,1,0 )
+            return yVector.rotateTo( normalVector ).asMatrix()
+        return OpenMaya.MMatrix()
     
     
     @staticmethod
@@ -574,11 +615,29 @@ class Functions:
         trMtxA.setRotation( rotPtr, trMtxA.kXYZ )
         trMtxA.setScale( scalePtr, OpenMaya.MSpace.kTransform )
         
-        Tool_global.randomMatrix = trMtxA.asMatrix() * trMtx.asMatrix()
+        return trMtxA.asMatrix() * trMtx.asMatrix()
 
 
     @staticmethod
-    def getOffsetMatrix( editMatrix ):
+    def getOffsetMatrix( editMatrix, normalMatrix ):
+        
+        def getBoundingBoxMinMaxY( selObject ):
+            bb = OpenMaya.MBoundingBox()
+            bbmin = cmds.getAttr( selObject + '.boundingBoxMin' )[0]
+            bbmax = cmds.getAttr( selObject + '.boundingBoxMax' )[0]
+            multMatrix = Tool_global.randomMatrix * Tool_global.scaleEditMatrix
+            point1 = OpenMaya.MPoint( bbmin[0], bbmin[1], bbmin[2] ) * multMatrix
+            point2 = OpenMaya.MPoint( bbmax[0], bbmin[1], bbmin[2] ) * multMatrix
+            point3 = OpenMaya.MPoint( bbmax[0], bbmax[1], bbmin[2] ) * multMatrix
+            point4 = OpenMaya.MPoint( bbmax[0], bbmax[1], bbmax[2] ) * multMatrix
+            point5 = OpenMaya.MPoint( bbmin[0], bbmax[1], bbmax[2] ) * multMatrix
+            point6 = OpenMaya.MPoint( bbmin[0], bbmin[1], bbmax[2] ) * multMatrix
+            bb.expand( point1 ); bb.expand( point2 ); bb.expand( point3 )
+            bb.expand( point4 ); bb.expand( point5 ); bb.expand( point6 )
+            return bb.min().y, bb.max().y
+            
+        
+        srcMatrix = editMatrix * normalMatrix.inverse()
         
         oValidator, oMainLayout, oCheck, oLineEdit, oSlider = Window_global.ui_offsetByObject.children()
         gValidator, oMainLayout, gCheck, gLineEdit, gSlider = Window_global.ui_offsetByGround.children()
@@ -588,26 +647,102 @@ class Functions:
         objectOffset = float( oLineEdit.text() )
         groundOffset = float( gLineEdit.text() )
         
-        maxY = -1000000000.0
-        minY =  1000000000.0
-        for i in range( Tool_global.instancePoints.length() ):
-            pointEdited = Tool_global.instancePoints[i] * editMatrix
-            if pointEdited.y < minY:
-                minY = pointEdited.y
-            if pointEdited.y > maxY:
-                maxY = pointEdited.y
-        
-        offsetObjectY = ( maxY - minY ) * objectOffset
+        if Window_global.ui_componentCheck.isChecked():
+            maxY = -1000000000.0
+            minY =  1000000000.0
+            for i in range( Tool_global.instancePoints.length() ):
+                pointEdited = Tool_global.instancePoints[i] * srcMatrix
+                if pointEdited.y < minY:
+                    minY = pointEdited.y
+                if pointEdited.y > maxY:
+                    maxY = pointEdited.y
+            offsetObjectY = ( maxY - minY ) * objectOffset
+        else:
+            minY, maxY = getBoundingBoxMinMaxY( Functions.getSelectedObject() )
+            offsetObjectY = ( maxY - minY ) * objectOffset
+            
         if not objectOffsetCheck:
             offsetObjectY = 0
         if not groundOffsetCheck:
             groundOffset = 0
         
-        mtxList = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,-minY+groundOffset+offsetObjectY,0,1]
+        offsetVector = OpenMaya.MVector( 0,-minY+groundOffset+offsetObjectY,0 ) * normalMatrix
+        
+        mtxList = [1,0,0,0, 0,1,0,0, 0,0,1,0, offsetVector.x,offsetVector.y,offsetVector.z,1]
         mtx = OpenMaya.MMatrix()
         OpenMaya.MScriptUtil.createMatrixFromList( mtxList, mtx )
         return mtx
+    
+    
+    @staticmethod
+    def getRotationEditMatrix( mouseX, mouseY ):
         
+        import math
+        
+        if Window_global.ui_orientEditMode.currentText() == 'All':
+            srcPoint = Tool_global.intersectPoint
+            srcViewPoint = Functions.worldPointToViewPoint( srcPoint )
+            mousePoint = OpenMaya.MPoint( mouseX, mouseY, 0 )
+            
+            mouseWorldPoint     = Functions.viewPointToWorldPoint( mousePoint )
+            srcViewPointToWorld = Functions.viewPointToWorldPoint( srcViewPoint )
+            
+            directionVector = mouseWorldPoint - srcViewPointToWorld
+            camVector = Functions.getCamVector()
+            crossVector = directionVector ^ camVector
+            
+            viewPointVector = OpenMaya.MVector(mousePoint) - OpenMaya.MVector(srcViewPoint)
+            rotValue = viewPointVector.length() / Tool_global.targetViewSize * 90
+        
+            return Functions.getRotationMatrix( crossVector, rotValue )
+            
+        return OpenMaya.MMatrix()
+    
+    
+    @staticmethod
+    def getRotationYEditMatrix( mouseX, mouseY ):
+        
+        import math
+        
+        if Window_global.ui_orientEditMode.currentText() == 'Only Y':
+            srcPoint = Tool_global.intersectPoint
+            srcViewPoint = Functions.worldPointToViewPoint( srcPoint )
+            mousePoint = OpenMaya.MPoint( mouseX, mouseY, 0 )
+            
+            mouseWorldPoint     = Functions.viewPointToWorldPoint( mousePoint )
+            srcViewPointToWorld = Functions.viewPointToWorldPoint( srcViewPoint )
+            
+            directionVector = mouseWorldPoint - srcViewPointToWorld
+            camVector = Functions.getCamVector()
+            crossVector = directionVector ^ camVector
+            
+            viewPointVector = OpenMaya.MVector(mousePoint) - OpenMaya.MVector(srcViewPoint)
+            rotValue = viewPointVector.x / Tool_global.targetViewSize * 45
+        
+            trMtx = OpenMaya.MTransformationMatrix()
+            euler = OpenMaya.MEulerRotation( 0.0,math.radians(rotValue),0.0 )
+            quat = euler.asQuaternion()
+            trMtx.setRotationQuaternion( quat.x, quat.y, quat.z, quat.w )
+            return trMtx.asMatrix()
+        else:
+            return OpenMaya.MMatrix()
+    
+    
+    @staticmethod
+    def getScaleEditMatrix( mouseX, mouseY ):
+        
+        srcPoint     = Tool_global.intersectPoint
+        srcViewPoint = Functions.worldPointToViewPoint( srcPoint )
+        mousePoint   = OpenMaya.MPoint( mouseX, mouseY, 0 )
+        
+        viewPointVector     = OpenMaya.MVector(mousePoint) - OpenMaya.MVector(srcViewPoint)
+        addSize = viewPointVector.y / Tool_global.targetViewSize * Tool_global.currentSize
+        
+        return  listToMatrix( [ addSize + 1, 0, 0, 0,
+                                0, addSize + 1, 0, 0,
+                                0, 0, addSize + 1, 0,
+                                0, 0, 0, 1 ])
+    
     
     
     
@@ -616,7 +751,7 @@ class Functions:
 
 class PutObjectContext( OpenMayaMPx.MPxSelectionContext ):
 
-    contextName = 'sgPutObjectAtGroundContext'
+    contextName = 'sgPutObjectOnGroundContext'
     
     def __init__( self ):
         OpenMayaMPx.MPxSelectionContext.__init__( self )
@@ -628,14 +763,6 @@ class PutObjectContext( OpenMayaMPx.MPxSelectionContext ):
         if not Window_global.windowObject:
             cmds.warning( "ui is not exists" )
             return None
-        
-        meshShape = getSelection()
-        
-        if meshShape:
-            self.meshName = meshShape
-            self.dagPath = getDagPath( meshShape )
-        else:
-            self.dagPath = None
         
         OpenMayaMPx.MPxSelectionContext.toolOnSetup( self, *args, **kwargs )
         Tool_global.eventFilter   = MainWindowEventFilter()
@@ -671,8 +798,6 @@ class PutObjectContext( OpenMayaMPx.MPxSelectionContext ):
         if modifiers != QtCore.Qt.ControlModifier:
             Tool_global.stilPressed_control = False
         
-        import math
-        
         selObj  = Functions.getSelectedObject()
         instObj = Functions.getInstanceObject()
         ground = Functions.getGround()
@@ -687,69 +812,29 @@ class PutObjectContext( OpenMayaMPx.MPxSelectionContext ):
                            0,1,0,0,
                            0,0,1,0,
                            Tool_global.intersectPoint.x, Tool_global.intersectPoint.y, Tool_global.intersectPoint.z, 1]
-        Tool_global.transMatrix = listToMatrix( transMatrixList )
+        
         
         if not Tool_global.stilPressed_control and modifiers == QtCore.Qt.ControlModifier and modifiers != QtCore.Qt.ShiftModifier:
-            srcPoint     = Tool_global.intersectPoint
-            srcViewPoint = Functions.worldPointToViewPoint( srcPoint )
-            mousePoint   = OpenMaya.MPoint( mouseX, mouseY, 0 )
-            
-            mouseWorldPoint     = Functions.viewPointToWorldPoint( mousePoint )
-            srcViewPointToWorld = Functions.viewPointToWorldPoint( srcViewPoint )
-            viewPointVector     = OpenMaya.MVector(mousePoint) - OpenMaya.MVector(srcViewPoint)
-            addSize = viewPointVector.y / Tool_global.targetViewSize * Tool_global.currentSize
-            
-            Tool_global.scaledMatrix = listToMatrix( [ addSize + 1, 0, 0, 0,
-                                                       0, addSize + 1, 0, 0,
-                                                       0, 0, addSize + 1, 0,
-                                                       0, 0, 0, 1 ])
-            normalRotMatrix = Functions.getRotationMatrixFromNormal( Tool_global.intersectNormal )
-            editMatrix = Tool_global.randomMatrix*Tool_global.scaledMatrix * Tool_global.defaultMatrix
-            offsetMatrix = Functions.getOffsetMatrix(editMatrix*normalRotMatrix.inverse())*normalRotMatrix
-            cuMatrix = editMatrix * offsetMatrix * Tool_global.transMatrix
-            mtxList = matrixToList( cuMatrix )
-            cmds.xform( instObj, ws=1, matrix=mtxList )
-            Tool_global.currentSize = addSize + 1
+            Tool_global.scaleEditMatrix = Functions.getScaleEditMatrix( mouseX, mouseY )
 
         elif not Tool_global.stilPressed_shift and  modifiers != QtCore.Qt.ControlModifier and modifiers == QtCore.Qt.ShiftModifier:
-            srcPoint = Tool_global.intersectPoint
-            srcViewPoint = Functions.worldPointToViewPoint( srcPoint )
-            mousePoint = OpenMaya.MPoint( mouseX, mouseY, 0 )
-            
-            mouseWorldPoint     = Functions.viewPointToWorldPoint( mousePoint )
-            srcViewPointToWorld = Functions.viewPointToWorldPoint( srcViewPoint )
-            
-            directionVector = mouseWorldPoint - srcViewPointToWorld
-            camVector = Functions.getCamVector()
-            crossVector = directionVector ^ camVector
-            
-            viewPointVector = OpenMaya.MVector(mousePoint) - OpenMaya.MVector(srcViewPoint)
-            rotValue = viewPointVector.length() / Tool_global.targetViewSize * 90
-
-            normalRotMatrix = Functions.getRotationMatrixFromNormal( Tool_global.intersectNormal )
-            Tool_global.rotatedMatrix = Functions.getRotationMatrix( crossVector, math.radians(rotValue) )
-            editMatrix = Tool_global.randomMatrix*Tool_global.defaultMatrix*Tool_global.rotatedMatrix
-            offsetMatrix = Functions.getOffsetMatrix(editMatrix*normalRotMatrix.inverse())*normalRotMatrix
-            cuMatrix = editMatrix * offsetMatrix * Tool_global.transMatrix
-            mtxList = matrixToList( cuMatrix )
-            cmds.xform( instObj, ws=1, matrix=mtxList )
-
+            Tool_global.rotationYEditMatrix = Functions.getRotationYEditMatrix(mouseX, mouseY)
+            Tool_global.rotationEditMatrix = Functions.getRotationEditMatrix( mouseX, mouseY )
         else:
-            Tool_global.defaultMatrix = Tool_global.scaledMatrix * Tool_global.defaultMatrix * Tool_global.rotatedMatrix
-            Tool_global.rotatedMatrix = OpenMaya.MMatrix()
-            Tool_global.scaledMatrix  = OpenMaya.MMatrix()
-            
             Tool_global.intersectPoint = intersectPoint
             Tool_global.intersectNormal = intersectNormal
-            
-            rotValue = Functions.getRotationFromNormal( intersectNormal )
-            
-            normalRotMatrix = Functions.getRotationMatrixFromNormal( Tool_global.intersectNormal )
-            editMatrix = Tool_global.randomMatrix*Tool_global.defaultMatrix
-            offsetMatrix = Functions.getOffsetMatrix(editMatrix*normalRotMatrix.inverse())*normalRotMatrix
-            cuMatrix = editMatrix * offsetMatrix * Tool_global.transMatrix
-            mtxList = matrixToList( cuMatrix )
-            cmds.xform( instObj, ws=1, matrix=mtxList )
+        
+        if not Tool_global.randomMatrixExists:
+            Tool_global.randomMatrix       = Functions.getRandomMatrix()
+            Tool_global.randomMatrixExists = True
+        
+        transMatrix = listToMatrix( transMatrixList )
+        normalRotMatrix    = Functions.getRotationMatrixFromNormal( Tool_global.intersectNormal )
+        editMatrix = Tool_global.rotationYEditMatrix * Tool_global.randomMatrix * normalRotMatrix*Tool_global.scaleEditMatrix*Tool_global.rotationEditMatrix
+        offsetMatrix = Functions.getOffsetMatrix(editMatrix,normalRotMatrix)    
+        Tool_global.cuMatrix = editMatrix * offsetMatrix * transMatrix
+        mtxList = matrixToList( Tool_global.cuMatrix )
+        cmds.xform( instObj, ws=1, matrix=mtxList )
         cmds.undoInfo( swf=1 )
 
 
@@ -759,19 +844,16 @@ class PutObjectContext( OpenMayaMPx.MPxSelectionContext ):
         cmds.undoInfo( ock=1 )
         targetObject = Functions.getSelectedObject()
         copyObject = Functions.copyObject( targetObject )
-        
-        Tool_global.defaultMatrix = Tool_global.scaledMatrix * Tool_global.defaultMatrix * Tool_global.rotatedMatrix
-        Tool_global.rotatedMatrix = OpenMaya.MMatrix()
-        Tool_global.scaledMatrix  = OpenMaya.MMatrix()
-        
-        normalRotMatrix = Functions.getRotationMatrixFromNormal( Tool_global.intersectNormal )
-        editMatrix = Tool_global.randomMatrix*Tool_global.defaultMatrix
-        offsetMatrix = Functions.getOffsetMatrix(editMatrix*normalRotMatrix.inverse())*normalRotMatrix
-        cuMatrix = editMatrix * offsetMatrix * Tool_global.transMatrix
-        mtxList = matrixToList( cuMatrix )
+        mtxList = matrixToList( Tool_global.cuMatrix )
         cmds.xform( copyObject, ws=1, matrix=mtxList )
         Tool_global.mousePressed = True
         cmds.undoInfo( cck=1 )
+        
+        Tool_global.scaleEditMatrix = OpenMaya.MMatrix()
+        Tool_global.rotationEditMatrix = OpenMaya.MMatrix()
+        Tool_global.rotationYEditMatrix = OpenMaya.MMatrix()
+        
+        Tool_global.randomMatrixExists= False
 
 
 
@@ -803,7 +885,7 @@ class PutObjectContext( OpenMayaMPx.MPxSelectionContext ):
 
 class PutObjectContextCommand( OpenMayaMPx.MPxContextCommand ):
     
-    commandName = "sgPutObjectAtGroundContextCommand"
+    commandName = "sgPutObjectOnGroundContextCommand"
     def __init__(self):
         OpenMayaMPx.MPxContextCommand.__init__( self )
         self.m_pContext = 0

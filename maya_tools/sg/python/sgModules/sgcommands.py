@@ -1247,6 +1247,77 @@ def constrain_parent( first, target ):
 
 
 @convertSg_dec
+def constrain_tangent( curve, upObject, target, **options ):
+    
+    curveShape = curve.shape()
+    pointOnCurve = createNode( 'pointOnCurveInfo' )
+    curveShape.attr( 'worldSpace' ) >> pointOnCurve.inputCurve
+    nearNode = getNearPointOnCurve( target, curve )
+    paramValue = nearNode.parameter.get()
+    delete( nearNode )
+    
+    pointOnCurve.parameter.set( paramValue )
+    
+    vectorProduct = createNode( 'vectorProduct' ).setAttr( 'operation', 3 ).setAttr( 'input1', 0,1,0 )
+    upObject.wm >> vectorProduct.matrix
+    
+    fbf = createNode( 'fourByFourMatrix' )
+    pointOnCurve.tangentX >> fbf.in00
+    pointOnCurve.tangentY >> fbf.in01
+    pointOnCurve.tangentZ >> fbf.in02
+    vectorProduct.outputX >> fbf.in10
+    vectorProduct.outputY >> fbf.in11
+    vectorProduct.outputZ >> fbf.in12
+    mm = createNode( 'multMatrix' )
+    fbf.output >> mm.i[0]
+    target.pim >> mm.i[1]
+    fbfDcmp = getDecomposeMatrix( mm )
+    
+    fbfDcmp.outputRotate >> target.r
+
+
+
+@convertSg_dec
+def constrain_onCurve( curve, upObject, target, **options ):
+    
+    curveShape = curve.shape()
+    pointOnCurve = createNode( 'pointOnCurveInfo' )
+    curveShape.attr( 'worldSpace' ) >> pointOnCurve.inputCurve
+    nearNode = getNearPointOnCurve( target, curve )
+    position = cmds.xform( target.name(), ws=1, q=1, t=1 )[:3]
+    nearNode.inPosition.set( position )
+    paramValue = nearNode.parameter.get()
+    delete( nearNode )
+    
+    pointOnCurve.parameter.set( paramValue )
+    
+    vectorProduct = createNode( 'vectorProduct' ).setAttr( 'operation', 3 ).setAttr( 'input1', 0,1,0 )
+    upObject.wm >> vectorProduct.matrix
+    
+    fbf = createNode( 'fourByFourMatrix' )
+    pointOnCurve.tangentX >> fbf.in00
+    pointOnCurve.tangentY >> fbf.in01
+    pointOnCurve.tangentZ >> fbf.in02
+    vectorProduct.outputX >> fbf.in10
+    vectorProduct.outputY >> fbf.in11
+    vectorProduct.outputZ >> fbf.in12
+    pointOnCurve.positionX >> fbf.in30
+    pointOnCurve.positionY >> fbf.in31
+    pointOnCurve.positionZ >> fbf.in32
+    mm = createNode( 'multMatrix' )
+    fbf.output >> mm.i[0]
+    target.pim >> mm.i[1]
+    dcmp = createNode( 'decomposeMatrix' )
+    mm.o >> dcmp.imat
+    dcmp.outputRotate >> target.r
+    dcmp.outputTranslate >> target.t
+    
+    
+
+
+
+
+@convertSg_dec
 def constrain_all( first, target ):
     
     mm = getConstrainMatrix( first, target )
@@ -1571,6 +1642,36 @@ def getBlendTwoMatrixNode( first, second, **options ):
     wtAddMtx = createBlendTwoMatrixNode( first, second, **options )
     select( wtAddMtx )
     return wtAddMtx
+
+
+
+
+@convertSg_dec
+def connectBlendTwoMatrix( first, second, target, **options ):
+
+    blendNode = createBlendTwoMatrixNode( first, second )
+    mm = createNode( 'multMatrix' )
+    blendNode.matrixOutput() >> mm.i[0]
+    target.pim >> mm.i[1]
+    dcmp = getDecomposeMatrix( mm )
+    
+    trConnect = False
+    roConnect = False
+    scaleConnect = False
+    
+    if options.has_key( 'ct' ):
+        trConnect = options['ct']
+    if options.has_key( 'cr' ):
+        roConnect = options['cr']
+    if options.has_key( 'cs' ):
+        scaleConnect = options['cs']
+    
+    if trConnect: dcmp.ot >> target.t
+    if roConnect: dcmp.outputRotate >> target.r
+    if scaleConnect: dcmp.outputScale >> target.s
+    
+    target.addAttr( ln='blend', min=0, max=1, k=1, dv=0.5 )
+    target.blend >> blendNode.blend
 
 
 
@@ -4102,4 +4203,20 @@ def setGeometryMatrixToTarget( geo, matrixTarget ):
     
     geo.xform( ws=1, matrix= matrixTarget.wm.get() )
     setPntsZero( geo )
+
+
+@convertSg_dec
+def getNearPointOnCurve( tr, curve ):
+
+    node = createNode( 'nearestPointOnCurve' )
+    dcmp = getDecomposeMatrix( tr )
+    curveShape = curve.shape()
+    
+    dcmp.ot >> node.inPosition
+    curveShape.attr( 'worldSpace' ) >> node.inputCurve
+    
+    return node
+    
+    
+
 

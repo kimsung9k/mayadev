@@ -2,6 +2,11 @@ from sgModules import sgcommands
 from maya import cmds
 
 sels = cmds.ls( sl=1 )
-node = sgcommands.getLocalMatrix( sels[0], sels[1] )
-dcmp = sgcommands.getDecomposeMatrix(node)
-sgcommands.select( dcmp )
+targets = sels[:-1]
+parentTarget = sels[-1]
+dcmps = []
+for target in targets:
+    node = sgcommands.getLocalMatrix( target, parentTarget )
+    dcmp = sgcommands.getDecomposeMatrix(node)
+    dcmps.append( dcmp )
+sgcommands.select( dcmps )

@@ -322,15 +322,14 @@ def cleanController( controller ):
         if not cmds.attributeQuery( attr, node=controller, ex=1 ): continue
         try:cmds.setAttr( controller + '.' + attr, e=1, cb=0 )
         except:pass
+        try:cmds.setAttr( controller + '.' + attr, e=1, k=0 )
+        except:pass
     
     for attr in controllerKeyAttrList:
         if not cmds.attributeQuery( attr, node=controller, ex=1 ): continue
         try:cmds.setAttr( controller + '.' + attr, e=1, k=0 )
         except:pass
-    
-    attrs = cmds.listAttr( pController[0] )
-    for attr in attrs:
-        try:cmds.setAttr( pController[0] + '.' + attr, e=1, lock=1 )
+        try:cmds.setAttr( controller + '.' + attr, e=1, ch=0 )
         except:pass
 
 

@@ -5,7 +5,7 @@ import maya.OpenMaya as OpenMaya
 import PySide.QtGui
 import pymel.core
 import os
-from sgUIs.putObjectAtGround import Window_cmd
+from sgUIs.putObjectOnGround import Window_cmd
 
 
 class Window_global:

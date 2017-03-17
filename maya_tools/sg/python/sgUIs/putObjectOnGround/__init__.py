@@ -72,17 +72,17 @@ def makeFile( filePath ):
 class Window_global:
     
     mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QtGui.QWidget )
-    title = "Put Object At Ground"
+    title = "Put Object On Ground"
     width = 300
     height = 300
     
-    infoPath = cmds.about(pd=True) + "/sg/putObjectAtGround/uiInfo.txt"
+    infoPath = cmds.about(pd=True) + "/sg/putObjectOnGround/uiInfo.txt"
     makeFile( infoPath )
     
     mainGui = QtGui.QMainWindow()
     listItems = []
 
-    objectName = 'sgui_putObjectAtGround'
+    objectName = 'sgui_putObjectOnGround'
     listWidgetPutName     =  objectName + "_listPut"
     listWidgetGroundName  =  objectName + "_listGround"
     randomOptionRotName   =  objectName + "_randomRot"
@@ -91,7 +91,10 @@ class Window_global:
     randomOptionScaleAName = objectName + "_randomScaleAll"
     offsetByObjectName     = objectName + '_offsetObject'
     offsetByGroundName     = objectName + '_offsetGround'
-    
+    checkNormalOrientName  = objectName + '_checkNormalOrient'
+    orientEditModeName     = objectName + '_orientEditMode'
+    duGroupListName        = objectName + '_duGroupList'
+    componentCheckName         = objectName + '_componentCheck'
     
     
     @staticmethod
@@ -218,12 +221,12 @@ class Window_cmd:
     
     
     @staticmethod
-    def setTool_putObjectAtGround( evt=0 ):
+    def setTool_putObjectOnGround( evt=0 ):
 
-        if not cmds.pluginInfo( 'sgPutObjectAtGround', q=1, l=1 ):
+        if not cmds.pluginInfo( 'sgPutObjectOnGround', q=1, l=1 ):
             appendPluginPath()
-            cmds.loadPlugin( 'sgPutObjectAtGround' )
-        cmds.setToolTo( 'sgPutObjectAtGroundContext1' )
+            cmds.loadPlugin( 'sgPutObjectOnGround' )
+        cmds.setToolTo( 'sgPutObjectOnGroundContext1' )
         cmds.select( d=1 )
         
 
@@ -507,8 +510,6 @@ class UI_OffsetSlider( QtGui.QWidget ):
 
     def eventFilter(self, *args, **kwargs):
         return QtGui.QWidget.eventFilter(self, *args, **kwargs)
-        
-
 
 
 
@@ -536,13 +537,20 @@ class Window( QtGui.QMainWindow ):
         widgetPutList.listWidget.setObjectName( Window_global.listWidgetPutName )
         widgetBaseList.listWidget.setObjectName( Window_global.listWidgetGroundName )
         
+        widgetGroupList = UI_objectList()
+        widgetGroupList.label.setText( 'Duplicate Group List' )
+        widgetGroupList.listWidget.setObjectName( Window_global.duGroupListName )
+        widgetGroupList.listWidget.setSelectionMode( QtGui.QAbstractItemView.SingleSelection )
+        
         hLayoutListWidget.addWidget( widgetPutList )
         hLayoutListWidget.addWidget( widgetBaseList )
+        
+        randomGroupBox = QtGui.QGroupBox( 'Random' )
+        vLayoutRandom = QtGui.QVBoxLayout( randomGroupBox )
         
         rotateValidator = QtGui.QDoubleValidator(-1000000, 1000000, 2, self )
         scaleValidator  = QtGui.QDoubleValidator( 0.0, 100, 2, self )
         
-        randomLabel   = UI_radomLabel()
         randomOptionR = UI_randomOption2( 'Rotate', rotateValidator, -45, 45 )
         randomOptionS = UI_randomOption2( 'Scale', scaleValidator, 0.8, 1.2 )
         randomOptionRA = UI_randomOption( 'Rotate All', rotateValidator, -45, 45 )
@@ -552,23 +560,49 @@ class Window( QtGui.QMainWindow ):
         randomOptionRA.setObjectName( Window_global.randomOptionRotAName )
         randomOptionSA.setObjectName( Window_global.randomOptionScaleAName )
         
+        vLayoutRandom.addWidget( randomOptionR )
+        vLayoutRandom.addWidget( randomOptionS )
+        vLayoutRandom.addWidget( randomOptionRA )
+        vLayoutRandom.addWidget( randomOptionSA )
+        
+        offsetGroupBox = QtGui.QGroupBox( 'Offset' )
+        vLayoutOffset = QtGui.QVBoxLayout( offsetGroupBox )
+        
+        componentCheck    = QtGui.QCheckBox( "Component check" )
         offsetSlider1 = UI_OffsetSlider( "Offset By Object",  -1, 1, 0 )
         offsetSlider2 = UI_OffsetSlider( "Offset By Ground",  -100, 100, 0 )
+        componentCheck.setObjectName( Window_global.componentCheckName )
         offsetSlider1.setObjectName( Window_global.offsetByObjectName )
         offsetSlider2.setObjectName( Window_global.offsetByGroundName )
         
+        vLayoutOffset.addWidget( componentCheck )
+        vLayoutOffset.addWidget( offsetSlider1 )
+        vLayoutOffset.addWidget( offsetSlider2 )
+        
+        orientGroupBox = QtGui.QGroupBox( 'Orient Option' )
+        vLayoutOrient = QtGui.QVBoxLayout( orientGroupBox )
+        orientNormalCheck  = QtGui.QCheckBox("Ground Normal Affects")
+        hLayoutCombobox = QtGui.QHBoxLayout()
+        orientTypeText = QtGui.QLabel( 'Orient Edit Type : ' )
+        orientTypeComboBox = QtGui.QComboBox()
+        orientTypeComboBox.addItem( 'All' )
+        orientTypeComboBox.addItem( 'Only Y' )
+        hLayoutCombobox.addWidget( orientTypeText )
+        hLayoutCombobox.addWidget( orientTypeComboBox )
+        vLayoutOrient.addWidget( orientNormalCheck )
+        vLayoutOrient.addLayout( hLayoutCombobox )
+        orientNormalCheck.setObjectName( Window_global.checkNormalOrientName )
+        orientTypeComboBox.setObjectName( Window_global.orientEditModeName )
+        
         vLayout.addLayout( hLayoutListWidget )
-        vLayout.addWidget( randomLabel )
-        vLayout.addWidget( randomOptionR )
-        vLayout.addWidget( randomOptionS )
-        vLayout.addWidget( randomOptionRA )
-        vLayout.addWidget( randomOptionSA )
-        vLayout.addWidget( offsetSlider1 )
-        vLayout.addWidget( offsetSlider2 )
+        vLayout.addWidget( widgetGroupList )
+        vLayout.addWidget( randomGroupBox )
+        vLayout.addWidget( offsetGroupBox )
+        vLayout.addWidget( orientGroupBox )
         vLayout.addWidget( buttonPut )
         Window_global.loadInfo()
         
-        QtCore.QObject.connect( buttonPut, QtCore.SIGNAL( 'clicked()' ), Window_cmd.setTool_putObjectAtGround )
+        QtCore.QObject.connect( buttonPut, QtCore.SIGNAL( 'clicked()' ), Window_cmd.setTool_putObjectOnGround )
         
         
     
