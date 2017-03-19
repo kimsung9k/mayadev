@@ -2431,7 +2431,7 @@ def makeController( pointList, defaultScaleMult = 1, **options ):
     else:
         name = None
     
-    jnt = createNode( 'joint' ).setAttr( 'drawStyle', 2 ).setAttr( 'segmentScaleCompensate', 0 )
+    jnt = createNode( 'transform' )
     if name: jnt.rename( name )
     parent( crvShape, jnt, add=1, shape=1 )
     delete( crv )
