@@ -1647,6 +1647,14 @@ def getBlendTwoMatrixNode( first, second, **options ):
 
 
 @convertSg_dec
+def blendTwoMatrix( first, second, target, **options ):
+    
+    connectBlendTwoMatrix(first, second, target, **options)
+
+
+
+
+@convertSg_dec
 def connectBlendTwoMatrix( first, second, target, **options ):
 
     blendNode = createBlendTwoMatrixNode( first, second )
@@ -1681,14 +1689,19 @@ def createBlendMatrix( *args, **options ):
     constObjs = args[:-1]
     target = args[-1]
     
+    isLocal = False
+    if options.has_key( 'local' ):
+        isLocal = options['local']
+    
     wtAddMtx = createNode( 'wtAddMatrix' )
     plusNode = createNode( 'plusMinusAverage' )
-    outMM    = createNode( 'multMatrix' )
-    
-    wtAddMtx.o >> outMM.i[0]
-    target.pim >> outMM.i[1]
-    
-    outDcmp = getDecomposeMatrix( outMM )
+    if isLocal :
+        outDcmp = getDecomposeMatrix( wtAddMtx )
+    else:
+        outMM    = createNode( 'multMatrix' )
+        wtAddMtx.o >> outMM.i[0]
+        target.pim >> outMM.i[1]
+        outDcmp = getDecomposeMatrix( outMM )
     
     for i in range( len(constObjs) ):
         constObj = constObjs[i]
@@ -1696,6 +1709,8 @@ def createBlendMatrix( *args, **options ):
             constChild = constObj.makeChild('_Offset')
             constChild.xform( ws=1, matrix= target.wm.get() )
             constMatrixAttr = constChild.wm
+        elif isLocal:
+            constMatrixAttr = constObj.m
         else:
             constMatrixAttr = constObj.wm
         
@@ -4220,3 +4235,17 @@ def getNearPointOnCurve( tr, curve ):
     
 
 
+@convertSg_dec
+def replaceShape( src, dst ):
+    
+    dstShapes = dst.listRelatives( s=1 )
+    srcShape = src.shape()
+    
+    delete( dstShapes )
+    parent( srcShape, dst, add=1, shape=1 )
+    
+    
+    
+    
+    
+    

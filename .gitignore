@@ -45,3 +45,8 @@ $RECYCLE.BIN/
 Network Trash Folder
 Temporary Items
 .apdisk
+*.pyc
+*.pyc
+*.pyc
+maya_tools/sg/python/sgModules/sgcommands.pyc
+*.pyc
