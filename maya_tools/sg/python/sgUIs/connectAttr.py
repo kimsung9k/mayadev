@@ -160,6 +160,7 @@ class Window( QtGui.QMainWindow ):
         
         def connectCommand():
             
+            cmds.undoInfo( ock=1 )
             sels = cmds.ls( sl=1 )
             numItems = self.layout.count()
             
@@ -169,14 +170,13 @@ class Window( QtGui.QMainWindow ):
                 srcAttr = targetWidget.lineEdit_srcAttr.text()
                 dstAttr = targetWidget.lineEdit_dstAttr.text()
                 
-                print srcAttr, dstAttr
-                
                 if not srcAttr or not dstAttr: continue
                 
                 try: 
                     for sel in sels[1:]:
                         cmds.connectAttr( sels[0] + '.' + srcAttr, sel + '.' + dstAttr )
                 except: pass
+            cmds.undoInfo( cck=1 )
             
         
         self.ui_buttons.button_connect.clicked.connect( connectCommand )

@@ -4246,6 +4246,12 @@ def replaceShape( src, dst ):
     
     
     
+def todayNodeId():
     
+    import datetime
+    cuTime = datetime.datetime.now()
+    sg = str( hex( 0x73 + 0x67 ) )
+    today = str( hex( int( '%04d' % cuTime.year + '%02d' % cuTime.month + '%02d' % cuTime.day ) ) )
+    return sg + " + " + today
     
     

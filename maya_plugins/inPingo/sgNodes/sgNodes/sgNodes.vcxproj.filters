@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="_sgprintf">
+      <UniqueIdentifier>{bf688ace-7df0-447e-9b13-5b2cb1cfbc91}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SGControlledCurve">
+      <UniqueIdentifier>{923accdd-97ca-4f27-b855-0676a0cc0f2b}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="pluginMain.cpp" />
+    <ClCompile Include="sgprintf.cpp">
+      <Filter>_sgprintf</Filter>
+    </ClCompile>
+    <ClCompile Include="SGControlledCurve00.cpp">
+      <Filter>SGControlledCurve</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="sgprintf.h">
+      <Filter>_sgprintf</Filter>
+    </ClInclude>
+    <ClInclude Include="SGControlledCurve00.h">
+      <Filter>SGControlledCurve</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
