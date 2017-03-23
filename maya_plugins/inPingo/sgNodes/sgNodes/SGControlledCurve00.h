@@ -27,6 +27,9 @@ private:
 		static MObject aMatrix;
 	static MObject aSmoothRate;
 	static MObject aOutputCurve;
+	static MObject aOutputMatrices;
+		static MObject aOutputParam;
+		static MObject aOutputMatrix;
 
 	static MString strInputCurve;
 	static MString strControls;
@@ -35,6 +38,7 @@ private:
 		static MString strMatrix;
 	static MString strSmoothRate;
 	static MString strOutputCurve;
+	static MString strOutputMatrices;
 
 public:
 	static  MString     typeName;

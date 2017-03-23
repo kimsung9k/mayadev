@@ -79,8 +79,8 @@ MStatus SGControlledCurve00::initialize()
 	addAttribute(aControls);
 	attributeAffects(aControls, aOutputCurve);
 
-	aSmoothRate = nAttr.create(strSmoothRate, strSmoothRate, MFnNumericData::kDouble);
-	nAttr.setMin(0);
+	aSmoothRate = nAttr.create(strSmoothRate, strSmoothRate, MFnNumericData::kDouble, 2.0);
+	nAttr.setMin(1);
 	nAttr.setStorable(true);
 	addAttribute(aSmoothRate);
 	attributeAffects(aSmoothRate, aOutputCurve);
@@ -166,14 +166,31 @@ void SGControlledCurve00::computDetail()
 		{
 			if (cvParams[j] <= m_parameters[i]) {
 				eachControlWeightList[i][j] = 1.0;
+				for (unsigned int k = 0; k < i; k++) {
+					eachControlWeightList[i][j] -= eachControlWeightList[k][j];
+				}
 				eachControlWeightList[i + 1][j] = 0.0;
 			}
 			else if (cvParams[j] <= m_parameters[i + 1]) {
 				double paramRange = m_parameters[i + 1] - m_parameters[i];
 				double paramValue = cvParams[j] - m_parameters[i];
+
 				double weightValue = paramValue / paramRange;
-				eachControlWeightList[i][j] = 1.0-weightValue;
-				eachControlWeightList[i + 1][j] = weightValue;
+
+				double resultWeight;
+				if (weightValue < 0.5) {
+					double twiceWeight = weightValue * 2;
+					double powWeight = pow(twiceWeight, m_smoothValue);
+					resultWeight = powWeight / 2;
+				}
+				else {
+					double twiceWeight = (1 - weightValue) * 2;
+					double powWeight = pow(twiceWeight, m_smoothValue);
+					double halfWeight = powWeight / 2;
+					resultWeight = 1 - halfWeight;
+				}
+				eachControlWeightList[i][j]   = 1.0 - resultWeight;
+				eachControlWeightList[i+1][j] = resultWeight;
 			}
 			else {
 				eachControlWeightList[i][j] = 0.0;
@@ -182,6 +199,30 @@ void SGControlledCurve00::computDetail()
 		}
 	}
 
+	/*
+	for (int j = 0; j < numCVs; j++)
+	{
+		for (int i = 1; i < numControl; i++)
+		{
+			if(eachControlWeightList[i][j] == 1)
+			{
+			for (int k = 0; k < i; k++) {
+				eachControlWeightList[i][j] -= eachControlWeightList[k][j];
+				}
+			}
+		}
+	}
+
+	/**/
+	/*
+	if (numControl == 3)
+	{
+		for (int i = 0; i < numCVs; i++)
+		{
+			sgPrintf("weights[%d] : %f, %f, %f", i, eachControlWeightList[0][i], eachControlWeightList[1][i], eachControlWeightList[2][i]);
+		}
+	}
+	/**/
 	MPointArray weightedPoints;
 	weightedPoints.setLength(cvPoints.length());
 
@@ -195,7 +236,6 @@ void SGControlledCurve00::computDetail()
 			weightedMatrix += m_bindPreMatrices[j] * m_matrices[j] * eachControlWeightList[j][i];
 			allWeights += eachControlWeightList[j][i];
 		}
-
 		if (allWeights == 0) weightedMatrix = MMatrix();
 		else { weightedMatrix *= (1.0 / allWeights); }
 		weightedPoints[i] = cvPoints[i] * weightedMatrix;

@@ -490,35 +490,34 @@ def putControllerToGeo( target, points, multSize = 1.0 ):
         targetP.rename( 'P' + target.shortName() )
         return targetP
     
-    target = pymel.core.ls( target )[0]
-    targetP = target.getParent()
-    parentMatrix = OpenMaya.MMatrix()
-    if targetP:
-        parentMatrix = listToMatrix( cmds.getAttr( targetP.wm.name() ) )
-    
-    bbmin = target.boundingBoxMin.get()
-    bbmax = target.boundingBoxMax.get()
-    
-    center = ( ( bbmin[0] + bbmax[0] )/2, ( bbmin[1] + bbmax[1] )/2, ( bbmin[2] + bbmax[2] )/2 )
-    sizeX = (bbmax[0]-bbmin[0])/2 * multSize
-    sizeY = (bbmax[1]-bbmin[1])/2 * multSize
-    sizeZ = (bbmax[2]-bbmin[2])/2 * multSize
-    
-    if not sizeX: sizeX = 1
-    if not sizeY: sizeY = 1
-    if not sizeZ: sizeZ = 1
+    if target:
+        target = pymel.core.ls( target )[0]
+        targetP = target.getParent()
+        parentMatrix = OpenMaya.MMatrix()
+        if targetP:
+            parentMatrix = listToMatrix( cmds.getAttr( targetP.wm.name() ) )
+        
+        bbmin = target.boundingBoxMin.get()
+        bbmax = target.boundingBoxMax.get()
+        
+        center = ( ( bbmin[0] + bbmax[0] )/2, ( bbmin[1] + bbmax[1] )/2, ( bbmin[2] + bbmax[2] )/2 )
+        sizeX = (bbmax[0]-bbmin[0])/2 * multSize
+        sizeY = (bbmax[1]-bbmin[1])/2 * multSize
+        sizeZ = (bbmax[2]-bbmin[2])/2 * multSize
+        
+        if not sizeX: sizeX = 1
+        if not sizeY: sizeY = 1
+        if not sizeZ: sizeZ = 1
+        worldCenter = OpenMaya.MPoint( *center ) * parentMatrix
+    else:
+        worldCenter = OpenMaya.MPoint()
 
     targetCtl = makeController( points )
     targetCtl.shape_sx.set( sizeX )
     targetCtl.shape_sy.set( sizeY )
     targetCtl.shape_sz.set( sizeZ )
 
-    worldCenter = OpenMaya.MPoint( *center ) * parentMatrix
-
     targetCtl.t.set( worldCenter.x, worldCenter.y, worldCenter.z )
     makeParent( targetCtl )
     
     return targetCtl
-
-
-

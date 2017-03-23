@@ -69,3 +69,6 @@ maya_tools/sg/python/sgModules/sgcommands.pyc
 maya_plugins/SGMLibrary/SGMLibrary.VC.db
 *.ipch
 *.db
+*.iobj
+*.pyc
+*.pyc
