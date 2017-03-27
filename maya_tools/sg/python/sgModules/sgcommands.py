@@ -829,6 +829,8 @@ class SGNode( SGObject ):
             return self.attr( "output" )
         if self.nodeType() == "closestPointOnMesh":
             return self.attr( "normal" )
+        if self.nodeType() == "plusMinusAverage":
+            return self.attr( "output3D" )
     
     
     def matrixOutput(self):
@@ -848,7 +850,7 @@ class SGNode( SGObject ):
     
     
     def attributeQuery(self, attrName, **options ):
-        options.append( {'node':self.name()} )
+        options.update( {'node':self.name()} )
         return cmds.attributeQuery( attrName, **options )
 
 
@@ -1331,11 +1333,11 @@ def constrain_all( first, target ):
 
 @convertName_dec
 def parent( *args, **options ):
-    cmds.parent( *args, **options )
-    for arg in args:
-        if cmds.nodeType( arg ) == 'joint':
-            freezeJoint( arg )
-    return convertSg( args )
+    parentedTargets = cmds.parent( *args, **options )
+    for target in parentedTargets:
+        if cmds.nodeType( target ) == 'joint':
+            freezeJoint( target )
+    return convertSg( parentedTargets )
 
 
 
@@ -2383,34 +2385,38 @@ def putObject( putTargets, typ='joint', putType='boundingBoxCenter' ):
         return newObjects
 
 
+
+@convertName_dec
+def copyShapeToTransform( shape, target ):
+    
+    oTarget = getMObject( target )
+    if cmds.nodeType( shape ) == 'mesh':
+        oMesh = getMObject( shape )
+        fnMesh = OpenMaya.MFnMesh( oMesh )
+        fnMesh.copy( oMesh, oTarget )
+    elif cmds.nodeType( shape ) == 'nurbsCurve':
+        oCurve = getMObject( shape )
+        fnCurve = OpenMaya.MFnNurbsCurve( oCurve )
+        fnCurve.copy( oCurve, oTarget )
+    elif cmds.nodeType( shape ) == 'nurbsSurface':
+        oSurface = getMObject( shape )
+        fnSurface = OpenMaya.MFnNurbsSurface( oSurface )
+        fnSurface.copy( oSurface, oTarget )
+
+
+
 @convertSg_dec
 def addIOShape( target ):
     
-    if target.nodeType() == 'transform':
-        targetTr    = target.transform()
-        targetShape = target.shape()
-        newShape = createNode( targetShape.nodeType() )
-        newShapeTr = newShape.transform()
-        targetShape.outputGeometry() >> newShape.inputGeometry()
-        cmds.refresh()
-        targetShape.outputGeometry() // newShape.inputGeometry()
-        newShape.attr( 'io' ).set( 1 )
-        newShapeName = newShape.name()
-        cmds.parent( newShapeName, targetTr.name(), add=1, shape=1 )
-        cmds.delete( newShapeTr.name() )
-        return convertSg( newShapeName )
-    else:
-        targetTr = target.transform()
-        newShape = createNode( target.nodeType() )
-        newShapeTr = newShape.transform()
-        target.outputGeometry() >> newShape.inputGeometry()
-        cmds.refresh()
-        target.outputGeometry() // newShape.inputGeometry()
-        newShape.attr( 'io' ).set( 1 )
-        newShapeName = newShape.name()
-        cmds.parent( newShapeName, targetTr.name(), add=1, shape=1 )
-        cmds.delete( newShapeTr.name() )
-        return convertSg( newShapeName )
+    targetTr    = target.transform()
+    targetShape = target.shape()
+    newShapeTr = createNode( 'transform' )
+    copyShapeToTransform( targetShape, newShapeTr )
+    newShapeTr.shape().attr( 'io' ).set( 1 )
+    newShapeName = newShapeTr.shape().name()
+    cmds.parent( newShapeName, targetTr.name(), add=1, shape=1 )
+    cmds.delete( newShapeTr.name() )
+    return convertSg( newShapeName )
         
 
 
@@ -2436,6 +2442,12 @@ def makeController( pointList, defaultScaleMult = 1, **options ):
     
     options.update( {'p':newPointList, 'd':1} )
     
+    typ = 'transform'
+    if options.has_key( 'typ' ):
+        typ = options.pop( 'typ' )
+    
+    print typ
+    
     crv = curve( **options )
     crvShape = crv.shape()
     
@@ -2446,7 +2458,7 @@ def makeController( pointList, defaultScaleMult = 1, **options ):
     else:
         name = None
     
-    jnt = createNode( 'transform' )
+    jnt = createNode( typ )
     if name: jnt.rename( name )
     parent( crvShape, jnt, add=1, shape=1 )
     delete( crv )
@@ -4000,6 +4012,17 @@ def connectBindPre( targetGeo ):
 
 
 
+
+@convertSg_dec
+def addOptionAttribute( target ):
+    
+    barString = '____'
+    while target.attributeQuery( barString, ex=1 ):
+        barString += '_'
+    
+    target.addAttr( ln=barString,  at="enum", en="Options:", cb=1 )
+
+
     
     
 class BodyRig:
@@ -4013,9 +4036,13 @@ class BodyRig:
         self.stdBackSecond = convertSg( stdBackSecond )
         self.stdChest = convertSg( stdChest )
         
+        self.controllerSize = 1
+        
         
     
-    def createAll(self, numJoint ):
+    def createAll(self, numJoint, controllerSize = 1 ):
+        
+        self.controllerSize = controllerSize
         
         self.createRigBase()
         self.createController()
@@ -4035,13 +4062,13 @@ class BodyRig:
 
     def createController(self):
         
-        self.ctlRoot = makeController( sgdata.Controllers.movePoints, n= 'Ctl_Root' ).xform( ws=1, matrix= self.stdRoot.wm.get() )
-        self.ctlPervis = makeController( sgdata.Controllers.cubePoints, n='Ctl_PervisRotator' ).xform( ws=1, matrix= self.stdRoot.wm.get() )
-        self.ctlBodyRotator1 = makeController( sgdata.Controllers.cubePoints, n='Ctl_BodyRotator1' ).xform( ws=1, matrix= self.stdBackFirst.wm.get() )
-        self.ctlBodyRotator2 = makeController( sgdata.Controllers.cubePoints, n='Ctl_BodyRotator2' ).xform( ws=1, matrix= self.stdBackSecond.wm.get() )
-        self.ctlChest = makeController( sgdata.Controllers.circlePoints, n='Ctl_Chest' ).xform( ws=1, matrix= self.stdChest.wm.get() )
-        self.ctlWaist = makeController( sgdata.Controllers.circlePoints, n='Ctl_Waist' ).xform( ws=1, matrix= self.stdBackFirst.wm.get() )
-        self.ctlHip   = makeController( sgdata.Controllers.circlePoints, n='Ctl_Hip' ).xform( ws=1, matrix= self.stdRoot.wm.get() )
+        self.ctlRoot = makeController( sgdata.Controllers.movePoints, self.controllerSize, n= 'Ctl_Root' ).xform( ws=1, matrix= self.stdRoot.wm.get() )
+        self.ctlPervis = makeController( sgdata.Controllers.cubePoints, self.controllerSize, n='Ctl_PervisRotator' ).xform( ws=1, matrix= self.stdRoot.wm.get() )
+        self.ctlBodyRotator1 = makeController( sgdata.Controllers.cubePoints, self.controllerSize, n='Ctl_BodyRotator1' ).xform( ws=1, matrix= self.stdBackFirst.wm.get() )
+        self.ctlBodyRotator2 = makeController( sgdata.Controllers.cubePoints, self.controllerSize, n='Ctl_BodyRotator2' ).xform( ws=1, matrix= self.stdBackSecond.wm.get() )
+        self.ctlChest = makeController( sgdata.Controllers.circlePoints, self.controllerSize, n='Ctl_Chest' ).xform( ws=1, matrix= self.stdChest.wm.get() )
+        self.ctlWaist = makeController( sgdata.Controllers.circlePoints, self.controllerSize, n='Ctl_Waist' ).xform( ws=1, matrix= self.stdBackFirst.wm.get() )
+        self.ctlHip   = makeController( sgdata.Controllers.circlePoints, self.controllerSize, n='Ctl_Hip' ).xform( ws=1, matrix= self.stdRoot.wm.get() )
         
         makeParent( self.ctlRoot )
         makeParent( self.ctlPervis )
@@ -4245,8 +4272,9 @@ class ArmRig:
     
     
     
-    def createAll(self):
+    def createAll(self, controllerSize, numJnt=3 ):
         
+        self.controllerSize = controllerSize
         self.createRigBase()
         self.createIkController()
         self.createPoleVController()
@@ -4256,40 +4284,69 @@ class ArmRig:
         self.createFkJoints()
         self.connectAndParentFk()
         self.createBlController()
+        self.connectBlVisibility()
         self.createBlJoints()
         self.connectAndParentBl()
-    
+        self.makeCurve()
+        self.makeSpJointsUpper(numJnt)
+        self.makeSpJointsLower(numJnt)
 
 
     def createRigBase(self ):
         
         self.rigBase = createNode( 'transform', n= self.stdFirst.localName().replace( self.stdPrefix, 'RigBase_' ) )
         self.rigBase.xform( ws=1, matrix= self.stdFirst.wm.get() )
+        constrain_parent( self.stdFirst, self.rigBase )
     
 
     
     def createIkController(self ):
         
-        self.ctlIkEnd = makeController( sgdata.Controllers.cubePoints, n= self.stdEnd.localName().replace( self.stdPrefix, 'Ctl_Ik' ) )
+        self.ctlIkEnd = makeController( sgdata.Controllers.cubePoints, self.controllerSize, typ='joint', n= self.stdEnd.localName().replace( self.stdPrefix, 'Ctl_Ik' ) )
         self.ctlIkEnd.setAttr( 'shape_sx', 0.1 )
         self.ctlIkEnd.setAttr( 'shape_sy', 1.5 )
         self.ctlIkEnd.setAttr( 'shape_sz', 1.5 )
         self.ctlIkEnd.xform( ws=1, matrix= self.stdEnd.wm.get() )
-        makeParent( self.ctlIkEnd )
+        pCtlIkEnd = makeParent( self.ctlIkEnd )
     
-
-    
+        dcmpStdEnd = getDecomposeMatrix( self.stdEnd )
+        composeMatrix = createNode( 'composeMatrix' )
+        
+        dcmpStdEnd.ot >> composeMatrix.it
+        mmLocalEndPos = createNode( 'multMatrix' )
+        composeMatrix.outputMatrix >> mmLocalEndPos.i[0]
+        self.stdFirst.wim >> mmLocalEndPos.i[1]
+        dcmpPCtlIkEnd = getDecomposeMatrix( mmLocalEndPos )
+        
+        dcmpPCtlIkEnd.ot >> pCtlIkEnd.t
+        dcmpPCtlIkEnd.outputRotate >> pCtlIkEnd.r
+        
+        invCompose = createNode( 'inverseMatrix' )
+        composeMatrix.outputMatrix >> invCompose.inputMatrix
+        
+        mmIkJo = createNode( 'multMatrix' )
+        self.stdEnd.wm >> mmIkJo.i[0]
+        invCompose.outputMatrix >> mmIkJo.i[1]
+        dcmpJo = getDecomposeMatrix( mmIkJo )
+        dcmpJo.outputRotate >> self.ctlIkEnd.jo
+        
+        
+        
     def createPoleVController(self ):
         
-        self.ctlIkPoleV = makeController( sgdata.Controllers.diamondPoints, n= self.stdPoleV.localName().replace( self.stdPrefix, 'Ctl_PoleV' ) )
+        self.ctlIkPoleV = makeController( sgdata.Controllers.diamondPoints, self.controllerSize, n= self.stdPoleV.localName().replace( self.stdPrefix, 'Ctl_PoleV' ) )
         self.ctlIkPoleV.setAttr( 'shape_sx', 0.23 )
         self.ctlIkPoleV.setAttr( 'shape_sy', 0.23 )
         self.ctlIkPoleV.setAttr( 'shape_sz', 0.23 )
         makeParent( self.ctlIkPoleV )
         pIkCtlPoleV = self.ctlIkPoleV.parent()
+        pIkCtlPoleV.xform( ws=1, matrix = self.stdLookAt.wm.get() )
         self.poleVTwist = makeParent( pIkCtlPoleV, n='Twist_PoleV' + self.stdPoleV.localName().replace( self.stdPrefix, '' ) )
-        self.poleVTwist.xform( ws=1, matrix=self.stdLookAt.wm.get() )
-        pIkCtlPoleV.xform( ws=1, matrix= self.stdPoleV.wm.get() )
+        
+        dcmpPoleVStd = getDecomposeMatrix( getLocalMatrix( self.stdPoleV, self.stdLookAt ))
+        dcmpPoleVStd.ot >> pIkCtlPoleV.t
+        dcmpPoleVStd.outputRotate >> pIkCtlPoleV.r
+        
     
     
     
@@ -4304,25 +4361,32 @@ class ArmRig:
         self.ikJntSecond = joint( n=self.stdSecond.replace( self.stdPrefix, 'IkJnt_' ) ).xform( ws=1, matrix=secondPos )
         self.ikJntEnd  = joint( n=self.stdEnd.replace( self.stdPrefix, 'IkJnt_' ) ).xform( ws=1, matrix=thirdPos )
         
+        self.stdSecond.tx >> self.ikJntSecond.tx
+        self.stdEnd.tx >> self.ikJntEnd.tx
+        
         secondRotMtx = listToMatrix( self.stdSecond.xform( q=1, os=1, matrix=1 ) )
         rot = OpenMaya.MTransformationMatrix( secondRotMtx ).eulerRotation().asVector()
         self.ikJntSecond.attr( 'preferredAngleY' ).set( math.degrees( rot.y ) )
         self.ikHandle = ikHandle( sj=self.ikJntFirst, ee=self.ikJntEnd, sol='ikRPsolver' )[0]
+        self.ikJntFirst.v.set( 0 )
+        self.ikHandle.v.set( 0 )
+        constrain_rotate( self.ctlIkEnd, self.ikJntEnd )
 
 
 
     def connectAndParentIk(self):
         
-        pIkWrist = self.ctlIkEnd.parent()
-        lookAtChild = makeLookAtChild( self.ctlIkEnd, self.rigBase, n='LookAt_' + self.ctlIkPoleV.localName().replace( 'Ctl_', '' ) )
+        self.ikGroup = createNode( 'transform', n= self.stdFirst.localName().replace( self.stdPrefix, 'IkGrp_' ) )
+        
+        lookAtChild = makeLookAtChild( self.ctlIkEnd, self.ikGroup, n='LookAt_' + self.ctlIkPoleV.localName().replace( 'Ctl_', '' ) )
         constrain_point( self.ctlIkEnd, self.ikHandle )
         parent( self.poleVTwist, lookAtChild )
+        self.poleVTwist.setTransformDefault()
         
-        self.ikGroup = createNode( 'transform', n= self.stdFirst.localName().replace( self.stdPrefix, 'IkGrp_' ) )
         parent( self.ikGroup, self.rigBase )
         self.ikGroup.setTransformDefault()
         
-        parent( pIkWrist, self.ikGroup )
+        parent( self.ctlIkEnd.parent(), self.ikGroup )
         parent( self.ikHandle, self.ikGroup )
         parent( self.ikJntFirst, self.ikGroup )
         
@@ -4333,9 +4397,9 @@ class ArmRig:
     
     def createFKController( self ):
         
-        self.fkCtlFirst = makeController( sgdata.Controllers.rhombusPoints, n= self.stdFirst.localName().replace( self.stdPrefix, 'Ctl_Fk' ) )
-        self.fkCtlSecond = makeController( sgdata.Controllers.rhombusPoints, n= self.stdSecond.localName().replace( self.stdPrefix, 'Ctl_Fk' ) )
-        self.fkCtlEnd = makeController( sgdata.Controllers.rhombusPoints, n= self.stdEnd.localName().replace( self.stdPrefix, 'Ctl_Fk' ) )
+        self.fkCtlFirst = makeController( sgdata.Controllers.rhombusPoints, self.controllerSize, n= self.stdFirst.localName().replace( self.stdPrefix, 'Ctl_Fk' ) )
+        self.fkCtlSecond = makeController( sgdata.Controllers.rhombusPoints, self.controllerSize, n= self.stdSecond.localName().replace( self.stdPrefix, 'Ctl_Fk' ) )
+        self.fkCtlEnd = makeController( sgdata.Controllers.rhombusPoints, self.controllerSize, n= self.stdEnd.localName().replace( self.stdPrefix, 'Ctl_Fk' ) )
         
         self.fkCtlFirst.xform( ws=1, matrix = self.stdFirst.wm.get() ).setAttr( 'shape_rz', 90 ).setAttr( 'shape_sx', .7 ).setAttr( 'shape_sy', .7 ).setAttr( 'shape_sz', .7 )
         self.fkCtlSecond.xform( ws=1, matrix = self.stdSecond.wm.get() ).setAttr( 'shape_rz', 90 ).setAttr( 'shape_sx', .7 ).setAttr( 'shape_sy', .7 ).setAttr( 'shape_sz', .7 )
@@ -4346,6 +4410,12 @@ class ArmRig:
         makeParent( self.fkCtlEnd )
         parent( self.fkCtlEnd.parent(), self.fkCtlSecond )
         parent( self.fkCtlSecond.parent(), self.fkCtlFirst )
+        
+        self.stdSecond.tx >> self.fkCtlSecond.parent().tx
+        self.stdEnd.tx >> self.fkCtlEnd.parent().tx
+        self.stdSecond.r >> self.fkCtlSecond.parent().r
+        self.stdEnd.r >> self.fkCtlEnd.parent().r
+        
     
     
     def createFkJoints(self ):
@@ -4358,6 +4428,8 @@ class ArmRig:
         self.fkJntFirst  = joint( n=self.stdFirst.localName().replace( self.stdPrefix, 'FkJnt_' ) ).xform( ws=1, matrix=firstPos )
         self.fkJntSecond = joint( n=self.stdSecond.localName().replace( self.stdPrefix, 'FkJnt_' ) ).xform( ws=1, matrix=secondPos )
         self.fkJntEnd  = joint( n=self.stdEnd.localName().replace( self.stdPrefix, 'FkJnt_' ) ).xform( ws=1, matrix=thirdPos )
+        self.fkJntFirst.v.set( 0 )
+        
         
     
     def connectAndParentFk(self):
@@ -4373,13 +4445,47 @@ class ArmRig:
         constrain_parent( self.fkCtlSecond, self.fkJntSecond )
         constrain_parent( self.fkCtlEnd, self.fkJntEnd )
     
-    
+
+
     def createBlController(self ):
         
-        self.ctlBl = makeController( sgdata.Controllers.switchPoints, n= self.stdEnd.localName().replace( self.stdPrefix, 'Ctl_Bl' ) )
-        self.ctlBl.xform( ws=1, matrix= self.stdEnd.wm.get() ).setAttr( 'shape_sx', 0.3 ).setAttr( 'shape_sy', 0.3 ).setAttr( 'shape_sz', 0.3 ).setAttr( 'shape_ty', 0.8 )
-        self.ctlBl.addAttr( ln='blend', min=0, max=1, k=1 )
+        self.ctlBl = makeController( sgdata.Controllers.switchPoints, self.controllerSize, n= self.stdEnd.localName().replace( self.stdPrefix, 'Ctl_Bl' ) )
+        pCtlBl = makeParent( self.ctlBl )
+        pCtlBl.xform( ws=1, matrix= self.stdEnd.wm.get() )
         
+        tyValue = 0.8
+        if self.stdEnd.tx.get() < 0:
+            tyValue *= -1
+        
+        self.ctlBl.setAttr( 'shape_sx', 0.3 ).setAttr( 'shape_sy', 0.3 ).setAttr( 'shape_sz', 0.3 ).setAttr( 'shape_ty', tyValue * self.controllerSize )
+        self.ctlBl.setTransformDefault()
+        keyAttrs = self.ctlBl.listAttr( k=1 )
+        for attr in keyAttrs:
+            self.ctlBl.attr( attr ).set( e=1, lock=1, k=0 )
+    
+    
+    def connectBlVisibility(self):
+        
+        addOptionAttribute( self.ctlBl )
+        self.ctlBl.addAttr( ln='blend', min=0, max=1, k=1 )
+        self.ctlBl.addAttr( ln='ikVis', at='long', min=0, max=1, cb=1 )
+        self.ctlBl.addAttr( ln='fkVis', at='long', min=0, max=1, cb=1 )
+        
+        visIk  = createNode( 'condition' ).setAttr( 'op', 1 ).setAttr( 'colorIfTrueR', 1 ).setAttr( 'colorIfFalseR', 0 ).setAttr( 'secondTerm', 1 )
+        visFk  = createNode( 'condition' ).setAttr( 'op', 1 ).setAttr( 'colorIfTrueR', 1 ).setAttr( 'colorIfFalseR', 0 ).setAttr( 'secondTerm', 0 )
+        addVisIk = createNode( 'addDoubleLinear' )
+        addVisFk = createNode( 'addDoubleLinear' )
+        
+        self.ctlBl.blend >> visIk.firstTerm
+        self.ctlBl.blend >> visFk.firstTerm
+        self.ctlBl.ikVis >> addVisIk.input1
+        self.ctlBl.fkVis >> addVisFk.input1
+        visIk.outColorR >> addVisIk.input2
+        visFk.outColorR >> addVisFk.input2
+        
+        addVisIk.output >> self.ikGroup.attr( 'v' )
+        addVisFk.output >> self.fkGroup.attr( 'v' )
+    
     
     
     def createBlJoints(self ):
@@ -4402,8 +4508,9 @@ class ArmRig:
         self.blGroup.setTransformDefault()
         
         parent( self.blJntFirst, self.blGroup )
-        parent( self.ctlBl, self.blGroup )
-        constrain_parent( self.blJntEnd, self.ctlBl )
+        parent( self.ctlBl.parent(), self.blGroup )
+        
+        constrain_parent( self.blJntEnd, self.ctlBl.parent() )
         
         blendNodeFirst = getBlendTwoMatrixNode( self.ikJntFirst, self.fkJntFirst, local=1 )
         blendNodeSecond = getBlendTwoMatrixNode( self.ikJntSecond, self.fkJntSecond, local=1 )
@@ -4423,6 +4530,121 @@ class ArmRig:
         self.ctlBl.blend >> blendNodeFirst.blend
         self.ctlBl.blend >> blendNodeSecond.blend
         self.ctlBl.blend >> blendNodeEnd.blend
+        
+
+
+    def makeCurve(self):
+        
+        self.curveUpper = curve( p=[[0,0,0],[0,0,0]], d=1 )
+        self.curveLower = curve( p=[[0,0,0],[0,0,0]], d=1 )
+        
+        upperShape = self.curveUpper.shape()
+        lowerShape = self.curveLower.shape()
+        
+        self.blJntSecond.t >> upperShape.attr( 'controlPoints[1]' )
+        self.blJntEnd.t    >> lowerShape.attr( 'controlPoints[1]' )
+        
+        parent( self.curveUpper, self.blJntFirst )
+        parent( self.curveLower, self.blJntSecond )
+        self.curveUpper.setTransformDefault()
+        self.curveLower.setTransformDefault()
+
+
+    
+    def makeSpJointsUpper(self, numJnt=3 ):
+        
+        select( d=1 )
+        self.upperJnts = [ joint() ]
+        for i in range( numJnt ):
+            self.upperJnts.append( joint() )
+        
+        self.handleUpper, effector = ikHandle( sj=self.upperJnts[0], ee=self.upperJnts[-1], sol='ikSplineSolver', ccv=False, pcv=False, curve=self.curveUpper.shape() )
+        curveInfo = createNode( 'curveInfo' )
+        
+        self.curveUpper.shape().attr( 'local' ) >> curveInfo.inputCurve
+        multNode = createNode( 'multDoubleLinear' )
+        curveInfo.arcLength >> multNode.input1
+        
+        multValue = 1.0/numJnt
+        if self.blJntSecond.tx.get() < 0:
+            multValue *= -1
+        
+        multNode.input2.set( multValue )
+        for upperJnt in self.upperJnts[1:]:
+            multNode.output >> upperJnt.tx
+        pass
+    
+        self.handleUpper.attr( 'dTwistControlEnable' ).set( 1 )
+        self.handleUpper.attr( 'dWorldUpType' ).set( 4 )
+        if self.blJntSecond.tx.get() < 0:
+            self.handleUpper.attr( 'dForwardAxis' ).set( 1 )
+            upObjectStart = makeLookAtChild( self.blJntSecond, self.blGroup, direction=[-1,0,0] )
+        else:
+            upObjectStart = makeLookAtChild( self.blJntSecond, self.blGroup, direction=[1,0,0] )
+        upObjectEnd   = makeChild( upObjectStart )
+        blMtx = getBlendTwoMatrixNode( self.blJntSecond, upObjectStart ).setAttr( 'blend', math.fabs( multValue ) )
+        mmBl = createNode( 'multMatrix' )
+        blMtx.matrixSum >> mmBl.i[0]
+        upObjectEnd.pim >> mmBl.i[1]
+        dcmpBl = getDecomposeMatrix( mmBl )
+        dcmpBl.outputTranslate >> upObjectEnd.t
+        dcmpBl.outputRotate >> upObjectEnd.r
+        
+        upObjectStart.wm >> self.handleUpper.attr( 'dWorldUpMatrix' )
+        upObjectEnd.wm   >> self.handleUpper.attr( 'dWorldUpMatrixEnd' )
+        
+        for jnt in self.upperJnts:
+            jnt.attr( 'dla' ).set(1)
+        parent( self.handleUpper, self.rigBase )
+    
+
+
+    def makeSpJointsLower(self, numJnt=3 ):
+        
+        self.upperJnts[-1].v.set( 0 )
+        select( self.upperJnts[-2] )
+        self.lowerJnts = [ joint() ]
+        for i in range( numJnt ):
+            self.lowerJnts.append( joint() )
+        
+        self.handleLower, effector = ikHandle( sj=self.lowerJnts[0], ee=self.lowerJnts[-1], sol='ikSplineSolver', ccv=False, pcv=False, curve=self.curveLower.shape() )
+        curveInfo = createNode( 'curveInfo' )
+        
+        self.curveLower.shape().attr( 'local' ) >> curveInfo.inputCurve
+        multNode = createNode( 'multDoubleLinear' )
+        curveInfo.arcLength >> multNode.input1
+        
+        multValue = 1.0/numJnt
+        if self.blJntSecond.tx.get() < 0:
+            multValue *= -1
+        
+        multNode.input2.set( multValue )
+        for lowerJnt in self.lowerJnts[1:]:
+            multNode.output >> lowerJnt.tx
+        
+        self.handleLower.attr( 'dTwistControlEnable' ).set( 1 )
+        self.handleLower.attr( 'dWorldUpType' ).set( 4 )
+        upObjectStart = self.blJntSecond
+        if self.blJntSecond.tx.get() < 0:
+            self.handleLower.attr( 'dForwardAxis' ).set( 1 )
+            pUpObjectEnd  = makeLookAtChild( self.blJntSecond, self.blJntEnd, direction=[1,0,0] )
+        else:
+            pUpObjectEnd  = makeLookAtChild( self.blJntSecond, self.blJntEnd, direction=[-1,0,0] )
+        upObjectEnd = makeChild( pUpObjectEnd )
+        connectBlendTwoMatrix( pUpObjectEnd, upObjectStart, upObjectEnd, ct=1, cr=1 )
+        upObjectEnd.blend.set( multValue )
+        
+        upObjectStart.wm >> self.handleLower.attr( 'dWorldUpMatrix' )
+        upObjectEnd.wm   >> self.handleLower.attr( 'dWorldUpMatrixEnd' )
+        
+        for jnt in self.lowerJnts:
+            jnt.attr( 'dla' ).set(1)
+        
+        constrain_rotate( self.blJntEnd, self.lowerJnts[-1] )
+        parent( self.handleLower, self.rigBase )
+    
+        
+
 
 
 
@@ -4430,3 +4652,121 @@ class LegRig( ArmRig ):
     
     def __init__( self, stdBase, stdFirst, stdSecond, stdEnd, stdSecondoffset, stdPoleV, stdLookAt ):
         ArmRig.__init__( self,stdBase, stdFirst, stdSecond, stdEnd, stdSecondoffset, stdPoleV, stdLookAt )
+        
+    
+    def createAll(self, controllerSize, numJnt=3 ):
+        
+        self.controllerSize = controllerSize
+        self.createRigBase()
+        self.createIkController()
+        self.createPoleVController()
+        self.createIkJoints()
+        self.connectAndParentIk()
+        self.createFKController()
+        self.createFkJoints()
+        self.connectAndParentFk()
+        self.createBlController()
+        self.connectBlVisibility()
+        self.createBlJoints()
+        self.connectAndParentBl()
+        self.makeCurve()
+        self.makeSpJointsUpper(numJnt)
+        self.makeSpJointsLower(numJnt)
+    
+    
+    
+    @convertSg_dec
+    def createIkFootRig(self, stdToe, stdToeEnd, stdFootPiv, stdToePiv, stdFootInside, stdFootOutside, stdFootEnd ):
+        
+        self.footIkGrp = createNode( 'transform', n = self.stdEnd.localName().replace( self.stdPrefix, 'RigFootBase_' ) )
+        constrain_parent( self.ctlIkEnd, self.footIkGrp )
+        
+        ctlFoot = makeController( sgdata.Controllers.circlePoints, self.controllerSize, n= self.stdEnd.localName().replace( self.stdPrefix, 'Ctl_FootIk' ) )
+        ctlFoot.shape_rz.set( 90 )
+        pCtlFoot = makeParent( ctlFoot )
+        parent( pCtlFoot, self.footIkGrp )
+        
+        select( ctlFoot )
+        footPivJnt = joint( n= stdFootPiv.localName().replace( self.stdPrefix, 'FootIkJnt_' ) )
+        toePivJnt = joint( n= stdToePiv.localName().replace( self.stdPrefix, 'FootIkJnt_' ) )
+        footInsideJnt = joint( n= stdFootInside.localName().replace( self.stdPrefix, 'FootIkJnt_' ) )
+        footOusideJnt = joint( n= stdFootOutside.localName().replace( self.stdPrefix, 'FootIkJnt_' ) )
+        footEndJnt = joint( n= stdFootEnd.localName().replace( self.stdPrefix, 'FootIkJnt_' ) )
+        
+        stdFootPiv.t >> pCtlFoot.t
+        stdFootPiv.r >> pCtlFoot.r
+        
+        stdToePiv.t >> toePivJnt.t
+        stdFootInside.t >> footInsideJnt.t
+        stdFootOutside.t >> footOusideJnt.t
+        stdFootEnd.t >> footEndJnt.t
+        
+        addOptionAttribute( ctlFoot )
+        ctlFoot.addAttr( 'liftToe', k=1 )
+        ctlFoot.addAttr( 'liftHill', k=1 )
+        ctlFoot.addAttr( 'ballRot', k=1 )
+        ctlFoot.addAttr( 'bank', k=1 )
+        
+        multMinusLiftToe = createNode( 'multDoubleLinear' ).setAttr( 'input2', -1 )
+        ctlFoot.liftToe >> multMinusLiftToe.input1
+        
+        multMinusLiftToe.output >> footPivJnt.ry
+        ctlFoot.liftHill >> footEndJnt.ry
+        ctlFoot.ballRot >> toePivJnt.rx
+        
+        bankIn  = createNode( 'condition' ).setAttr( 'op', 2 ).setAttr( 'colorIfFalseR', 0 )
+        bankOut = createNode( 'condition' ).setAttr( 'op', 4 ).setAttr( 'colorIfFalseR', 0 )
+        
+        multMinuseBank = createNode( 'multDoubleLinear' ).setAttr( 'input2', -1 )
+        ctlFoot.bank >> multMinuseBank.input1
+        
+        multMinuseBank.output >> bankIn.firstTerm
+        multMinuseBank.output >> bankOut.firstTerm
+        multMinuseBank.output >> bankIn.colorIfTrueR
+        multMinuseBank.output >> bankOut.colorIfTrueR
+        
+        bankIn.outColorR >> footInsideJnt.rz
+        bankOut.outColorR >> footOusideJnt.rz
+
+        select( footEndJnt )
+        pivToeJnt = joint( n= 'Piv' + stdToe.localName().replace( self.stdPrefix, 'FootIkJnt_' ) )
+        toeJnt = joint( n=stdToe.localName().replace( self.stdPrefix, 'FootIkJnt_' ) )
+        footToAnkleJnt = joint( n= toeJnt.localName() + '_end' )
+        
+        localDcmpToeJnt = getDecomposeMatrix( getLocalMatrix( stdToe, stdFootEnd ) )
+        localDcmpToeJnt.ot >> toeJnt.t
+
+        worldDcmpToeJnt = getDecomposeMatrix( stdToe )
+        worldDcmpToePiv  = getDecomposeMatrix( self.stdEnd )
+        composeWorldToe = createNode( 'composeMatrix' )
+        worldDcmpToeJnt.ot >> composeWorldToe.it
+        worldDcmpToePiv.outputRotate >> composeWorldToe.ir
+        invWorldToe = createNode( 'inverseMatrix' )
+        composeWorldToe.outputMatrix >> invWorldToe.inputMatrix
+        mmLocalStdEnd = createNode( 'multMatrix' )
+        self.stdEnd.wm >> mmLocalStdEnd.i[0]
+        invWorldToe.outputMatrix >> mmLocalStdEnd.i[1]
+        dcmpToeEnd = getDecomposeMatrix( mmLocalStdEnd )
+        dcmpToeEnd.ot >> footToAnkleJnt.t
+        
+        
+        ctlToeEnd = makeController( sgdata.Controllers.spherePoints, self.controllerSize, n= self.stdEnd.localName().replace( stdToeEnd.name(), 'Ctl_FootIk' ) )
+        ctlToeEnd.setAttr( 'shape_sx', 0.2 ).setAttr( 'shape_sy', 0.2 ).setAttr( 'shape_sz', 0.2 )
+        pCtlToeEnd = makeParent( ctlToeEnd )
+        parent( pCtlToeEnd, ctlFoot )
+        constrain_parent( footEndJnt, pCtlToeEnd )
+        ctlToeEnd.r >> pivToeJnt.r
+        
+        ctlToe = makeController( sgdata.Controllers.circlePoints, self.controllerSize, n= self.stdEnd.localName().replace( stdToeEnd.name(), 'Ctl_FootIk' ) )
+        ctlToe.setAttr( 'shape_sx', 0.5 ).setAttr( 'shape_sy', 0.2 ).setAttr( 'shape_sz', 0.15 ).setAttr( 'shape_ry', 15 ).setAttr( 'shape_tx', 0.3 * self.controllerSize )
+        ctlToe.setAttr( 'shape_rz', 90 )
+        pCtlToe = makeParent( ctlToe )
+        parent( pCtlToe, ctlToeEnd )
+        pCtlToe.setTransformDefault()
+        localDcmpToeJnt.ot >> pCtlToe.t
+        ctlToe.r >> toeJnt.r
+    
+    
+
+
+

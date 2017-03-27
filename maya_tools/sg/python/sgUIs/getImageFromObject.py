@@ -432,32 +432,34 @@ class Functions:
     @staticmethod
     def updateSelTextureList( evt=0 ):
         
-        import pymel.core
-        for i in range( Window_global.selTextureList.count() ):
-            Window_global.selTextureList.takeItem(0)
-        
-        sels = pymel.core.ls( sl=1 )
-        Window_global.imageBaseSelArea.clearImage()
-        
-        textureList = []
-        for sel in sels:
-            try:
-                sel.getShape()
-            except:
-                continue
-            shadingGroups = sel.getShape().listConnections( type='shadingEngine' )
-            for shadingGroup in shadingGroups:
-                hists = shadingGroup.history()
-                if not hists: continue
-                for hist in hists:
-                    if hist.type() != 'file': continue
-                    fileTextureName = hist.fileTextureName.get()
-                    if not os.path.exists( fileTextureName ): continue
-                    if fileTextureName in textureList: continue
-                    textureList.append( fileTextureName )
-        
-        for textureName in textureList:
-            Window_global.selTextureList.addItem( textureName )
+        try:
+            import pymel.core
+            for i in range( Window_global.selTextureList.count() ):
+                Window_global.selTextureList.takeItem(0)
+            
+            sels = pymel.core.ls( sl=1 )
+            Window_global.imageBaseSelArea.clearImage()
+            
+            textureList = []
+            for sel in sels:
+                try:
+                    sel.getShape()
+                except:
+                    continue
+                shadingGroups = sel.getShape().listConnections( type='shadingEngine' )
+                for shadingGroup in shadingGroups:
+                    hists = shadingGroup.history()
+                    if not hists: continue
+                    for hist in hists:
+                        if hist.type() != 'file': continue
+                        fileTextureName = hist.fileTextureName.get()
+                        if not os.path.exists( fileTextureName ): continue
+                        if fileTextureName in textureList: continue
+                        textureList.append( fileTextureName )
+            
+            for textureName in textureList:
+                Window_global.selTextureList.addItem( textureName )
+        except:pass
         
             
     
