@@ -1,7 +1,0 @@
-﻿  SGEvent.cpp
-CL : warning : Inclusion of header files from include/Qt is deprecated.
-  globalValues.obj : /GL로 컴파일한 MSIL .netmodule 또는 모듈이 있습니다. /LTCG를 지정하여 링크를 다시 시작하십시오. /LTCG를 링크 명령줄에 추가하면 링커 성능이 향상됩니다.
-     Release\SGMPlugMod01.lib 라이브러리 및 Release\SGMPlugMod01.exp 개체를 생성하고 있습니다.
-  코드를 생성하고 있습니다.
-  코드를 생성했습니다.
-  SGMPlugMod01.vcxproj -> D:\Github\private\maya_plugins\SGMPlugMod01\SGMPlugMod01\Release\SGMPlugMod01.mll
