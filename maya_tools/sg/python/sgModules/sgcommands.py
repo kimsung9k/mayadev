@@ -793,7 +793,8 @@ class SGNode( SGObject ):
     
     
     def setAttr(self, attrName, *values, **options ):
-        cmds.setAttr( self.name() + '.' + attrName, *values, **options )
+        try:cmds.setAttr( self.name() + '.' + attrName, *values, **options )
+        except:pass
         return self
         
     
@@ -965,6 +966,12 @@ class SGDagNode( SGNode ):
             return self.attr( 'outMesh' )
         elif nodeType in ['nurbsCurve', 'nurbsSurface']:
             return self.attr( 'local' )
+    
+    
+    def getMMatrix(self, attrName = 'wm' ):
+        return listToMatrix( self.attr( attrName ).get() )
+    
+    
         
         
 
@@ -1466,6 +1473,8 @@ def getConstrainedObject( node, messageName = '' ):
 @convertSg_dec
 def getDistance( node ):
     distNode = createNode( 'distanceBetween' )
+    if node.nodeType() in ['transform', 'joint' ]:
+        node.t >> distNode.point1
     if node.nodeType() == "decomposeMatrix":
         node.outputTranslate >> distNode.point1
     elif node.nodeType() in ['composeMatrix', 'transposeMatrix', 'inverseMatrix','multMatrix', 'wtAddMatrix', 'addMatrix']:
@@ -1493,30 +1502,14 @@ def createLookAtMatrix( lookTarget, rotTarget ):
 
 
 
-@convertSg_dec
-def getLookAtMatrix( lookTarget, rotTarget ):
-    
-    consLookTarget = lookTarget.wm.listConnections( type="multMatrix", p=1 )
-    '''
-    mm = None
-    if consLookTarget:
-        for i in range( len( consLookTarget ) ):
-            conLookTarget = consLookTarget[i]
-            if not conLookTarget.attrName() in ['i[0]','matrixIn[0]']: continue
-            if not conLookTarget.node().i[1].listConnections( type="inverseMatrix" ):continue
-            mm = conLookTarget.node()
-            mmSrcs = getSourceList( mm )
-            srcCons = []
-            for mmSrc in mmSrcs:
-                srcCons += mmSrc.listConnections( s=1, d=0 )
-            for srcCon in srcCons:
-                print srcCon.name(), rotTarget.name()'''
-
-    return createLookAtMatrix( lookTarget, rotTarget )
-
 
 @convertSg_dec
 def getLookAtAngleNode( lookTarget, rotTarget, **options ):
+
+    def getLookAtMatrixNode( lookTarget, rotTarget ):
+    
+        consLookTarget = lookTarget.wm.listConnections( type="multMatrix", p=1 )
+        return createLookAtMatrix( lookTarget, rotTarget )
     
     if options.has_key( 'direction' ) and options['direction']:
         direction = options['direction']
@@ -1526,7 +1519,7 @@ def getLookAtAngleNode( lookTarget, rotTarget, **options ):
     lookTarget = convertSg( lookTarget )
     rotTarget = convertSg( rotTarget )
     
-    dcmpLookAt = getDecomposeMatrix( getLookAtMatrix( lookTarget, rotTarget ) )
+    dcmpLookAt = getDecomposeMatrix( getLookAtMatrixNode( lookTarget, rotTarget ) )
     
     abnodes = dcmpLookAt.ot.listConnections( type='angleBetween' )
     if not abnodes:
@@ -1659,11 +1652,15 @@ def blendTwoMatrix( first, second, target, **options ):
 @convertSg_dec
 def connectBlendTwoMatrix( first, second, target, **options ):
 
-    blendNode = createBlendTwoMatrixNode( first, second )
-    mm = createNode( 'multMatrix' )
-    blendNode.matrixOutput() >> mm.i[0]
-    target.pim >> mm.i[1]
-    dcmp = getDecomposeMatrix( mm )
+    if options.has_key( 'local' ):
+        blendNode = createBlendTwoMatrixNode( first, second, local='local' )
+        dcmp = getDecomposeMatrix( blendNode )
+    else:
+        blendNode = createBlendTwoMatrixNode( first, second )
+        mm = createNode( 'multMatrix' )
+        blendNode.matrixOutput() >> mm.i[0]
+        target.pim >> mm.i[1]
+        dcmp = getDecomposeMatrix( mm )
     
     trConnect = False
     roConnect = False
@@ -2040,6 +2037,47 @@ def setCenterMirrorLocal( sel ):
 
 
 @convertSg_dec
+def getLookAtMatrixValue( aimTarget, rotTarget, **options ):
+    
+    rotWorldMatrix = listToMatrix( rotTarget.wm.get() )
+    aimWorldMatrix = listToMatrix( aimTarget.wm.get() )
+    localAimTarget = aimWorldMatrix * rotWorldMatrix.inverse()
+    localAimPos    = OpenMaya.MPoint( localAimTarget[3] )
+    direction = OpenMaya.MVector( localAimPos ).normal()
+    
+    directionIndex = getDirectionIndex( direction )
+    
+    baseDir = None
+    if options.has_key( 'direction' ):
+        baseDir = OpenMaya.MVector( *options[ 'direction' ] ).normal()
+    
+    if not baseDir:
+        baseDir = [[1,0,0], [0,1,0], [0,0,1], [-1,0,0], [0,-1,0], [0,0,-1]][directionIndex]
+    
+    baseDir = OpenMaya.MVector( *baseDir )
+    direction = OpenMaya.MVector( *direction )
+    localAngle = baseDir.rotateTo( direction ).asMatrix()
+    
+    rotResultMatrix = localAngle * rotWorldMatrix
+    return rotResultMatrix
+
+
+
+def getRotateFromMatrix( mtxValue ):
+    
+    if type( mtxValue ) == list:
+        mtxValue = listToMatrix( mtxValue )
+    
+    trMtx = OpenMaya.MTransformationMatrix( mtxValue )
+    rotVector = trMtx.eulerRotation().asVector()
+    
+    return math.degrees(rotVector.x), math.degrees(rotVector.y), math.degrees(rotVector.z)
+
+
+
+
+
+@convertSg_dec
 def lookAt( aimTarget, rotTarget, baseDir=None, **options ):
     
     rotWorldMatrix = listToMatrix( rotTarget.wm.get() )
@@ -2063,6 +2101,10 @@ def lookAt( aimTarget, rotTarget, baseDir=None, **options ):
     
     options.update( {'ws':1} )
     rotTarget.setOrient( math.degrees( rotVector.x ), math.degrees( rotVector.y ), math.degrees( rotVector.z ), **options )
+
+
+
+
     
 
 @convertSg_dec
@@ -2377,7 +2419,7 @@ def putObject( putTargets, typ='joint', putType='boundingBoxCenter' ):
                 newObject = cmds.spaceLocator()[0]
             elif typ == 'null':
                 newObject = cmds.createNode( 'transform' )
-                cmds.setAttr( putTarget + '.dh', 1 )
+                cmds.setAttr( newObject + '.dh', 1 )
             else:
                 newObject = cmds.createNode( typ )
             cmds.xform( newObject, ws=1, matrix=mtx )
@@ -4040,7 +4082,7 @@ class BodyRig:
         
         
     
-    def createAll(self, numJoint, controllerSize = 1 ):
+    def createAll(self, controllerSize = 1, numJoint=3 ):
         
         self.controllerSize = controllerSize
         
@@ -4497,6 +4539,10 @@ class ArmRig:
         self.blJntFirst  = joint( n=self.stdFirst.replace( self.stdPrefix, 'BlJnt_' ) ).xform( ws=1, matrix=firstPos )
         self.blJntSecond = joint( n=self.stdSecond.replace( self.stdPrefix, 'BlJnt_' ) ).xform( ws=1, matrix=secondPos )
         self.blJntEnd    = joint( n=self.stdEnd.replace( self.stdPrefix, 'BlJnt_' ) ).xform( ws=1, matrix=thirdPos )
+        
+        offsetPos = self.stdSecondoffset.xform( q=1, ws=1, matrix=1 )
+        select( self.blJntSecond )
+        self.blOffset = joint( n=self.stdSecondoffset.replace( self.stdPrefix, 'BlJnt_' ) ).xform( ws=1, matrix=offsetPos )
     
 
 
@@ -4530,6 +4576,7 @@ class ArmRig:
         self.ctlBl.blend >> blendNodeFirst.blend
         self.ctlBl.blend >> blendNodeSecond.blend
         self.ctlBl.blend >> blendNodeEnd.blend
+        self.stdSecondoffset.t >> self.blOffset.t
         
 
 
@@ -4541,7 +4588,10 @@ class ArmRig:
         upperShape = self.curveUpper.shape()
         lowerShape = self.curveLower.shape()
         
-        self.blJntSecond.t >> upperShape.attr( 'controlPoints[1]' )
+        dcmpOffsetInUpper = getDecomposeMatrix( getLocalMatrix( self.stdSecondoffset, self.stdFirst ) )
+        
+        dcmpOffsetInUpper.ot >> upperShape.attr( 'controlPoints[1]' )
+        self.blOffset.t    >> lowerShape.attr( 'controlPoints[0]' )
         self.blJntEnd.t    >> lowerShape.attr( 'controlPoints[1]' )
         
         parent( self.curveUpper, self.blJntFirst )
@@ -4554,11 +4604,11 @@ class ArmRig:
     def makeSpJointsUpper(self, numJnt=3 ):
         
         select( d=1 )
-        self.upperJnts = [ joint() ]
+        self.outJntsUpper = [ joint() ]
         for i in range( numJnt ):
-            self.upperJnts.append( joint() )
+            self.outJntsUpper.append( joint() )
         
-        self.handleUpper, effector = ikHandle( sj=self.upperJnts[0], ee=self.upperJnts[-1], sol='ikSplineSolver', ccv=False, pcv=False, curve=self.curveUpper.shape() )
+        self.handleUpper, effector = ikHandle( sj=self.outJntsUpper[0], ee=self.outJntsUpper[-1], sol='ikSplineSolver', ccv=False, pcv=False, curve=self.curveUpper.shape() )
         curveInfo = createNode( 'curveInfo' )
         
         self.curveUpper.shape().attr( 'local' ) >> curveInfo.inputCurve
@@ -4570,7 +4620,7 @@ class ArmRig:
             multValue *= -1
         
         multNode.input2.set( multValue )
-        for upperJnt in self.upperJnts[1:]:
+        for upperJnt in self.outJntsUpper[1:]:
             multNode.output >> upperJnt.tx
         pass
     
@@ -4593,7 +4643,7 @@ class ArmRig:
         upObjectStart.wm >> self.handleUpper.attr( 'dWorldUpMatrix' )
         upObjectEnd.wm   >> self.handleUpper.attr( 'dWorldUpMatrixEnd' )
         
-        for jnt in self.upperJnts:
+        for jnt in self.outJntsUpper:
             jnt.attr( 'dla' ).set(1)
         parent( self.handleUpper, self.rigBase )
     
@@ -4601,13 +4651,13 @@ class ArmRig:
 
     def makeSpJointsLower(self, numJnt=3 ):
         
-        self.upperJnts[-1].v.set( 0 )
-        select( self.upperJnts[-2] )
-        self.lowerJnts = [ joint() ]
+        self.outJntsUpper[-1].v.set( 0 )
+        select( self.outJntsUpper[-2] )
+        self.outJntsLower = [ joint() ]
         for i in range( numJnt ):
-            self.lowerJnts.append( joint() )
+            self.outJntsLower.append( joint() )
         
-        self.handleLower, effector = ikHandle( sj=self.lowerJnts[0], ee=self.lowerJnts[-1], sol='ikSplineSolver', ccv=False, pcv=False, curve=self.curveLower.shape() )
+        self.handleLower, effector = ikHandle( sj=self.outJntsLower[0], ee=self.outJntsLower[-1], sol='ikSplineSolver', ccv=False, pcv=False, curve=self.curveLower.shape() )
         curveInfo = createNode( 'curveInfo' )
         
         self.curveLower.shape().attr( 'local' ) >> curveInfo.inputCurve
@@ -4619,7 +4669,7 @@ class ArmRig:
             multValue *= -1
         
         multNode.input2.set( multValue )
-        for lowerJnt in self.lowerJnts[1:]:
+        for lowerJnt in self.outJntsLower[1:]:
             multNode.output >> lowerJnt.tx
         
         self.handleLower.attr( 'dTwistControlEnable' ).set( 1 )
@@ -4637,10 +4687,10 @@ class ArmRig:
         upObjectStart.wm >> self.handleLower.attr( 'dWorldUpMatrix' )
         upObjectEnd.wm   >> self.handleLower.attr( 'dWorldUpMatrixEnd' )
         
-        for jnt in self.lowerJnts:
+        for jnt in self.outJntsLower:
             jnt.attr( 'dla' ).set(1)
         
-        constrain_rotate( self.blJntEnd, self.lowerJnts[-1] )
+        constrain_rotate( self.blJntEnd, self.outJntsLower[-1] )
         parent( self.handleLower, self.rigBase )
     
         
@@ -4678,7 +4728,7 @@ class LegRig( ArmRig ):
     @convertSg_dec
     def createIkFootRig(self, stdToe, stdToeEnd, stdFootPiv, stdToePiv, stdFootInside, stdFootOutside, stdFootEnd ):
         
-        self.footIkGrp = createNode( 'transform', n = self.stdEnd.localName().replace( self.stdPrefix, 'RigFootBase_' ) )
+        self.footIkGrp = createNode( 'transform', n = self.stdEnd.localName().replace( self.stdPrefix, 'FootIkBase_' ) )
         constrain_parent( self.ctlIkEnd, self.footIkGrp )
         
         ctlFoot = makeController( sgdata.Controllers.circlePoints, self.controllerSize, n= self.stdEnd.localName().replace( self.stdPrefix, 'Ctl_FootIk' ) )
@@ -4750,14 +4800,14 @@ class LegRig( ArmRig ):
         dcmpToeEnd.ot >> footToAnkleJnt.t
         
         
-        ctlToeEnd = makeController( sgdata.Controllers.spherePoints, self.controllerSize, n= self.stdEnd.localName().replace( stdToeEnd.name(), 'Ctl_FootIk' ) )
+        ctlToeEnd = makeController( sgdata.Controllers.spherePoints, self.controllerSize, n= self.stdEnd.localName().replace( self.stdPrefix, 'Ctl_FootIk' ) )
         ctlToeEnd.setAttr( 'shape_sx', 0.2 ).setAttr( 'shape_sy', 0.2 ).setAttr( 'shape_sz', 0.2 )
         pCtlToeEnd = makeParent( ctlToeEnd )
         parent( pCtlToeEnd, ctlFoot )
         constrain_parent( footEndJnt, pCtlToeEnd )
         ctlToeEnd.r >> pivToeJnt.r
         
-        ctlToe = makeController( sgdata.Controllers.circlePoints, self.controllerSize, n= self.stdEnd.localName().replace( stdToeEnd.name(), 'Ctl_FootIk' ) )
+        ctlToe = makeController( sgdata.Controllers.circlePoints, self.controllerSize, n= self.stdEnd.localName().replace( self.stdPrefix, 'Ctl_FootIk' ) )
         ctlToe.setAttr( 'shape_sx', 0.5 ).setAttr( 'shape_sy', 0.2 ).setAttr( 'shape_sz', 0.15 ).setAttr( 'shape_ry', 15 ).setAttr( 'shape_tx', 0.3 * self.controllerSize )
         ctlToe.setAttr( 'shape_rz', 90 )
         pCtlToe = makeParent( ctlToe )
@@ -4765,8 +4815,138 @@ class LegRig( ArmRig ):
         pCtlToe.setTransformDefault()
         localDcmpToeJnt.ot >> pCtlToe.t
         ctlToe.r >> toeJnt.r
+        
+        select( footToAnkleJnt )
+        self.ikJntFoot = joint( n= self.stdEnd.localName().replace( self.stdPrefix, 'FootIkJnt_' ) )
+        self.ikJntToe  = joint( n= stdToe.localName().replace( self.stdPrefix, 'FootIkJnt_' ) )
+        self.ikJntToeEnd  = joint( n= stdToeEnd.localName().replace( self.stdPrefix, 'FootIkJnt_' ) )
+        
+        distNode = getDistance( dcmpToeEnd )
+        distMultNode = createNode( 'multDoubleLinear' )
+        distNode.distance >> distMultNode.input1
+        distMultNode.input2.set( 1 )
+        if dcmpToeEnd.otx > 0:
+            distMultNode.input2.set( -1 )
+        distMultNode.output >> self.ikJntToe.tx
+        
+        distNode = getDistance( localDcmpToeJnt )
+        distMultNode = createNode( 'multDoubleLinear' )
+        distNode.distance >> distMultNode.input1
+        distMultNode.input2.set( 1 )
+        if dcmpToeEnd.otx > 0:
+            distMultNode.input2.set( -1 )
+        distMultNode.output >> self.ikJntToeEnd.tx
+        
+        direction = [1,0,0]
+        if dcmpToeEnd.otx > 0:
+            direction = [-1,0,0]
+        
+        lookAtConnect( ctlToe, self.ikJntFoot, direction=direction )
+        lookAtConnect( ctlToeEnd, self.ikJntToe, direction=direction )
+        
+        rCons = self.ikJntToe.r.listConnections( s=1, d=0, p=1 )
+        rCons[0] // self.ikJntToe.r
+        rCons[0] >> self.ikJntToe.jo
+        
+        self.ikJntToe.r.set( 0,0,0 )
     
+        addOptionAttribute(ctlToe)
+        ctlToe.addAttr( ln='toeRot', k=1 )
+        ctlToe.toeRot >> self.ikJntToe.ry
+        
+        constrain_point( footToAnkleJnt, self.ikHandle )
+        parent( self.footIkGrp, self.ikGroup )
+
+
+
+    @convertSg_dec
+    def createFKFootRig(self, stdToe, stdToeEnd ):
+        
+        self.footFkGrp = createNode( 'transform', n = self.stdEnd.localName().replace( self.stdPrefix, 'FootFkBase_' ) )
+        
+        ctlFkToe = makeController( sgdata.Controllers.rhombusPoints, self.controllerSize, n= stdToe.localName().replace( self.stdPrefix, 'Ctl_FootFk' ) )
+        ctlFkToe.setAttr( 'shape_sx', 0.63 ).setAttr( 'shape_sy', 0.31 ).setAttr( 'shape_sz', 0.28 ).setAttr( 'shape_rz', 90 )
+        pCtlFkToe = makeParent( ctlFkToe )
+        constrain_parent( self.fkCtlEnd, self.footFkGrp )
+        parent( pCtlFkToe, self.footFkGrp )
+        
+        composeLocalToe    = createNode( 'composeMatrix' )
+        composeLocalToeEnd = createNode( 'composeMatrix' )
+        inverseToe = createNode( 'inverseMatrix' )
+        
+        dcmpLocalToeEnd = getDecomposeMatrix( getLocalMatrix( stdToeEnd, self.stdEnd ) )
+        
+        stdToe.t >> composeLocalToe.it
+        dcmpLocalToeEnd.ot >> composeLocalToeEnd.it
+        
+        composeLocalToe.outputMatrix >> inverseToe.inputMatrix
+        
+        mmLocalToeEnd = createNode( 'multMatrix' )
+        composeLocalToeEnd.outputMatrix >> mmLocalToeEnd.i[0]
+        inverseToe.outputMatrix >> mmLocalToeEnd.i[1]
+        dcmpLocalToeEndTrans = getDecomposeMatrix( mmLocalToeEnd )
+        
+        angleNode = createNode( 'angleBetween' )
+        if self.stdEnd.tx.get() > 0:
+            angleNode.vector1.set( 1,0,0 )
+        else:
+            angleNode.vector1.set( -1,0,0 )
+        dcmpLocalToeEndTrans.ot >> angleNode.vector2
+        
+        stdToe.t >> pCtlFkToe.t
+        angleNode.euler >> pCtlFkToe.r
+        
+        composeToe = createNode( 'composeMatrix' )
+        stdToe.t        >> composeToe.it
+        angleNode.euler >> composeToe.ir
+        inverseComposeToe = createNode( 'inverseMatrix' )
+        
+        composeToe.outputMatrix >> inverseComposeToe.inputMatrix
+        
+        mmToeEndInToe = createNode( 'multMatrix' )
+        composeLocalToeEnd.outputMatrix >> mmToeEndInToe.i[0]
+        inverseComposeToe.outputMatrix >> mmToeEndInToe.i[1]
+        dcmpToeEndInToe = getDecomposeMatrix( mmToeEndInToe )
+        
+        childToeEnd = makeChild( ctlFkToe )
+        dcmpToeEndInToe.ot >> childToeEnd.t
+        
+        select( self.footFkGrp )
+        self.fkJntFoot = joint( n= self.stdEnd.localName().replace( self.stdPrefix, 'FootFkJnt_' ) )
+        self.fkJntToe  = joint( n= stdToe.localName().replace( self.stdPrefix, 'FootFkJnt_' ) )
+        self.fkJntToeEnd  = joint( n= stdToeEnd.localName().replace( self.stdPrefix, 'FootFkJnt_' ) )
+        
+        direction = [1,0,0]
+        if self.stdEnd.tx.get() < 0:
+            direction = [-1,0,0]
+        lookAtConnect( ctlFkToe, self.fkJntFoot, direction=direction )
+        constrain_parent( ctlFkToe, self.fkJntToe )
+        childToeEnd.t >> self.fkJntToeEnd.t
+        
+        parent( self.footFkGrp, self.fkGroup )
+
+        
+    @convertSg_dec
+    def createBlFootRig(self):
+        
+        self.outJntsFoot = []
+        select( self.outJntsLower[-2] )
+        
+        outJntFoot = joint()
+        outJntToe = joint()
+        outJntToeEnd = joint()
+        
+        self.outJntsLower[-1].t >> outJntFoot.t
+        connectBlendTwoMatrix( self.ikJntFoot, self.fkJntFoot, outJntFoot, cr=1 )
+        connectBlendTwoMatrix( self.ikJntToe,  self.fkJntToe,  outJntToe, ct=1, cr=1, local=1 )
+        connectBlendTwoMatrix( self.ikJntToeEnd, self.fkJntToeEnd, outJntToeEnd, ct=1, local=1 )
+        
+        self.ctlBl.blend >> outJntFoot.blend
+        self.ctlBl.blend >> outJntToe.blend
+        self.ctlBl.blend >> outJntToeEnd.blend
+        
+        pass
+
+
+
     
-
-
-

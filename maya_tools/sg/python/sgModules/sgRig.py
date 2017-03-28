@@ -4,6 +4,44 @@ from maya import OpenMaya
 
 
 
+def getMObject( target ):
+    mObject = OpenMaya.MObject()
+    selList = OpenMaya.MSelectionList()
+    selList.add( target )
+    selList.getDependNode( 0, mObject )
+    return mObject
+
+
+
+def getDagPath( target ):
+    dagPath = OpenMaya.MDagPath()
+    selList = OpenMaya.MSelectionList()
+    selList.add( target )
+    try:
+        selList.getDagPath( 0, dagPath )
+        return dagPath
+    except:
+        return None
+    
+    
+
+def matrixToList( matrix ):
+    mtxList = range( 16 )
+    for i in range( 4 ):
+        for j in range( 4 ):
+            mtxList[ i * 4 + j ] = matrix( i, j )
+    return mtxList
+
+
+
+def listToMatrix( mtxList ):
+    matrix = OpenMaya.MMatrix()
+    OpenMaya.MScriptUtil.createMatrixFromList( mtxList, matrix  )
+    return matrix
+
+
+
+
 mocParentOrder = {
         'root' : None,
         'spines' : 'root',
@@ -157,45 +195,6 @@ def createMocapJoints( mocCreateDict ):
     pymel.core.group( newMeshs, n='MOCMESH_grp' )
     jntGrp = pymel.core.group( mocRoot, n='MOCJNT_grp' )
     cmds.move( 0,0,0, jntGrp.scalePivot.name(), jntGrp.rotatePivot.name() ,rpr=1 )
-
-
-
-
-def getMObject( target ):
-    mObject = OpenMaya.MObject()
-    selList = OpenMaya.MSelectionList()
-    selList.add( target )
-    selList.getDependNode( 0, mObject )
-    return mObject
-
-
-
-def getDagPath( target ):
-    dagPath = OpenMaya.MDagPath()
-    selList = OpenMaya.MSelectionList()
-    selList.add( target )
-    try:
-        selList.getDagPath( 0, dagPath )
-        return dagPath
-    except:
-        return None
-    
-    
-
-def matrixToList( matrix ):
-    mtxList = range( 16 )
-    for i in range( 4 ):
-        for j in range( 4 ):
-            mtxList[ i * 4 + j ] = matrix( i, j )
-    return mtxList
-
-
-
-def listToMatrix( mtxList ):
-    matrix = OpenMaya.MMatrix()
-    OpenMaya.MScriptUtil.createMatrixFromList( mtxList, matrix  )
-    return matrix
-
 
 
 
