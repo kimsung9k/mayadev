@@ -32,5 +32,5 @@ def reverseAngle( evt=0 ):
 def reversePosition( evt=0 ):
     
     for sel in sgcommands.listNodes( sl=1 ):
-        tr = sel.t.get()[0]
+        tr = sel.t.get()
         sel.t.set( -tr[0], -tr[1], -tr[2] )

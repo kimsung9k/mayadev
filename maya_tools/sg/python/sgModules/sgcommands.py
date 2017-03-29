@@ -578,7 +578,10 @@ class SGAttribute( SGObject ):
 
 
     def get(self):
-        return cmds.getAttr( self.name() )
+        getValue = cmds.getAttr( self.name() )
+        if type( getValue ) == list and len( getValue ) == 1:
+            return getValue[0]
+        return getValue
     
     
     def name(self):
@@ -1033,20 +1036,17 @@ class SGTransformNode( SGDagNode ):
     
 
     def getPivotMatrix( self ):
-        mtxList = self.wm.get()
-        mtx = listToMatrix( mtxList )
-        piv = OpenMaya.MPoint( *self.attr( 'rotatePivot' ).get()[0] )
-        wp = piv * mtx
-        mtxList[ 12 ] = wp.x
-        mtxList[ 13 ] = wp.y
-        mtxList[ 14 ] = wp.z
+        piv = OpenMaya.MPoint( *self.attr( 'rotatePivot' ).get() )
+        mtxList = matrixToList( OpenMaya.MMatrix() )
+        mtxList[ 12 ] = piv.x
+        mtxList[ 13 ] = piv.y
+        mtxList[ 14 ] = piv.z
         return SGMatrix( mtxList )
 
 
     def getWorldMatrix(self):
         return SGMatrix( self.wm.get() )
         
-
 
     def getMatrix(self):
         return SGMatrix( self.m.get() )
@@ -1611,6 +1611,7 @@ def createBlendTwoMatrixNode( first, second, **options ):
     return wtAddMtx
 
 
+
 @convertSg_dec
 def getBlendTwoMatrixNode( first, second, **options ):
 
@@ -1777,7 +1778,7 @@ def getAngle( node, axis=[1,0,0] ):
     
     conectedindex = None
     for i in range( len( connectedAttrs ) ):
-        value = connectedAttrs[i].node().attr( 'vector1' ).get()[0]
+        value = connectedAttrs[i].node().attr( 'vector1' ).get()
         if OpenMaya.MVector(*axis) * OpenMaya.MVector( *value ) > 0.999:
             conectedindex = i
             break
@@ -2310,7 +2311,7 @@ def setAngleReverse( rigedNode ):
     srcList = getSourceList( rigedNode, [] )
     for src in srcList:
         if src.nodeType() == 'angleBetween':
-            vector1Value = src.vector1.get()[0]
+            vector1Value = src.vector1.get()
             src.vector1.set( -vector1Value[0],-vector1Value[1],-vector1Value[2])
 
 
@@ -3067,7 +3068,7 @@ class MirrorInfo:
             cmds.setAttr( mirrorInfo + '.dh', 1 )
             
         self.mirrorInfo = convertSg( mirrorInfo )
-        pivMatrix = convertSg( nodeName ).getPivotMatrix()
+        pivMatrix = convertSg( nodeName ).getPivotMatrix() * convertSg( nodeName ).getWorldMatrix()
         self.mirrorInfo.xform( ws=1, matrix=pivMatrix.getList() )
 
     
@@ -3242,7 +3243,7 @@ class SymmetryControl:
         for attr in transformAttrs:
             transformAttrValues.append( sgtrans.attr( attr ).get() )
         worldMatrix = sgtrans.getWorldMatrix()
-        pivMatrix   = sourceParent[0].sgtransform.getPivotMatrix()
+        pivMatrix   = sourceParent[0].sgtransform.getPivotMatrix() * sourceParent[0].sgtransform.getWorldMatrix()
         return udAttrs, udAttrValues, transformAttrs, transformAttrValues, worldMatrix * pivMatrix.inverse()
     
     
@@ -3284,7 +3285,7 @@ class SymmetryControl:
 
         if 'matrix' in mirrorTypes:
             srcLocalMtx = self.setMatrixByMirrorType( mirrorTypes, localMatrix )
-            dstMatrix = srcLocalMtx * target.parent()[0].sgtransform.getPivotMatrix()
+            dstMatrix = srcLocalMtx * target.parent()[0].sgtransform.getPivotMatrix() * target.parent()[0].sgtransform.getWorldMatrix()
 
             rotList = dstMatrix.getRotate().getList()
             for i in range( len( rotList ) ):
@@ -4950,3 +4951,40 @@ class LegRig( ArmRig ):
 
 
     
+
+class StdControl:
+    
+    def __init__(self):
+        
+        pass
+    
+    
+    @convertSg_dec
+    def setSymmetry( self, targetStd, **options ):
+        
+        fromSide = '_L_'
+        toSide = '_R_'
+        if options.has_key( 'from' ):
+            fromSide = options['from']
+        if options.has_key( 'to' ):
+            toSide = options['to']
+        
+        ns = targetStd.name().split( 'Std_' )[0]
+        
+        stds = listNodes( ns + 'Std_*', type='transform' )
+        
+        for std in stds:
+            if std.name().find( fromSide ) == -1: continue
+            if not cmds.objExists( std.name().replace( fromSide, toSide ) ): continue
+            
+            stdToSide = convertSg( std.name().replace( fromSide, toSide ) )
+            stdToSide.xform( ws=1, matrix= std.wm.get() )
+            setMirror( stdToSide )
+    
+            print std.name(), "--->", stdToSide.name()
+    
+    
+    
+    
+
+
