@@ -1,0 +1,42 @@
+import maya.OpenMaya as om
+import sgBFunction_dag
+import sgBFunction_attribute
+
+sels = sgBFunction_dag.getChildrenCurveExists( cmds.ls( sl=1 ) )
+
+bb = om.MBoundingBox()
+
+normal = om.MVector()
+
+for sel in sels:
+    pos = cmds.xform( sel + '.cv[0]', q=1, ws=1, t=1 )[:3]
+    bb.expand( om.MPoint( *pos ) )
+    pos2 = cmds.xform( sel + '.cv[1]', q=1, ws=1, t=1 )[:3]
+    dir = om.MVector( *pos2 ) - om.MVector( *pos )
+    normal += dir
+
+bbc = bb.center()
+bbl = bb.min().distanceTo( bb.max() )
+if bbl < 1: bbl = 1
+rot = cmds.angleBetween( euler=1, vector1= [0,0,1], vector2=[normal.x, normal.y, normal.z] ) 
+
+plane = cmds.nurbsPlane( ch=0, o=1, po=0, ax=[0,0,1] )[0]
+
+rampNode = cmds.shadingNode( 'ramp', asTexture=1 )
+lambert  = cmds.shadingNode( 'lambert', asShader=1 )
+lambertSet = cmds.sets( renderable=True, noSurfaceShader=True, empty=1 )
+cmds.connectAttr( lambert + '.outColor', lambertSet + '.surfaceShader' )
+cmds.connectAttr( rampNode + '.outColor', lambert + '.color' )
+cmds.sets( plane, e=1, forceElement = lambertSet )
+
+cmds.setAttr( plane + '.t', bbc.x, bbc.y, bbc.z )
+cmds.setAttr( plane + '.r', rot[0], rot[1], rot[2] )
+cmds.setAttr( plane + '.s', bbl, bbl, bbl )
+
+sgBFunction_attribute.addAttr( plane, ln='min', k=1 )
+sgBFunction_attribute.addAttr( plane, ln='max', k=1 )
+sgBFunction_attribute.addAttr( plane, ln='rand', k=1 )
+
+cmds.setAttr( plane + '.min', 0 )
+cmds.setAttr( plane + '.max', 1 )
+cmds.setAttr( plane + '.rand', 0.2 )

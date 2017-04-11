@@ -1,0 +1,31 @@
+import maya.cmds as cmds
+import sgBFunction_dag
+import sgBFunction_connection
+
+sels = cmds.ls( sl=1 )
+if sels:
+    beforeTopNodes = sgBFunction_dag.getTopTransformNodes()
+    
+    filePath = "Z:/project_2015/cm_03/26_SF_Project/dpt_cgi/assets/Snipergun_RifeDSR1/reference/Snipergun_RifeDSR1.mb"
+    cmds.file( filePath, r=1, type="mayaBinary",  ignoreVersion=1, gl=1, mergeNamespacesOnClash=False, namespace="Snipergun_RifeDSR1", options="v=0;" )
+      
+    afterTopNodes = sgBFunction_dag.getTopTransformNodes()
+    
+    gun = ''
+    for topNode in afterTopNodes:
+        if not topNode in beforeTopNodes:
+            gun = topNode
+    
+    if gun:
+        gun = gun.split( '|' )[-1]
+        char = sels[0]
+        
+        gunNs = gun.split( ':' )[0]
+        if char.find( ':' ) != -1:
+            charNs = char.split( ':' )[0]
+        else:
+            charNs = ''
+        
+        gunWorld = gunNs + ':Ctl_World'
+        bodyRoot = charNs + ':Root_CTL'
+        sgBFunction_connection.constraint( bodyRoot, gunWorld )

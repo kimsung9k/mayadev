@@ -1,0 +1,2 @@
+import sgPWindow_curve_sgWobbleCurve
+sgPWindow_curve_sgWobbleCurve.Window().show()

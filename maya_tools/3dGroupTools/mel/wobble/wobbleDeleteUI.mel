@@ -1,0 +1,39 @@
+//
+// Copyright (C) 2006-2010 Felix Ulber
+//
+// version 1.1
+// last change 25.06.2010
+
+global proc wobbleDeleteUI()
+{
+	global string $gMainDeformationsMenu;
+    global string $gMainEditDeformationsMenu;
+
+	if (`menu -exists $gMainDeformationsMenu`)
+	{
+		deleteUI -menuItem wobbleCreateDividerItem;
+		deleteUI -menuItem wobbleItem;
+        deleteUI -menuItem wobbleDialogItem;
+	}
+	else if (`menu -exists primMenu`)
+	{
+		deleteUI -menuItem wobbleCreateDividerItem;
+		deleteUI -menuItem wobbleItem;
+        deleteUI -menuItem wobbleDialogItem;
+	}
+	else error "Could not find wobble menu items and thus not delete them.";
+    
+    if (`menu -exists $gMainEditDeformationsMenu`)
+	{
+		deleteUI -menuItem wobbleEditDividerItem;
+		deleteUI -menuItem wobblePaintItem;
+        deleteUI -menuItem wobblePaintDialogItem;
+	}
+	else if (`menu -exists primMenu`)
+	{
+		deleteUI -menuItem wobbleEditDividerItem;
+		deleteUI -menuItem wobblePaintItem;
+        deleteUI -menuItem wobblePaintDialogItem;
+	}
+	else error "Could not find wobble menu items and thus not delete them.";
+}

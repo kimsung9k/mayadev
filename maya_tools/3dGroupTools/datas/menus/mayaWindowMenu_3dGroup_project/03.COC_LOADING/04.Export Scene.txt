@@ -1,0 +1,43 @@
+import os
+import sgBExcute_data
+import sgBFunction_dag
+import sgBFunction_fileAndPath
+import cPickle
+
+exportPath  = 'Z:/project_2015/cm_09/32_coc_loading_screen/dpt_cgi/scenes/sc001/td/exportMesh_exportScene'
+refInfoPath = 'Z:/project_2015/cm_09/32_coc_loading_screen/dpt_cgi/scenes/sc001/td/refInfo.txt'
+
+import os
+import sgBExcute_data
+import sgBFunction_dag
+
+sels = cmds.ls( tr=1 )
+
+parentsList = []
+for sel in sels:
+    if cmds.listRelatives( sel, p=1 ): continue
+    if sel[-10:] != '_CHARACTER': continue
+    parentsList.append( sel )
+
+parentsList = list( set( parentsList ) )
+
+filePaths = []
+for targetParent in parentsList:
+    if not cmds.referenceQuery( targetParent, inr=1 ): continue
+    filePath = cmds.referenceQuery( targetParent, f=1 )
+    filePath = filePath.split( '{' )[0]
+    filePaths.append( filePath )
+
+filePaths = list( set( filePaths ) )
+filePaths.append( exportPath )
+
+f = open( refInfoPath, 'w' )
+cPickle.dump( filePaths, f )
+f.close()
+
+cmds.select( parentsList )
+
+sgBFunction_fileAndPath.makeFolder( exportPath )
+
+exTargets = sgBFunction_dag.getChildrenMeshExists( parentsList )
+sgBExcute_data.exportSgMeshDatas( exTargets, exportPath )

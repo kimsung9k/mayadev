@@ -1,5 +1,9 @@
 from sgModules import sgcommands
+import maya.cmds as cmds
 
-sels = sgcommands.listNodes( sl=1 )
-newObjects = sgcommands.putObject( sels, 'joint', 'transform' )
+sels = cmds.ls( sl=1 )
+newObjects = []
+for sel in sels:
+    newObject = sgcommands.putObject( sel, 'joint', 'transform' )
+    newObjects.append( newObject )
 sgcommands.select( newObjects )

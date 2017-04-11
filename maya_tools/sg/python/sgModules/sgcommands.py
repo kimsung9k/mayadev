@@ -53,6 +53,7 @@ def getFloat2Ptr():
 
 
 def getMObject( target ):
+    
     mObject = OpenMaya.MObject()
     selList = OpenMaya.MSelectionList()
     selList.add( target )
@@ -76,7 +77,11 @@ def getDagPath( target ):
 def getDirectionIndex( inputVector ):
     
     import math
-    normalInput = OpenMaya.MVector(inputVector).normal()
+    
+    if type( inputVector ) in [ list, tuple ]:
+        normalInput = OpenMaya.MVector(*inputVector).normal()
+    else:
+        normalInput = OpenMaya.MVector(inputVector).normal()
     
     xVector = OpenMaya.MVector( 1,0,0 )
     yVector = OpenMaya.MVector( 0,1,0 )
@@ -104,6 +109,15 @@ def getDirectionIndex( inputVector ):
         dotIndex += 3
     
     return dotIndex
+
+
+
+
+def getDirection( inputVector ):
+    
+    return [ [1,0,0], [0,1,0], [0,0,1], [-1,0,0], [0,-1,0], [0,0,-1] ][getDirectionIndex( inputVector )]
+
+
     
     
     
@@ -719,7 +733,9 @@ class SGNode( SGObject ):
     
     
     def rename(self, inputName ):
-        cmds.rename( self.name(), inputName )
+        origName = self.name()
+        resultName = cmds.rename( self.name(), inputName )
+        #print "rename : ", origName, "-->", resultName
         return self
     
     
@@ -841,10 +857,12 @@ class SGNode( SGObject ):
         
         if self.nodeType() in ['composeMatrix', 'inverseMatrix']:
             return self.attr( 'outputMatrix' )
-        elif self.nodeType() in ['multMatrix', 'wtAddMatrix']:
+        elif self.nodeType() in ['multMatrix', 'wtAddMatrix', 'addMatrix']:
             return self.attr( 'matrixSum' )
         elif self.nodeType() in ['fourByFourMatrix']:
             return self.attr( 'output' )
+        elif self.nodeType() in ['transform', 'joint']:
+            return self.attr( 'wm' )
     
     
     def scalarOutput(self):
@@ -997,6 +1015,7 @@ class SGTransformNode( SGDagNode ):
         return self
 
 
+
     def setPosition(self, *args, **options ):
         
         args = list( args )
@@ -1004,7 +1023,8 @@ class SGTransformNode( SGDagNode ):
         cmds.move( *args, **options )
         return self
     
-    
+
+
     def xform(self, *args, **options ):
         result = cmds.xform( self.name(), **options )
         if not result:
@@ -1012,28 +1032,36 @@ class SGTransformNode( SGDagNode ):
         return result
     
         
+
     def makeChild(self, addName='_child', *args, **options ):
         
-        childNode = SGTransformNode( cmds.createNode( 'transform', n=self.localName() + addName ) )
+        name = self.localName() + addName
+        if options.has_key( 'replaceName' ):
+            name = self.localName().replace( *options['replaceName'] )
+            
+        childNode = SGTransformNode( cmds.createNode( 'transform', n=name ) )
         cmds.parent( childNode.name(), self.name() )[0]
         childNode.setTransformDefault()
         return childNode
 
 
+
     def setTransformDefault(self):
-        self.t.set( 0,0,0 )
-        self.r.set( 0,0,0 )
-        self.s.set( 1,1,1 )
-        self.sh.set( 0,0,0 )
+        self.setAttr( 'tx', 0 ).setAttr( 'ty', 0 ).setAttr( 'tz', 0 )
+        self.setAttr( 'rx', 0 ).setAttr( 'ry', 0 ).setAttr( 'rz', 0 )
+        self.setAttr( 'sx', 1 ).setAttr( 'sy', 1 ).setAttr( 'sz', 1 )
+        self.setAttr( 'shxy', 0 ).setAttr( 'shxz', 0 ).setAttr( 'shyz', 0 )
         if self.nodeType() == 'joint':
-            self.jo.set( 0,0,0)
+            self.jo.set( 0,0,0 )
         return self
     
-    
+
+
     def parentTo(self, target ):
         cmds.parent( self.name(), self.convertName( target ) )[0]
         return self
     
+
 
     def getPivotMatrix( self ):
         piv = OpenMaya.MPoint( *self.attr( 'rotatePivot' ).get() )
@@ -1044,9 +1072,11 @@ class SGTransformNode( SGDagNode ):
         return SGMatrix( mtxList )
 
 
+
     def getWorldMatrix(self):
         return SGMatrix( self.wm.get() )
         
+
 
     def getMatrix(self):
         return SGMatrix( self.m.get() )
@@ -1391,7 +1421,7 @@ def createLocalMatrix( localTarget, parentTarget ):
     
     multMatrixNode = createNode( 'multMatrix' )
     
-    localTarget.wm >> multMatrixNode.i[0]
+    localTarget.matrixOutput() >> multMatrixNode.i[0]
     parentTarget.wim >> multMatrixNode.i[1]
     
     return multMatrixNode
@@ -1402,7 +1432,7 @@ def createLocalMatrix( localTarget, parentTarget ):
 @convertSg_dec
 def getLocalMatrix( localTarget, parentTarget ):
     
-    multMatrixNodes = localTarget.wm.listConnections( d=1, s=0, type='multMatrix' )
+    multMatrixNodes = localTarget.matrixOutput().listConnections( d=1, s=0, type='multMatrix' )
     for multMatrixNode in multMatrixNodes:
         firstAttr = multMatrixNode.i[0].listConnections( s=1, d=0, p=1 )
         secondAttr = multMatrixNode.i[1].listConnections( s=1, d=0, p=1 )
@@ -1540,7 +1570,10 @@ def lookAtConnect( lookTarget, rotTarget, **options ):
     
     if not direction:
         pRotTarget = rotTarget.parent()
-        wim = listToMatrix( pRotTarget.wim.get() )
+        if pRotTarget:
+            wim = listToMatrix( pRotTarget.wim.get() )
+        else:
+            wim = OpenMaya.MMatrix()
         pos = OpenMaya.MPoint( *lookTarget.xform( q=1, ws=1, t=1 ) )
         directionIndex = getDirectionIndex( pos*wim )
         direction = [[1,0,0], [0,1,0], [0,0,1],[-1,0,0], [0,-1,0], [0,0,-1]][directionIndex]
@@ -1727,6 +1760,7 @@ def createBlendMatrix( *args, **options ):
     
     outDcmp.ot >> target.t
     outDcmp.outputRotate >> target.r
+   
 
 
 
@@ -1765,7 +1799,6 @@ def addBlendMatrix( *args, **options ):
             
         constAttr >> wtAddMtx[0].i[cuNumber].m
         divNode.outputX >> wtAddMtx[0].i[cuNumber].w
-    
     return length
 
 
@@ -1981,6 +2014,36 @@ def setMirror( sel ):
     matList[8]  *= -1
     matList[12] *= -1
     sel.xform( ws=1, matrix= matList )
+
+
+
+
+@convertSg_dec
+def setSymmetryToOther( src, trg ):
+    
+    matList = src.wm.get()
+    matList[1]  *= -1
+    matList[2]  *= -1
+    matList[4]  *= -1
+    matList[8]  *= -1
+    matList[12] *= -1
+    
+    if trg.nodeType() == 'joint':
+        trg.xform( ws=1, matrix = matList )
+        worldMatrix = listToMatrix( matList )
+        joValue = trg.attr( 'jo' ).get()
+        joRadValue = [ math.radians( joValue[0]), math.radians( joValue[1]), math.radians( joValue[2]) ]
+        joMtx = OpenMaya.MEulerRotation( OpenMaya.MVector( *joRadValue ) ).asMatrix()
+        pMtx = listToMatrix( trg.attr( 'pm' ).get() )
+        localRotMtx = worldMatrix * pMtx.inverse() * joMtx.inverse()
+        trMtx = OpenMaya.MTransformationMatrix( localRotMtx )
+        rotValue = trMtx.eulerRotation().asVector()
+        rotDegValue = [ math.degrees( rotValue[0] ), math.degrees( rotValue[1] ), math.degrees( rotValue[2] ) ]
+        #print 'rot deg value : ', rotDegValue
+        trg.r.set( *rotDegValue )
+    else:
+        trg.xform( ws=1, matrix= matList )
+
     
 
 
@@ -2315,6 +2378,8 @@ def setAngleReverse( rigedNode ):
             src.vector1.set( -vector1Value[0],-vector1Value[1],-vector1Value[2])
 
 
+
+
 def getSelectedVertices( targetObj=None ):
     
     cmds.select( targetObj )
@@ -2363,6 +2428,20 @@ def getSelectedVertices( targetObj=None ):
 
 
 
+def getBBC( target ):
+    
+    bbmin = cmds.getAttr( target + '.boundingBoxMin' )[0]
+    bbmax = cmds.getAttr( target + '.boundingBoxMax' )[0]
+    
+    bbcenter = []
+    for i in range( 3 ):
+        bbcenter.append( (bbmin[i] + bbmax[i])/2.0 )
+    return bbcenter
+
+
+
+
+
 def getCenter( sels ):
     if not sels: return None
     
@@ -2387,45 +2466,24 @@ def getCenter( sels ):
 
 
 
-
-def putObject( putTargets, typ='joint', putType='boundingBoxCenter' ):
+def putObject( putTarget, typ='joint', putType='' ):
     
-    for i in range( len( putTargets )):
-        putTargets[i] = convertName( putTargets[i] )
-    
-    if putType == 'boundingBoxCenter':
-        center = getCenter( putTargets )
-
-        if typ == 'locator':
-            putTarget = cmds.spaceLocator()[0]
-        elif typ == 'null':
-            putTarget = cmds.createNode( 'transform' )
-            cmds.setAttr( putTarget + '.dh', 1 )
-        else:
-            putTarget = cmds.createNode( typ )
-    
-        cmds.move( center.x, center.y, center.z, putTarget, ws=1 )    
-        
-        if len( putTargets ) == 1:
-            rot = cmds.xform( putTargets[0], q=1, ws=1, ro=1 )
-            cmds.rotate( rot[0], rot[1], rot[2], putTarget, ws=1 )
-        
-        return convertSg( putTarget )
-    
+    if typ == 'locator':
+        newObj = cmds.spaceLocator()[0]
+    elif typ == 'null':
+        newObj = cmds.createNode( 'transform' )
+        cmds.setAttr( newObj + '.dh', 1 )
     else:
-        newObjects = []
-        for putTarget in putTargets:
-            mtx = cmds.getAttr( putTarget + '.wm' )
-            if typ == 'locator':
-                newObject = cmds.spaceLocator()[0]
-            elif typ == 'null':
-                newObject = cmds.createNode( 'transform' )
-                cmds.setAttr( newObject + '.dh', 1 )
-            else:
-                newObject = cmds.createNode( typ )
-            cmds.xform( newObject, ws=1, matrix=mtx )
-            newObjects.append( convertSg(newObject) )
-        return newObjects
+        newObj = cmds.createNode( typ )
+    
+    if type( putTarget ) in [list, tuple]:
+        center = getCenter( putTarget )
+        cmds.move( center.x, center.y, center.z, newObj, ws=1 )
+    else:
+        mtx = cmds.getAttr( putTarget + '.wm' )
+        cmds.xform( newObj, ws=1, matrix= mtx )
+    
+    return newObj
 
 
 
@@ -2478,10 +2536,6 @@ def makeController( pointList, defaultScaleMult = 1, **options ):
     
     import copy
     newPointList = copy.deepcopy( pointList )
-    for point in newPointList:
-        point[0] *= defaultScaleMult
-        point[1] *= defaultScaleMult
-        point[2] *= defaultScaleMult
     
     options.update( {'p':newPointList, 'd':1} )
     
@@ -2489,7 +2543,14 @@ def makeController( pointList, defaultScaleMult = 1, **options ):
     if options.has_key( 'typ' ):
         typ = options.pop( 'typ' )
     
-    print typ
+    mp = False
+    if options.has_key( 'makeParent' ):
+        mp = options.pop('makeParent')
+        
+    colorIndex = -1
+    if options.has_key( 'colorIndex' ):
+        colorIndex = options.pop('colorIndex')
+        
     
     crv = curve( **options )
     crvShape = crv.shape()
@@ -2502,7 +2563,11 @@ def makeController( pointList, defaultScaleMult = 1, **options ):
         name = None
     
     jnt = createNode( typ )
-    if name: jnt.rename( name )
+    if name:
+        if mp:
+            makeParent( jnt ).rename( 'P' + name )
+        jnt.rename( name )
+
     parent( crvShape, jnt, add=1, shape=1 )
     delete( crv )
     crvShape = jnt.shape()
@@ -2518,7 +2583,12 @@ def makeController( pointList, defaultScaleMult = 1, **options ):
     jnt.addAttr( ln='shape_sx', dv=1, cb=1 )
     jnt.addAttr( ln='shape_sy', dv=1, cb=1 )
     jnt.addAttr( ln='shape_sz', dv=1, cb=1 )
+    jnt.addAttr( ln='scaleMult', dv=defaultScaleMult, cb=1, min=0 )
     composeMatrix = createNode( 'composeMatrix' )
+    composeMatrix2 = createNode( 'composeMatrix' )
+    multMatrix = createNode( 'multMatrix' )
+    composeMatrix.outputMatrix >> multMatrix.i[0]
+    composeMatrix2.outputMatrix >> multMatrix.i[1]
     jnt.shape_tx >> composeMatrix.inputTranslateX
     jnt.shape_ty >> composeMatrix.inputTranslateY
     jnt.shape_tz >> composeMatrix.inputTranslateZ
@@ -2528,13 +2598,21 @@ def makeController( pointList, defaultScaleMult = 1, **options ):
     jnt.shape_sx >> composeMatrix.inputScaleX
     jnt.shape_sy >> composeMatrix.inputScaleY
     jnt.shape_sz >> composeMatrix.inputScaleZ
+    jnt.scaleMult >> composeMatrix2.inputScaleX
+    jnt.scaleMult >> composeMatrix2.inputScaleY
+    jnt.scaleMult >> composeMatrix2.inputScaleZ
     trGeo = createNode( 'transformGeometry' )
     jnt.attr( 'radius' ).set( 0 )
     
     ioShape.outputGeometry() >> trGeo.inputGeometry
-    composeMatrix.outputMatrix >> trGeo.transform
+    multMatrix.matrixSum >> trGeo.transform
     
     trGeo.outputGeometry >> crvShape.create
+    
+    if colorIndex != -1:
+        shape = jnt.shape().name()
+        cmds.setAttr( shape + '.overrideEnabled', 1 )
+        cmds.setAttr( shape + '.overrideColor', colorIndex )
 
     return jnt
 
@@ -2658,6 +2736,8 @@ def makeCurveFromSelection( *sels, **options ):
         dcmp.ot >> vp.input1
         curve.wim >> vp.matrix
         vp.output >> curveShape.attr( 'controlPoints' )[i]
+    
+    return curve
 
 
 
@@ -2858,11 +2938,6 @@ def ikHandle( *args, **options ):
 
 
 
-
-        
-    
-
-
 @convertName_dec
 def autoCopyWeight( *args ):
     
@@ -2894,7 +2969,8 @@ def autoCopyWeight( *args ):
     
     
 
-    
+
+
 @convertName_dec
 def setSkinClusterDefault( *args ):
     
@@ -2903,6 +2979,7 @@ def setSkinClusterDefault( *args ):
         cmds.loadPlugin( 'sgCmdSkinCluster' )
     cmds.sgCmdSkinClustser( cmds.ls( sl=1 ), d=1 )
     
+
 
 
 
@@ -4056,18 +4133,898 @@ def connectBindPre( targetGeo ):
 
 
 
-@convertSg_dec
-def addOptionAttribute( target ):
+def addOptionAttribute( target, enumName = "Options" ):
+    
+    target = convertSg( target )
     
     barString = '____'
     while target.attributeQuery( barString, ex=1 ):
         barString += '_'
     
-    target.addAttr( ln=barString,  at="enum", en="Options:", cb=1 )
+    target.addAttr( ln=barString,  at="enum", en="%s:" % enumName, cb=1 )
 
 
+
+
+
+def getUVAtPoint( point, mesh ):
+    
+    if type( point ) in [ type([]), type(()) ]:
+        point = OpenMaya.MPoint( *point )
+    
+    meshShape = convertSg( mesh ).shape().name()
+    fnMesh = OpenMaya.MFnMesh( getDagPath( meshShape ) )
+    
+    util = OpenMaya.MScriptUtil()
+    util.createFromList( [0.0,0.0], 2 )
+    uvPoint = util.asFloat2Ptr()
+    fnMesh.getUVAtPoint( point, uvPoint, OpenMaya.MSpace.kWorld )
+    u = OpenMaya.MScriptUtil.getFloat2ArrayItem( uvPoint, 0, 0 )
+    v = OpenMaya.MScriptUtil.getFloat2ArrayItem( uvPoint, 0, 1 )
+    
+    return u, v
     
     
+    
+
+def createFollicleOnVertex( vertexName, ct= True, cr= True ):
+    
+    vtxPos = cmds.xform( vertexName, q=1, ws=1, t=1 )
+    mesh = vertexName.split( '.' )[0]
+    meshShape = pymel.core.ls( mesh )[0].getShape().name()
+    u, v = getUVAtPoint( vtxPos, mesh )
+    
+    follicleNode = cmds.createNode( 'follicle' )
+    follicle = cmds.listRelatives( follicleNode, p=1, f=1 )[0]
+    
+    cmds.connectAttr( meshShape+'.outMesh', follicleNode+'.inputMesh' )
+    cmds.connectAttr( meshShape+'.wm', follicleNode+'.inputWorldMatrix' )
+    
+    cmds.setAttr( follicleNode+'.parameterU', u )
+    cmds.setAttr( follicleNode+'.parameterV', v )
+    
+    if ct: cmds.connectAttr( follicleNode+'.outTranslate', follicle+'.t' )
+    if cr: cmds.connectAttr( follicleNode+'.outRotate', follicle+'.r' )
+    
+    return follicle
+
+
+
+
+
+def createFollicleOnClosestPoint( targetObj, mesh ):
+        
+    vtxPos = cmds.xform( targetObj, q=1, ws=1, t=1 )
+    meshShape = convertSg( mesh ).shape().name()
+    u, v = getUVAtPoint( vtxPos, mesh )
+    
+    follicleNode = cmds.createNode( 'follicle' )
+    follicle = cmds.listRelatives( follicleNode, p=1, f=1 )[0]
+    
+    cmds.connectAttr( meshShape+'.outMesh', follicleNode+'.inputMesh' )
+    cmds.connectAttr( meshShape+'.wm', follicleNode+'.inputWorldMatrix' )
+    
+    cmds.setAttr( follicleNode+'.parameterU', u )
+    cmds.setAttr( follicleNode+'.parameterV', v )
+    
+    cmds.connectAttr( follicleNode+'.outTranslate', follicle+'.t' )
+    cmds.connectAttr( follicleNode+'.outRotate', follicle+'.r' )
+
+
+
+
+
+
+def getMeshAndIndicesPoints( selObjects ):
+    
+    selObjects = cmds.ls( cmds.polyListComponentConversion( selObjects, tv=1 ), fl=1 )
+    
+    mesh = ''
+    vtxIndices = []
+    for obj in selObjects:
+        splits = obj.split( '.' )
+        if len( splits ) == 1:
+            mesh = obj
+        else:
+            mesh = splits[0]
+            index = int( splits[1].split( '[' )[-1].replace( ']', '' ) )
+            vtxIndices.append( index )
+    
+    if vtxIndices:
+        vtxIndices = list( set( vtxIndices ) )
+    else:
+        vtxIndices = [ i for i in range( OpenMaya.MFnMesh( getDagPath( mesh ) ).numVertices() ) ]
+    
+    return mesh, vtxIndices
+
+
+
+def getNodeFromHistory( target, nodeType ):
+    
+    pmTarget = pymel.core.ls( target )[0]
+    hists = pmTarget.history( pdo=1 )
+    targetNodes = []
+    for hist in hists:
+        if hist.type() == nodeType:
+            targetNodes.append( hist.name() )
+    return targetNodes
+
+
+
+def getInfluenceAndWeightList( mesh, vertices = [] ):
+
+    skinClusters = getNodeFromHistory( mesh, 'skinCluster' )
+    if not skinClusters: return None
+    
+    skinCluster = skinClusters[0]
+    print "skincluster : ", skinCluster
+    
+    fnSkinCluster = OpenMaya.MFnDependencyNode( getMObject( skinCluster ) )
+    plugWeightList = fnSkinCluster.findPlug( 'weightList' )
+    
+    if not vertices: vertices = [ i for i in range( plugWeightList.numElements() ) ]
+    influenceAndWeightList = [ [] for i in range( len( vertices ) ) ]
+    phygicalMap = [ 0 for i in range( plugWeightList.numElements() ) ]
+    
+    for i in range( len( vertices ) ):
+        logicalIndex = vertices[i]
+        plugWeights = plugWeightList[ logicalIndex ].child( 0 )
+        influenceNums = []
+        values = []
+        for j in range( plugWeights.numElements() ):
+            influenceNum = plugWeights[j].logicalIndex()
+            value = plugWeights[j].asFloat()
+            influenceNums.append( influenceNum )
+            values.append( value )
+        
+        influenceAndWeightList[i] = [ influenceNums, values ]
+        phygicalMap[ logicalIndex ] = i
+        
+    return influenceAndWeightList, phygicalMap
+
+
+
+
+def getMeshLocalPoints( mesh ):
+    
+    fnMesh = OpenMaya.MFnMesh( getDagPath( mesh ) )
+    points = OpenMaya.MPointArray()
+    fnMesh.getPoints( points )
+    return points
+
+
+
+
+def createRivetBasedOnSkinWeights( selectedObjs ):
+    
+    def getPlugMatrix( mesh ):
+        skinCluster = getNodeFromHistory( mesh, 'skinCluster' )
+        if not skinCluster: return None
+        skinCluster = skinCluster[0]
+        fnSkinCluster = OpenMaya.MFnDependencyNode( getMObject( skinCluster ) )
+        
+        return fnSkinCluster.findPlug( 'matrix' )
+    
+    def getPlugBindPre( mesh ):
+    
+        skinCluster = getNodeFromHistory( mesh, 'skinCluster' )
+        if not skinCluster: return None
+        skinCluster = skinCluster[0]
+        fnSkinCluster = OpenMaya.MFnDependencyNode( getMObject( skinCluster ) )
+        
+        return fnSkinCluster.findPlug( 'bindPreMatrix' )
+    
+    
+    def getJointMultMatrix( jnt, mtxBindPre ):
+        cons = cmds.listConnections( jnt+'.wm', type='multMatrix' )
+
+        if cons:
+            for con in cons:
+                if cmds.attributeQuery( 'skinWeightInfluenceMatrix', node=con, ex=1 ):
+                    if mtxBindPre == cmds.getAttr( con+'.i[0]' ):
+                        return con
+        
+        mmtxNode = cmds.createNode( 'multMatrix' )
+        cmds.setAttr( mmtxNode+'.i[0]', mtxBindPre, type='matrix' )
+        cmds.connectAttr( jnt+'.wm', mmtxNode+'.i[1]' )
+        
+        cmds.addAttr( mmtxNode, ln='skinWeightInfluenceMatrix', at='message' )
+        
+        return mmtxNode
+
+
+    mesh, vtxIndices = getMeshAndIndicesPoints( selectedObjs )
+    
+    skinClusterNode = getNodeFromHistory( mesh, 'skinCluster' )
+    if not skinClusterNode: return None
+    skinClusterNode = skinClusterNode[0]
+    
+    influenceAndWeightList, phygicalMap = getInfluenceAndWeightList( mesh, vtxIndices )
+    
+    meshMatrix = getDagPath( mesh ).inclusiveMatrix()
+    meshPoints = getMeshLocalPoints( mesh )
+    plugMatrix = getPlugMatrix( mesh )
+    plugBindPre = getPlugBindPre( mesh )
+    
+    BB = OpenMaya.MBoundingBox()
+    
+    wtAddMtx = cmds.createNode( 'wtAddMatrix' )
+    mtxPlugIndidcesAndWeights = {}
+    allWeights = 0.0
+    for i in vtxIndices:
+        influenceList, weights = influenceAndWeightList[ phygicalMap[i] ]
+        
+        for j in range( len( influenceList ) ):
+            mtxPlugIndex = influenceList[j]
+            if mtxPlugIndex in mtxPlugIndidcesAndWeights.keys():
+                mtxPlugIndidcesAndWeights[mtxPlugIndex] += weights[j]
+            else:
+                mtxPlugIndidcesAndWeights.update( {mtxPlugIndex:weights[j]} )
+            allWeights += weights[j]
+        BB.expand( meshPoints[i] )
+    worldPoint = BB.center()*meshMatrix
+    
+    items = mtxPlugIndidcesAndWeights.items()
+    for i in range( len( items ) ):
+        influence, weight = items[i]
+        
+        plugMatrixElement = plugMatrix.elementByLogicalIndex( influence )
+        plugBindPreElement = plugBindPre.elementByLogicalIndex( influence )
+        
+        jnt = cmds.listConnections( plugMatrixElement.name(), s=1, d=0, type='joint' )[0]
+        mtxBindPre = cmds.getAttr( plugBindPreElement.name() )
+        mmtxNode = getJointMultMatrix( jnt, mtxBindPre )
+        cmds.connectAttr( mmtxNode+'.o', wtAddMtx+'.i[%d].m' % i )
+        cmds.setAttr( wtAddMtx+'.i[%d].w' % i, weight/allWeights )
+    
+    origObj = cmds.createNode( 'transform', n='OrigObject' )
+    destObj = cmds.createNode( 'transform', n='destObject' )
+    cmds.setAttr( destObj+'.dh' , 1 )
+    cmds.setAttr( destObj+'.dla', 1 )
+    mmNode = cmds.createNode( 'multMatrix' )
+    dcmp = cmds.createNode( 'decomposeMatrix' )
+    mtxWtAdd = cmds.getAttr( wtAddMtx+'.o' )
+    
+    cmds.connectAttr( origObj+'.wm', mmNode+'.i[0]' )
+    cmds.connectAttr( wtAddMtx+'.o', mmNode+'.i[1]' )
+    cmds.connectAttr( destObj+'.pim', mmNode+'.i[2]' )
+    
+    cmds.connectAttr( mmNode+'.o', dcmp+'.imat' )
+    
+    cmds.connectAttr( dcmp+'.ot', destObj+'.t' )
+    cmds.connectAttr( dcmp+'.or', destObj+'.r' )
+    
+    mmtxWtAdd = listToMatrix( mtxWtAdd )
+    worldPoint *= mmtxWtAdd.inverse()
+    cmds.setAttr( origObj+'.t', worldPoint.x, worldPoint.y, worldPoint.z )
+
+
+
+def getCloseSurfaceNode( target, surface ):
+    
+    surfShape = cmds.listRelatives( surface, s=1 )[0]
+    
+    closeNode = cmds.createNode( 'closestPointOnSurface' )
+    dcmp = cmds.createNode( 'decomposeMatrix' )
+    
+    cmds.connectAttr( target+'.wm', dcmp+'.imat' )
+    cmds.connectAttr( dcmp+'.ot', closeNode+'.inPosition' )
+    cmds.connectAttr( surfShape+'.worldSpace', closeNode+'.inputSurface' )
+    
+    print closeNode
+    return closeNode
+
+
+
+def getPointOnSurfaceNode( target, surface, keepClose=False ):
+    
+    surfShape = cmds.listRelatives( surface, s=1 )[0]
+    
+    node = cmds.createNode( 'pointOnSurfaceInfo' )
+    cmds.connectAttr( surfShape+'.local', node+'.inputSurface' )
+    
+    closeNode = getCloseSurfaceNode( target, surface )
+    
+    if not keepClose:
+        cmds.setAttr( node+'.u', cmds.getAttr( closeNode+'.u' ) )
+        cmds.setAttr( node+'.v', cmds.getAttr( closeNode+'.v' ) )
+        cmds.delete( closeNode )
+    else:
+        cmds.connectAttr( closeNode+'.u', node+'.u' )
+        cmds.connectAttr( closeNode+'.v', node+'.v' )
+    
+    return node
+
+
+def createTransformOnSurface( target, surface, keepClose=False ):
+    
+    pointOnSurfNode = getPointOnSurfaceNode( target, surface, keepClose )
+    
+    tr = cmds.createNode( 'transform', n='P'+target )
+    fbfMtx = cmds.createNode( 'fourByFourMatrix' )
+    dcmp   = cmds.createNode( 'decomposeMatrix' )
+    vectorNode = cmds.createNode( 'vectorProduct' )
+    cmds.setAttr( vectorNode+'.op', 2 )
+    cmds.connectAttr( pointOnSurfNode+'.tu', vectorNode+'.input1' )
+    cmds.connectAttr( pointOnSurfNode+'.n', vectorNode+'.input2' )
+    cmds.connectAttr( vectorNode+'.outputX', fbfMtx+'.i00' )
+    cmds.connectAttr( vectorNode+'.outputY', fbfMtx+'.i01' )
+    cmds.connectAttr( vectorNode+'.outputZ', fbfMtx+'.i02' )
+    cmds.connectAttr( pointOnSurfNode+'.px', fbfMtx+'.i30' )
+    cmds.connectAttr( pointOnSurfNode+'.py', fbfMtx+'.i31' )
+    cmds.connectAttr( pointOnSurfNode+'.pz', fbfMtx+'.i32' )
+    cmds.connectAttr( pointOnSurfNode+'.nx', fbfMtx+'.i10' )
+    cmds.connectAttr( pointOnSurfNode+'.ny', fbfMtx+'.i11' )
+    cmds.connectAttr( pointOnSurfNode+'.nz', fbfMtx+'.i12' )
+    cmds.connectAttr( pointOnSurfNode+'.position', tr+'.t' )
+    cmds.connectAttr( fbfMtx+'.output', dcmp+'.imat' )
+    cmds.connectAttr( dcmp+'.or', tr+'.r' )
+    
+    cmds.setAttr( tr+'.dh', 1 )
+    cmds.setAttr( tr+'.dla', 1 )
+    
+    return tr
+
+
+def setBindPreToJntP( sels ):
+    
+    for sel in sels:
+        cons = cmds.listConnections( sel+'.wm', d=1, s=0, p=1, c=1, type='skinCluster' )
+        selP = cmds.listRelatives( sel, p=1 )[0]
+        
+        inputCons = cons[1::2]
+        
+        for inputCon in inputCons:
+            bindPreAttr = inputCon.replace( 'matrix[', 'bindPreMatrix[' )
+            cmds.connectAttr( selP+'.wim', bindPreAttr )
+
+
+
+
+def getMDagPathAndComponent():
+    
+    mSelList = OpenMaya.MSelectionList()
+    OpenMaya.MGlobal.getActiveSelectionList( mSelList )
+    
+    returnTargets = []
+    for i in range( mSelList.length() ):
+        mDagPath = OpenMaya.MDagPath()
+        mObject  = OpenMaya.MObject()
+        
+        mSelList.getDagPath( i, mDagPath, mObject )
+        
+        mIntArrU = OpenMaya.MIntArray()
+        mIntArrV = OpenMaya.MIntArray()
+        mIntArrW = OpenMaya.MIntArray()
+        
+        if not mObject.isNull():
+            if mDagPath.apiType() == OpenMaya.MFn.kNurbsCurve:
+                component = OpenMaya.MFnSingleIndexedComponent( mObject )
+                component.getElements( mIntArrU )
+            elif mDagPath.apiType() == OpenMaya.MFn.kNurbsSurface:
+                component = OpenMaya.MFnDoubleIndexedComponent( mObject )
+                component.getElements( mIntArrU, mIntArrV )
+            elif mDagPath.apiType() == OpenMaya.MFn.kLattice:
+                component = OpenMaya.MFnTripleIndexedComponent( mObject )
+                component.getElements( mIntArrU, mIntArrV, mIntArrW )
+            elif mObject.apiType() == OpenMaya.MFn.kMeshVertComponent:
+                component = OpenMaya.MFnSingleIndexedComponent( mObject )
+                component.getElements( mIntArrU )
+            elif mObject.apiType() == OpenMaya.MFn.kMeshEdgeComponent:
+                mfnMesh = OpenMaya.MFnMesh( mDagPath )
+                component = OpenMaya.MFnSingleIndexedComponent( mObject )
+                mIntArr = OpenMaya.MIntArray()
+                component.getElements( mIntArr )
+                mIntArrU.setLength( mIntArr.length() * 2 )
+                util = OpenMaya.MScriptUtil()
+                util.createFromList([0,0],2)
+                ptrEdgeToVtxIndex = util.asInt2Ptr()
+                for i in range( mIntArr.length() ):
+                    mfnMesh.getEdgeVertices( mIntArr[i], ptrEdgeToVtxIndex )
+                    index1 = util.getInt2ArrayItem( ptrEdgeToVtxIndex, 0, 0 )
+                    index2 = util.getInt2ArrayItem( ptrEdgeToVtxIndex, 0, 1 )
+                    mIntArrU[i*2  ] = index1
+                    mIntArrU[i*2+1] = index2 
+            elif mObject.apiType() == OpenMaya.MFn.kMeshPolygonComponent:
+                mfnMesh = OpenMaya.MFnMesh( mDagPath )
+                component = OpenMaya.MFnSingleIndexedComponent( mObject )
+                mIntArr = OpenMaya.MIntArray()
+                component.getElements( mIntArr )
+                mIntArrEach = OpenMaya.MIntArray()
+                for i in range( mIntArr.length() ):
+                    mfnMesh.getPolygonVertices( mIntArr[i], mIntArrEach )
+                    for i in range( mIntArrEach.length() ):
+                        mIntArrU.append( mIntArrEach[i] )
+        
+        returnTargets.append( [mDagPath, mIntArrU, mIntArrV, mIntArrW] )
+    
+    return returnTargets
+
+
+
+
+
+def weightHammerCurve( targets ):
+    import maya.OpenMaya as om
+    
+    def getWeights( plug ):
+        childPlug = plug.child(0)
+        numElements = childPlug.numElements()
+        indicesAndValues = []
+        for i in range( numElements ):
+            logicalIndex = childPlug[i].logicalIndex()
+            value        = childPlug[i].asFloat()
+            indicesAndValues.append( [ logicalIndex, value ] )
+        return indicesAndValues
+    
+    def getMixWeights( first, second, rate ):
+        
+        invRate = 1.0-rate
+        
+        print first
+        print second
+        
+        firstMaxIndex = first[-1][0]
+        secondMaxIndex = second[-1][0]
+        maxIndex = firstMaxIndex+1
+        
+        if firstMaxIndex < secondMaxIndex:
+            maxIndex = secondMaxIndex+1
+        
+        firstLogicalMap  = [ False for i in range( maxIndex ) ]
+        secondLogicalMap = [ False for i in range( maxIndex ) ]
+        
+        for index, value in first:
+            firstLogicalMap[ index ] = True
+            
+        for index, value in second:
+            secondLogicalMap[ index ] = True
+        
+        returnTargets = []
+        
+        for index, value in first:
+            returnTargets.append( [index, invRate * value] )
+        for index, value in second:
+            if firstLogicalMap[ index ]:
+                for i in range( len( returnTargets ) ):
+                    wIndex = returnTargets[i][0]
+                    if wIndex == index:
+                        returnTargets[i][1] += rate * value
+                        break
+            else:
+                returnTargets.append( [index, rate * value] )
+        return returnTargets
+    
+    def clearArray( targetPlug ):
+        plugChild = targetPlug.child( 0 )
+        targetInstances = []
+        for i in range( plugChild.numElements() ):
+            targetInstances.append( plugChild[i].name() )
+        targetInstances.reverse()
+        for i in range( len( targetInstances ) ):
+            cmds.removeMultiInstance( targetInstances[i] )
+        
+    
+    node = targets[0].split( '.' )[0]
+    
+    skinClusterNodes = getNodeFromHistory( node, 'skinCluster' )
+    if not skinClusterNodes: return None
+    
+    fnSkinCluster = OpenMaya.MFnDependencyNode( getMObject( skinClusterNodes[0] ) )
+    plugWeightList = fnSkinCluster.findPlug( 'weightList' )
+    
+    cmds.select( targets )
+    for dagPath, uArr, vArr, wArr in getMDagPathAndComponent():
+        
+        fnCurve = OpenMaya.MFnNurbsCurve( dagPath )
+        startNum = 0
+        lastNum = fnCurve.numCVs()-1
+        
+        if uArr[-1] == lastNum:
+            pass
+        elif uArr[0] == startNum:
+            pass
+        elif uArr[0] == startNum and uArr[-1] == lastNum:
+            pass
+        else:
+            weightStart = getWeights( plugWeightList[ uArr[0]-1 ] )
+            weightEnd   = getWeights( plugWeightList[ uArr[-1]+1 ] )
+            
+            length = uArr.length()
+            for i in range( uArr.length() ):
+                clearArray( plugWeightList[ uArr[i] ] )
+                plugWeightListEmelent = plugWeightList.elementByLogicalIndex( uArr[i] )
+                
+                rate = float( i+1 ) / (length+2)
+                weights = getMixWeights( weightStart, weightEnd, rate )
+                for index, value in weights:
+                    targetPlug = plugWeightListEmelent.child(0).elementByLogicalIndex( index )
+                    cmds.setAttr( targetPlug.name(), value )
+        cmds.skinPercent( skinClusterNodes[0], normalize=1 )
+
+
+
+def setSkinWeightOnlyVertices( selVertices ):
+    
+    for dagPath, vtxIds in getSelectedVertices( selVertices ):
+        fnNode = OpenMaya.MFnDagNode( dagPath )
+        mesh = cmds.ls( fnNode.partialPathName() )[0]
+        hists = cmds.listHistory( mesh, pdo=1 )
+        
+        skinNode = ''
+        for hist in hists:
+            if cmds.nodeType( hist ) == 'skinCluster':
+                skinNode = OpenMaya.MFnDependencyNode( getMObject( hist ) )
+                break
+        
+        if not skinNode: continue
+        
+        weightListPlug = skinNode.findPlug( 'weightList' )
+        
+        for i in range( vtxIds.length() ):
+            vtxId = vtxIds[i]
+            weightsPlug = weightListPlug[vtxId].child( 0 )
+            
+            largeInfluence = 0.0
+            largeIndex = -1
+            for j in range( weightsPlug.numElements() ):
+                weight = weightsPlug[j].asFloat()
+                if weight > largeInfluence:
+                    largeInfluence = weight
+                    largeIndex = j
+            
+            if largeIndex == -1: continue
+            
+            targetMatrixIndex = -1
+            for j in range( weightsPlug.numElements() ):
+                if j == largeIndex:
+                    cmds.setAttr( weightsPlug[j].name(), 1 )
+                    targetMatrixIndex = weightsPlug[j].logicalIndex()
+                else:
+                    cmds.setAttr( weightsPlug[j].name(), 0 )
+            
+            if targetMatrixIndex == -1: continue
+            
+            for k in range( weightListPlug.numElements() ):
+                if vtxId == k: continue
+                weightsPlug = weightListPlug[k].child(0)
+                for m in range( weightsPlug.numElements() ):
+                    if targetMatrixIndex != weightsPlug[m].logicalIndex(): continue
+                    cmds.setAttr( weightsPlug[m].name(), 0 )
+
+    cmds.refresh()
+    cmds.skinPercent( skinNode.name(), normalize=1 )
+
+
+
+
+
+class Std:
+    
+    base     = 'StdJnt_Base'
+    root     = 'StdJnt_Root'
+    back01   = 'StdJnt_Back01'
+    back02   = 'StdJnt_Back02'
+    chest    = 'StdJnt_Chest'
+    neck     = 'StdJnt_Neck'
+    head     = 'StdJnt_Head'
+    headEnd  = 'StdJnt_HeadEnd'
+    
+    clavicle_SIDE_ = 'StdJnt_clavicle_SIDE_'
+    arm_SIDE_00 = 'StdJnt_Arm_SIDE_00'
+    arm_SIDE_01 = 'StdJnt_Arm_SIDE_01'
+    arm_SIDE_02 = 'StdJnt_Arm_SIDE_02'
+    arm_SIDE_poleV = 'StdJnt_Arm_SIDE_PoleV'
+    arm_SIDE_01_Offset = 'StdJnt_Arm_SIDE_01_Offset'
+    arm_SIDE_lookAt = 'LookAtStdjnt_Arm_SIDE_00'
+    fingers_SIDE_ = 'StdJnt_%s_SIDE_*'
+    
+    leg_SIDE_00   = 'StdJnt_Leg_SIDE_00'
+    leg_SIDE_01   = 'StdJnt_Leg_SIDE_01'
+    leg_SIDE_02   = 'StdJnt_Leg_SIDE_02'
+    leg_SIDE_poleV = 'StdJnt_Leg_SIDE_PoleV'
+    leg_SIDE_01_Offset = 'StdJnt_Leg_SIDE_01_Offset'
+    leg_SIDE_lookAt = 'LookAtStdJnt_Leg_SIDE_00'
+    foot_SIDE_Piv = 'StdJnt_Foot_SIDE_Piv'
+    foot_SIDE_ToePiv = 'StdJnt_Foot_SIDE_ToePiv'
+    foot_SIDE_inside = 'StdJnt_Foot_SIDE_Inside'
+    foot_SIDE_outside = 'StdJnt_Foot_SIDE_Outside'
+    foot_SIDE_end = 'StdJnt_Foot_SIDE_End'
+    toe_SIDE_ = 'StdJnt_Toe_SIDE_'
+    toe_SIDE_end = 'StdJnt_Toe_SIDE_End'    
+
+
+    @staticmethod
+    def getHeadList():
+        return Std.base, Std.neck, Std.head
+        
+
+    @staticmethod
+    def getBodyList():
+        return Std.base, Std.root, Std.back01, Std.back02, Std.chest
+    
+    
+    @staticmethod
+    def getLeftClavicleList():
+        
+        replaceList = ( '_SIDE_', '_L_' )
+        stdClavicle = Std.clavicle_SIDE_.replace( *replaceList )
+        stdArm00    = Std.arm_SIDE_00.replace( *replaceList )
+        return Std.base, stdClavicle, stdArm00
+    
+    
+    @staticmethod
+    def getRightClavicleList():
+        
+        replaceList = ( '_SIDE_', '_R_' )
+        stdClavicle = Std.clavicle_SIDE_.replace( *replaceList )
+        stdArm00    = Std.arm_SIDE_00.replace( *replaceList )
+        return Std.base, stdClavicle, stdArm00
+    
+    
+    @staticmethod
+    def getLeftArmList():
+        
+        replaceList = ( '_SIDE_', '_L_' )
+        stdArm00 = Std.arm_SIDE_00.replace( *replaceList )
+        stdArm01 = Std.arm_SIDE_01.replace( *replaceList )
+        stdArm02 = Std.arm_SIDE_02.replace( *replaceList )
+        stdArm01Offset = Std.arm_SIDE_01_Offset.replace( *replaceList )
+        stdPoleV = Std.arm_SIDE_poleV.replace( *replaceList )
+        stdLookAt = Std.arm_SIDE_lookAt.replace( *replaceList )
+        return Std.base, stdArm00, stdArm01, stdArm02, stdArm01Offset, stdPoleV, stdLookAt
+    
+
+    @staticmethod
+    def getRightArmList():
+        
+        replaceList = ( '_SIDE_', '_R_' )
+        stdArm00 = Std.arm_SIDE_00.replace( *replaceList )
+        stdArm01 = Std.arm_SIDE_01.replace( *replaceList )
+        stdArm02 = Std.arm_SIDE_02.replace( *replaceList )
+        stdArm01Offset = Std.arm_SIDE_01_Offset.replace( *replaceList )
+        stdPoleV = Std.arm_SIDE_poleV.replace( *replaceList )
+        stdLookAt = Std.arm_SIDE_lookAt.replace( *replaceList )
+        return Std.base, stdArm00, stdArm01, stdArm02, stdArm01Offset, stdPoleV, stdLookAt
+    
+    
+    @staticmethod
+    def getLeftLegList():
+        
+        replaceList = ( '_SIDE_', '_L_' )
+        stdArm00 = Std.leg_SIDE_00.replace( *replaceList )
+        stdArm01 = Std.leg_SIDE_01.replace( *replaceList )
+        stdArm02 = Std.leg_SIDE_02.replace( *replaceList )
+        stdArm01Offset = Std.leg_SIDE_01_Offset.replace( *replaceList )
+        stdPoleV = Std.leg_SIDE_poleV.replace( *replaceList )
+        stdLookAt = Std.leg_SIDE_lookAt.replace( *replaceList )
+        return Std.base, stdArm00, stdArm01, stdArm02, stdArm01Offset, stdPoleV, stdLookAt
+    
+
+    @staticmethod
+    def getRightLegList():
+        
+        replaceList = ( '_SIDE_', '_R_' )
+        stdArm00 = Std.leg_SIDE_00.replace( *replaceList )
+        stdArm01 = Std.leg_SIDE_01.replace( *replaceList )
+        stdArm02 = Std.leg_SIDE_02.replace( *replaceList )
+        stdArm01Offset = Std.leg_SIDE_01_Offset.replace( *replaceList )
+        stdPoleV = Std.leg_SIDE_poleV.replace( *replaceList )
+        stdLookAt = Std.leg_SIDE_lookAt.replace( *replaceList )
+        return Std.base, stdArm00, stdArm01, stdArm02, stdArm01Offset, stdPoleV, stdLookAt
+        
+    
+    @staticmethod
+    def getLeftIkFootList():
+        
+        replaceList = ( '_SIDE_', '_L_' )
+        stdToe     = Std.toe_SIDE_.replace( *replaceList )
+        stdToeEnd  = Std.toe_SIDE_end.replace( *replaceList )
+        stdFootPiv = Std.foot_SIDE_Piv.replace( *replaceList )
+        stdToePiv  = Std.foot_SIDE_ToePiv.replace( *replaceList )
+        stdFootInside = Std.foot_SIDE_inside.replace( *replaceList )
+        stdFootOutside = Std.foot_SIDE_outside.replace( *replaceList )
+        stdFootEnd  = Std.foot_SIDE_end.replace( *replaceList )
+        return stdToe, stdToeEnd, stdFootPiv, stdToePiv, stdFootInside, stdFootOutside, stdFootEnd
+
+
+    @staticmethod
+    def getRightIkFootList():
+        
+        replaceList = ( '_SIDE_', '_R_' )
+        stdToe     = Std.toe_SIDE_.replace( *replaceList )
+        stdToeEnd  = Std.toe_SIDE_end.replace( *replaceList )
+        stdFootPiv = Std.foot_SIDE_Piv.replace( *replaceList )
+        stdToePiv  = Std.foot_SIDE_ToePiv.replace( *replaceList )
+        stdFootInside = Std.foot_SIDE_inside.replace( *replaceList )
+        stdFootOutside = Std.foot_SIDE_outside.replace( *replaceList )
+        stdFootEnd  = Std.foot_SIDE_end.replace( *replaceList )
+        return stdToe, stdToeEnd, stdFootPiv, stdToePiv, stdFootInside, stdFootOutside, stdFootEnd
+    
+    
+    @staticmethod
+    def getLeftFkFootList():
+        
+        replaceList = ( '_SIDE_', '_L_' )
+        stdToe  = Std.toe_SIDE_.replace( *replaceList )
+        stdToeEnd  = Std.toe_SIDE_end.replace( *replaceList )
+        return stdToe, stdToeEnd
+    
+    
+    @staticmethod
+    def getRightFkFootList():
+        
+        replaceList = ( '_SIDE_', '_R_' )
+        stdToe  = Std.toe_SIDE_.replace( *replaceList )
+        stdToeEnd  = Std.toe_SIDE_end.replace( *replaceList )
+        return stdToe, stdToeEnd
+    
+    
+    @staticmethod
+    def getLeftHandList():
+        
+        replaceList = ( '_SIDE_', '_L_' )
+        stdArm02 = Std.arm_SIDE_02.replace( *replaceList )
+        fingerString = Std.fingers_SIDE_.replace( *replaceList )
+        return Std.base, stdArm02, fingerString
+
+
+    @staticmethod
+    def getRightHandList():
+        
+        replaceList = ( '_SIDE_', '_R_' )
+        stdArm02 = Std.arm_SIDE_02.replace( *replaceList )
+        fingerString = Std.fingers_SIDE_.replace( *replaceList )
+        return Std.base, stdArm02, fingerString
+
+
+
+
+@convertName_dec
+def aimConstraint( *args, **kwargs ):
+    
+    if kwargs.has_key( 'wuo' ) or kwargs.has_key( 'worldUpObject' ):
+        kwargs['wuo'] = convertName( kwargs['wuo'] ) 
+    
+    return cmds.aimConstraint( *args, **kwargs )
+
+
+
+
+class HumanRig:
+    
+    bodyColor = 18
+    bodyRotColor = 23
+    rootColor = 6
+    worldColor = 22
+    leftColor = 17
+    rightColor = 13
+
+
+
+
+class HeadRig:
+    
+    def __init__(self, stdBase, stdNeck, stdHead ):
+        
+        self.stdPrefix = 'StdJnt_'
+        self.stdBase = convertSg( stdBase )
+        self.stdNeck = convertSg( stdNeck )
+        self.stdHead = convertSg( stdHead )
+        self.controllerSize = 1
+    
+    
+    def createAll(self, controllerSize = 1 ):
+        
+        self.controllerSize = controllerSize
+        self.createRigBase()
+        self.createController()
+        self.createJoints()
+        
+    
+
+    def createRigBase(self):
+        
+        self.rigBase = createNode( 'transform', n= 'RigBase_Head' )
+        self.rigBase.xform( ws=1, matrix=self.stdNeck.wm.get() )
+        dcmp = getDecomposeMatrix( getLocalMatrix( self.stdNeck, self.stdBase ) )
+        dcmp.ot >> self.rigBase.t
+        dcmp.outputRotate >> self.rigBase.r
+
+
+
+    def createController(self):
+        
+        self.ctlNeck = makeController( sgdata.Controllers.circlePoints, self.controllerSize, n='Ctl_Neck', makeParent=1, colorIndex=23 )
+        self.ctlNeck.setAttr( 'shape_ty', 0.289  )
+        pCtlNeck = self.ctlNeck.parent()
+        pCtlNeck.xform( ws=1, matrix= self.stdNeck.wm.get() )
+        
+        self.ctlHead = makeController( sgdata.Controllers.circlePoints, self.controllerSize, n='Ctl_Head', makeParent=1, colorIndex=5 )
+        self.ctlHead.setAttr( 'shape_ty', 0.95  ).setAttr( 'shape_rx', 90 ).setAttr( 'shape_sx', 1.3 ).setAttr( 'shape_sy', 1.3 ).setAttr( 'shape_sz', 1.3 )
+        pCtlHead = self.ctlHead.parent()
+        pCtlHead.xform( ws=1, matrix= self.stdHead.wm.get() )
+        pCtlHead.parentTo( self.ctlNeck )
+        
+        self.stdHead.t >> pCtlHead.t
+        self.stdHead.r >> pCtlHead.r
+        
+        pCtlNeck.parentTo( self.rigBase )
+        headCtlOrientObj = pCtlNeck.makeChild()
+        
+        self.stdHead.t >> headCtlOrientObj.t
+        self.stdHead.r >> headCtlOrientObj.r
+        
+        constrain_rotate( headCtlOrientObj, pCtlHead )
+        
+        
+        
+    
+    
+    def createJoints(self):
+        
+        lookAtPointer01base = createNode( 'transform', n='lookAtPointerBase_neckMiddle01' )
+        lookAtPointer01base.parentTo( self.ctlHead )
+        lookAtPointer01base.setTransformDefault()
+        
+        lookAtPointer01 = lookAtPointer01base.makeChild( replaceName = ['lookAtPointerBase','lookAtPointer'] )
+        multPointer01 = createNode( 'multiplyDivide' ).setAttr( 'input2', -0.25,-0.25,-0.25 )
+        self.stdHead.t >> multPointer01.input1
+        multPointer01.output >> lookAtPointer01.t
+        
+        self.stdNeck.r >> lookAtPointer01base.r
+        
+        lookAtHeadToNeck = createNode( 'transform', n='lookAtHeadToNeck' )
+        lookAtHeadToNeck.parentTo( self.ctlHead )
+        lookAtHeadToNeck.setTransformDefault()
+        
+        lookAtConnect( self.ctlNeck, lookAtHeadToNeck )
+        
+        lookAtPointer02base = createNode( 'transform', n='lookAtPointerBase_neckMiddle02' )
+        lookAtPointer02base.parentTo( self.ctlNeck )
+        lookAtPointer02base.setTransformDefault()
+        
+        lookAtConnect( self.ctlHead, lookAtPointer02base )
+        
+        lookAtPointer02 = lookAtPointer02base.makeChild( replaceName = ['lookAtPointerBase','lookAtPointer'] )
+        multPointer02 = createNode( 'multiplyDivide' ).setAttr( 'input2', .75,.75,.75 )
+        self.stdHead.t >> multPointer02.input1
+        multPointer02.output >> lookAtPointer02.t
+
+        lookAtPointer = createNode( 'transform', n='lookAtPointerBase_neckMiddle' )
+        lookAtPointer.parentTo( self.ctlNeck.parent() )
+        blendTwoMatrix( lookAtPointer01, lookAtPointer02, lookAtPointer, ct=1, cr=1 )
+        
+        select( d=1 )
+        self.jntNeck = joint()
+        self.jntNeckMiddle = joint()
+        self.jntHead = joint()
+        
+        constrain_point( self.ctlNeck, self.jntNeck )
+        lookAtConnect( lookAtPointer, self.jntNeck ) 
+        
+        dcmp = getDecomposeMatrix( getLocalMatrix( self.ctlHead, self.ctlNeck ) )
+        distNode = getDistance( dcmp )
+        multDist = createNode( 'multDoubleLinear' )
+        distNode.distance >> multDist.input1
+        multDist.input2.set( 0.5 )
+        multDist.output >> self.jntNeckMiddle.ty
+        multDist.output >> self.jntHead.ty
+        
+        constrain_rotate( self.ctlHead, self.jntHead )
+        lookAtConnect( self.ctlHead, self.jntNeckMiddle )
+        
+        blendNode = getBlendTwoMatrixNode( lookAtPointer01base, lookAtPointer02base )
+        dcmp = getDecomposeMatrix( getLocalMatrix( blendNode, lookAtPointer02) )
+        
+        dcmp.ory >> self.jntNeckMiddle.attr( 'rotateAxisY' )
+        
+        self.resultJnts = [ self.jntNeck, self.jntNeckMiddle, self.jntHead ]
+
+
+
+
+
 class BodyRig:
     
     def __init__(self, stdBase, stdRoot, stdBackFirst, stdBackSecond, stdChest ):
@@ -4100,26 +5057,33 @@ class BodyRig:
         
         self.rigBase = createNode( 'transform', n= 'RigBase_body' )
         self.rigBase.xform( ws=1, matrix= self.stdRoot.wm.get() )
-    
 
 
     def createController(self):
         
-        self.ctlRoot = makeController( sgdata.Controllers.movePoints, self.controllerSize, n= 'Ctl_Root' ).xform( ws=1, matrix= self.stdRoot.wm.get() )
-        self.ctlPervis = makeController( sgdata.Controllers.cubePoints, self.controllerSize, n='Ctl_PervisRotator' ).xform( ws=1, matrix= self.stdRoot.wm.get() )
-        self.ctlBodyRotator1 = makeController( sgdata.Controllers.cubePoints, self.controllerSize, n='Ctl_BodyRotator1' ).xform( ws=1, matrix= self.stdBackFirst.wm.get() )
-        self.ctlBodyRotator2 = makeController( sgdata.Controllers.cubePoints, self.controllerSize, n='Ctl_BodyRotator2' ).xform( ws=1, matrix= self.stdBackSecond.wm.get() )
-        self.ctlChest = makeController( sgdata.Controllers.circlePoints, self.controllerSize, n='Ctl_Chest' ).xform( ws=1, matrix= self.stdChest.wm.get() )
-        self.ctlWaist = makeController( sgdata.Controllers.circlePoints, self.controllerSize, n='Ctl_Waist' ).xform( ws=1, matrix= self.stdBackFirst.wm.get() )
-        self.ctlHip   = makeController( sgdata.Controllers.circlePoints, self.controllerSize, n='Ctl_Hip' ).xform( ws=1, matrix= self.stdRoot.wm.get() )
+        self.ctlRoot = makeController( sgdata.Controllers.movePoints, self.controllerSize, n= 'Ctl_Root', makeParent=1, colorIndex=HumanRig.rootColor )
+        self.ctlPervis = makeController( sgdata.Controllers.cubePoints, self.controllerSize, n='Ctl_PervisRotator', makeParent=1, colorIndex=HumanRig.bodyRotColor )
+        self.ctlBodyRotator1 = makeController( sgdata.Controllers.cubePoints, self.controllerSize, n='Ctl_BodyRotatorFirst', makeParent=1, colorIndex=HumanRig.bodyRotColor )
+        self.ctlBodyRotator2 = makeController( sgdata.Controllers.cubePoints, self.controllerSize, n='Ctl_BodyRotatorSecond', makeParent=1, colorIndex=HumanRig.bodyRotColor )
+        self.ctlChest = makeController( sgdata.Controllers.circlePoints, self.controllerSize, n='Ctl_Chest', makeParent=1, colorIndex=HumanRig.bodyRotColor )
+        self.ctlWaist = makeController( sgdata.Controllers.circlePoints, self.controllerSize, n='Ctl_Waist', makeParent=1, colorIndex=HumanRig.bodyColor )
+        self.ctlHip   = makeController( sgdata.Controllers.circlePoints, self.controllerSize, n='Ctl_Hip', makeParent=1, colorIndex=HumanRig.bodyColor )
         
-        makeParent( self.ctlRoot )
-        makeParent( self.ctlPervis )
-        makeParent( self.ctlBodyRotator1 )
-        makeParent( self.ctlBodyRotator2 )
-        makeParent( self.ctlChest )
-        makeParent( self.ctlWaist )
-        makeParent( self.ctlHip )
+        self.ctlRoot.parent().xform( ws=1, matrix= self.stdRoot.wm.get() )
+        self.ctlPervis.parent().xform( ws=1, matrix= self.stdRoot.wm.get() )
+        self.ctlBodyRotator1.parent().xform( ws=1, matrix= self.stdBackFirst.wm.get() )
+        self.ctlBodyRotator2.parent().xform( ws=1, matrix= self.stdBackSecond.wm.get() )
+        self.ctlChest.parent().xform( ws=1, matrix= self.stdChest.wm.get() )
+        self.ctlWaist.parent().xform( ws=1, matrix= self.stdBackFirst.wm.get() )
+        self.ctlHip.parent().xform( ws=1, matrix= self.stdRoot.wm.get() )
+        
+        self.ctlRoot.setAttr( 'shape_sx', 2.14 ).setAttr( 'shape_sy', 2.14 ).setAttr( 'shape_sz', 2.14 )
+        self.ctlPervis.setAttr( 'shape_sx', 3.85 ).setAttr( 'shape_sy', 0.16 ).setAttr( 'shape_sz', 3.85 )
+        self.ctlBodyRotator1.setAttr( 'shape_sx', 3.36 ).setAttr( 'shape_sy', 0.16 ).setAttr( 'shape_sz', 3.36 )
+        self.ctlBodyRotator2.setAttr( 'shape_sx', 3.36 ).setAttr( 'shape_sy', 0.16 ).setAttr( 'shape_sz', 3.36 )
+        self.ctlWaist.setAttr( 'shape_sx', 2 ).setAttr( 'shape_sy', 2 ).setAttr( 'shape_sz', 2 )
+        self.ctlChest.setAttr( 'shape_sx', 2 ).setAttr( 'shape_sy', 2 ).setAttr( 'shape_sz', 2 )
+        self.ctlHip.setAttr( 'shape_sx', 1.9 ).setAttr( 'shape_sy', 1.9 ).setAttr( 'shape_sz', 1.9 )
     
 
 
@@ -4167,19 +5131,66 @@ class BodyRig:
     
     
     def createOrigCurve(self):
-        
-        dcmp0 = getDecomposeMatrix( getLocalMatrix ( self.stdRoot, self.stdRoot ) )
-        dcmp1 = getDecomposeMatrix( getLocalMatrix ( self.stdBackFirst, self.stdRoot ) )
-        dcmp2 = getDecomposeMatrix( getLocalMatrix ( self.stdBackSecond, self.stdRoot ) )
-        dcmp3 = getDecomposeMatrix( getLocalMatrix ( self.stdChest, self.stdRoot ) )
     
-        points = [ [0.0,0.0,0.0] for i in range( 4 ) ]
+        pointerInHip = self.stdRoot.makeChild().rename( 'pointer_' + self.stdRoot.name() )
+        multForPointerInHip = createNode( 'multiplyDivide' ).setAttr( 'input2', 0.1, 0.1, 0.1 )
+        self.stdBackFirst.t >> multForPointerInHip.input1
+        multForPointerInHip.output >> pointerInHip.t
+        
+        pointerInBack1_grp = self.stdBackFirst.makeChild().rename( 'pointerGrp_' + self.stdBackFirst.name() )
+        pointerInBack1_00 = pointerInBack1_grp.makeChild().rename( 'pointer00_' + self.stdBackFirst.name() )
+        pointerInBack1_01 = pointerInBack1_grp.makeChild().rename( 'pointer01_' + self.stdBackFirst.name() )
+        multForPointerInBack1_00 = createNode( 'multiplyDivide' ).setAttr( 'input2', 0.3, 0.3, 0.3 )
+        multForPointerInBack1_01 = createNode( 'multiplyDivide' ).setAttr( 'input2', 0.3, 0.3, 0.3 )
+        dcmpPointerInBack1_00 = getDecomposeMatrix( getLocalMatrix( self.stdRoot, self.stdBackFirst ) )
+        dcmpPointerInBack1_00.ot >> multForPointerInBack1_00.input1
+        self.stdBackSecond.t >> multForPointerInBack1_01.input1
+        multForPointerInBack1_00.output >> pointerInBack1_00.t
+        multForPointerInBack1_01.output >> pointerInBack1_01.t
+        connectBlendTwoMatrix( self.stdRoot, self.stdBackFirst, pointerInBack1_grp, cr=1 )
+        
+        pointerInBack2_grp = self.stdBackSecond.makeChild().rename( 'pointerGrp_' + self.stdBackSecond.name() )
+        pointerInBack2_00 = pointerInBack2_grp.makeChild().rename( 'pointer00_' + self.stdBackSecond.name() )
+        pointerInBack2_01 = pointerInBack2_grp.makeChild().rename( 'pointer01_' + self.stdBackSecond.name() )
+        multForPointerInBack2_00 = createNode( 'multiplyDivide' ).setAttr( 'input2', 0.3, 0.3, 0.3 )
+        multForPointerInBack2_01 = createNode( 'multiplyDivide' ).setAttr( 'input2', 0.3, 0.3, 0.3 )
+        dcmpPointerInBack2_00 = getDecomposeMatrix( getLocalMatrix( self.stdBackFirst, self.stdBackSecond ) )
+        dcmpPointerInBack2_00.ot >> multForPointerInBack2_00.input1
+        self.stdBackSecond.t >> multForPointerInBack2_01.input1
+        multForPointerInBack2_00.output >> pointerInBack2_00.t
+        multForPointerInBack2_01.output >> pointerInBack2_01.t
+        connectBlendTwoMatrix( self.stdBackFirst, self.stdBackSecond, pointerInBack2_grp, cr=1 )
+        
+        pointerInChest = self.stdChest.makeChild().rename( 'pointer_' + self.stdChest.name() )
+        multForPointerInChest = createNode( 'multiplyDivide' ).setAttr( 'input2', 0.1, 0.1, 0.1 )
+        dcmpForPointerInChest = getDecomposeMatrix( getLocalMatrix( self.stdBackSecond, self.stdChest ) )
+        dcmpForPointerInChest.ot >> multForPointerInChest.input1
+        multForPointerInChest.output >> pointerInChest.t
+        
+        dcmpCurvePointer0 = getDecomposeMatrix( getLocalMatrix( self.stdRoot, self.stdRoot ) )
+        dcmpCurvePointer1 = getDecomposeMatrix( getLocalMatrix( pointerInHip, self.stdRoot ) )
+        dcmpCurvePointer2 = getDecomposeMatrix( getLocalMatrix( pointerInBack1_00, self.stdRoot ) )
+        dcmpCurvePointer3 = getDecomposeMatrix( getLocalMatrix( self.stdBackFirst, self.stdRoot ) )
+        dcmpCurvePointer4 = getDecomposeMatrix( getLocalMatrix( pointerInBack1_01, self.stdRoot ) )
+        dcmpCurvePointer5 = getDecomposeMatrix( getLocalMatrix( pointerInBack2_00, self.stdRoot ) )
+        dcmpCurvePointer6 = getDecomposeMatrix( getLocalMatrix( self.stdBackSecond, self.stdRoot ) )
+        dcmpCurvePointer7 = getDecomposeMatrix( getLocalMatrix( pointerInBack2_01, self.stdRoot ) )
+        dcmpCurvePointer8 = getDecomposeMatrix( getLocalMatrix( pointerInChest, self.stdRoot ) )
+        dcmpCurvePointer9 = getDecomposeMatrix( getLocalMatrix( self.stdChest, self.stdRoot ) )
+
+        points = [[0,0,0] for i in range( 10 )]
         origCurve = curve( p=points, d=3 ).parentTo( self.ctlRoot ).setTransformDefault()
         origCurveShape = origCurve.shape()
-        dcmp0.ot >> origCurveShape.attr( "controlPoints" )[0]
-        dcmp1.ot >> origCurveShape.attr( "controlPoints" )[1]
-        dcmp2.ot >> origCurveShape.attr( "controlPoints" )[2]
-        dcmp3.ot >> origCurveShape.attr( "controlPoints" )[3]
+        dcmpCurvePointer0.ot >> origCurveShape.attr( 'controlPoints[0]' )
+        dcmpCurvePointer1.ot >> origCurveShape.attr( 'controlPoints[1]' )
+        dcmpCurvePointer2.ot >> origCurveShape.attr( 'controlPoints[2]' )
+        dcmpCurvePointer3.ot >> origCurveShape.attr( 'controlPoints[3]' )
+        dcmpCurvePointer4.ot >> origCurveShape.attr( 'controlPoints[4]' )
+        dcmpCurvePointer5.ot >> origCurveShape.attr( 'controlPoints[5]' )
+        dcmpCurvePointer6.ot >> origCurveShape.attr( 'controlPoints[6]' )
+        dcmpCurvePointer7.ot >> origCurveShape.attr( 'controlPoints[7]' )
+        dcmpCurvePointer8.ot >> origCurveShape.attr( 'controlPoints[8]' )
+        dcmpCurvePointer9.ot >> origCurveShape.attr( 'controlPoints[9]' )
         self.origCurve = origCurve
     
     
@@ -4225,17 +5236,64 @@ class BodyRig:
         dcmpPointer1.ot >> pointerBody1.t
         dcmpPointer2.ot >> pointerBody2.t
         
+        pointerInHip = self.ctlHip.makeChild().rename( 'pointer_' + self.ctlHip.name() )
+        multForPointerInHip = createNode( 'multiplyDivide' ).setAttr( 'input2', 0.1, 0.1, 0.1 )
+        self.stdBackFirst.t >> multForPointerInHip.input1
+        multForPointerInHip.output >> pointerInHip.t
+        
+        pointerInBack1_grp = pointerBody1.makeChild().rename( 'pointerGrp_' + pointerBody1.name() )
+        pointerInBack1_00 = pointerInBack1_grp.makeChild().rename( 'pointer00_' + pointerBody1.name() )
+        pointerInBack1_01 = pointerInBack1_grp.makeChild().rename( 'pointer01_' + pointerBody1.name() )
+        multForPointerInBack1_00 = createNode( 'multiplyDivide' ).setAttr( 'input2', 0.3, 0.3, 0.3 )
+        multForPointerInBack1_01 = createNode( 'multiplyDivide' ).setAttr( 'input2', 0.3, 0.3, 0.3 )
+        dcmpPointerInBack1_00 = getDecomposeMatrix( getLocalMatrix( self.stdRoot, self.stdBackFirst ) )
+        dcmpPointerInBack1_00.ot >> multForPointerInBack1_00.input1
+        self.stdBackSecond.t >> multForPointerInBack1_01.input1
+        multForPointerInBack1_00.output >> pointerInBack1_00.t
+        multForPointerInBack1_01.output >> pointerInBack1_01.t
+        connectBlendTwoMatrix( self.ctlBodyRotator1, self.ctlBodyRotator1.parent(), pointerInBack1_grp, cr=1 )
+        
+        pointerInBack2_grp = pointerBody2.makeChild().rename( 'pointerGrp_' + pointerBody2.name() )
+        pointerInBack2_00 = pointerInBack2_grp.makeChild().rename( 'pointer00_' + pointerBody2.name() )
+        pointerInBack2_01 = pointerInBack2_grp.makeChild().rename( 'pointer01_' + pointerBody2.name() )
+        multForPointerInBack2_00 = createNode( 'multiplyDivide' ).setAttr( 'input2', 0.3, 0.3, 0.3 )
+        multForPointerInBack2_01 = createNode( 'multiplyDivide' ).setAttr( 'input2', 0.3, 0.3, 0.3 )
+        dcmpPointerInBack2_00 = getDecomposeMatrix( getLocalMatrix( self.stdBackFirst, self.stdBackSecond ) )
+        dcmpPointerInBack2_00.ot >> multForPointerInBack2_00.input1
+        self.stdBackSecond.t >> multForPointerInBack2_01.input1
+        multForPointerInBack2_00.output >> pointerInBack2_00.t
+        multForPointerInBack2_01.output >> pointerInBack2_01.t
+        connectBlendTwoMatrix( self.ctlBodyRotator2, self.ctlBodyRotator2.parent(), pointerInBack2_grp, cr=1 )
+        
+        pointerInChest = self.ctlChest.makeChild().rename( 'pointer_' + self.ctlChest.name() )
+        multForPointerInChest = createNode( 'multiplyDivide' ).setAttr( 'input2', 0.1, 0.1, 0.1 )
+        dcmpForPointerInChest = getDecomposeMatrix( getLocalMatrix( self.stdBackSecond, self.stdChest ) )
+        dcmpForPointerInChest.ot >> multForPointerInChest.input1
+        multForPointerInChest.output >> pointerInChest.t
+        
         dcmpCurvePointer0 = getDecomposeMatrix( getLocalMatrix( self.ctlHip, self.ctlRoot ) )
-        dcmpCurvePointer1 = getDecomposeMatrix( getLocalMatrix( pointerBody1, self.ctlRoot ) )
-        dcmpCurvePointer2 = getDecomposeMatrix( getLocalMatrix( pointerBody2, self.ctlRoot ) )
-        dcmpCurvePointer3 = getDecomposeMatrix( getLocalMatrix( self.ctlChest, self.ctlRoot ) )
+        dcmpCurvePointer1 = getDecomposeMatrix( getLocalMatrix( pointerInHip, self.ctlRoot ) )
+        dcmpCurvePointer2 = getDecomposeMatrix( getLocalMatrix( pointerInBack1_00, self.ctlRoot ) )
+        dcmpCurvePointer3 = getDecomposeMatrix( getLocalMatrix( pointerBody1, self.ctlRoot ) )
+        dcmpCurvePointer4 = getDecomposeMatrix( getLocalMatrix( pointerInBack1_01, self.ctlRoot ) )
+        dcmpCurvePointer5 = getDecomposeMatrix( getLocalMatrix( pointerInBack2_00, self.ctlRoot ) )
+        dcmpCurvePointer6 = getDecomposeMatrix( getLocalMatrix( pointerBody2, self.ctlRoot ) )
+        dcmpCurvePointer7 = getDecomposeMatrix( getLocalMatrix( pointerInBack2_01, self.ctlRoot ) )
+        dcmpCurvePointer8 = getDecomposeMatrix( getLocalMatrix( pointerInChest, self.ctlRoot ) )
+        dcmpCurvePointer9 = getDecomposeMatrix( getLocalMatrix( self.ctlChest, self.ctlRoot ) )
 
-        bodyCurve = curve( p=[[0,0,0] for i in range( 4 )] )
+        bodyCurve = curve( p=[[0,0,0] for i in range( 10 )], d=7 )
         curveShape = bodyCurve.shape()
         dcmpCurvePointer0.ot >> curveShape.attr( 'controlPoints[0]' )
         dcmpCurvePointer1.ot >> curveShape.attr( 'controlPoints[1]' )
         dcmpCurvePointer2.ot >> curveShape.attr( 'controlPoints[2]' )
         dcmpCurvePointer3.ot >> curveShape.attr( 'controlPoints[3]' )
+        dcmpCurvePointer4.ot >> curveShape.attr( 'controlPoints[4]' )
+        dcmpCurvePointer5.ot >> curveShape.attr( 'controlPoints[5]' )
+        dcmpCurvePointer6.ot >> curveShape.attr( 'controlPoints[6]' )
+        dcmpCurvePointer7.ot >> curveShape.attr( 'controlPoints[7]' )
+        dcmpCurvePointer8.ot >> curveShape.attr( 'controlPoints[8]' )
+        dcmpCurvePointer9.ot >> curveShape.attr( 'controlPoints[9]' )
         
         bodyCurve.parentTo( self.ctlRoot ).setTransformDefault()
         self.currentCurve = bodyCurve
@@ -4244,17 +5302,16 @@ class BodyRig:
     def createResultJoints(self, numJoints = 5 ):
         
         jnts = []
-        select( self.ctlRoot )
-        self.rootJnt = joint().setAttr( 'dla', 1 )
+        select( d=1 )
+        self.rootJnt = joint()
         for i in range( numJoints + 1 ):
             jnt = joint()
             jnt.ty.set( 1.0 );
             jnts.append( jnt )
-            jnt.attr( 'displayLocalAxis' ).set( 1 )
         
         self.handle, self.effector = ikHandle( sj=jnts[0], ee=jnts[-1], curve= self.currentCurve, sol='ikSplineSolver',  ccv=False, pcv=False )
         self.handle.parentTo( self.rigBase )
-        self.ctlChest.addAttr( ln="stretch", min=0, max=1, dv=0, k=1 )
+        self.ctlChest.addAttr( ln="attach", min=0, max=1, dv=1, k=1 )
         
         currentShape = self.currentCurve.shape()
         origShape = self.origCurve.shape()
@@ -4281,7 +5338,7 @@ class BodyRig:
             blendNode = createNode( 'blendTwoAttr' )
             distOrig.distance >> blendNode.input[0]
             distCurrent.distance >> blendNode.input[1]
-            self.ctlChest.stretch >> blendNode.attributesBlender
+            self.ctlChest.attach >> blendNode.attributesBlender
             blendNode.output >> jnts[i+1].ty
         
         self.handle.attr( 'dTwistControlEnable' ).set( 1 )
@@ -4295,7 +5352,191 @@ class BodyRig:
         
         constrain_rotate( self.ctlChest, jnts[-1] )
         constrain_parent( self.ctlHip, self.rootJnt )
+        jnts.insert( 0, self.rootJnt )
+        self.resultJnts = jnts
+    
+
+    @convertSg_dec
+    def createClavicleConnector(self, stdClavicleL, stdClavicleR ):
         
+        chestJnt = self.resultJnts[-1]
+        
+        connectorClavicleL = chestJnt.makeChild().rename( stdClavicleL.replace( self.stdPrefix, 'Connector_' ) )
+        connectorClavicleR = chestJnt.makeChild().rename( stdClavicleR.replace( self.stdPrefix, 'Connector_' ) )
+        
+        stdClavicleL.t >> connectorClavicleL.t
+        stdClavicleL.r >> connectorClavicleL.r
+        stdClavicleR.t >> connectorClavicleR.t
+        stdClavicleR.r >> connectorClavicleR.r
+        
+        self.connectorClavicleL = connectorClavicleL
+        self.connectorClavicleR = connectorClavicleR
+    
+
+    @convertSg_dec
+    def createHipConnector(self, stdHipL, stdHipR ):
+        
+        rootJnt = self.rootJnt
+        lookAtTarget = self.ctlRoot.makeChild().rename( self.stdRoot.replace( self.stdPrefix, 'ConnectorLookTarget_' ) )
+        dcmp = getDecomposeMatrix( getLocalMatrix( self.stdChest, self.stdRoot ) )
+        dcmp.oty >> lookAtTarget.ty
+        
+        connectorOrientBaseParent = self.ctlRoot.makeChild().rename( self.stdRoot.replace( self.stdPrefix, 'PConnectorOrientBase_' ) )
+        connectorOrientBase = connectorOrientBaseParent.makeChild().rename( self.stdRoot.replace( self.stdPrefix, 'ConnectorOrientBase_' ) )
+        lookAtConnect( lookAtTarget, connectorOrientBase )
+        constrain_rotate( self.ctlHip, connectorOrientBaseParent )
+        
+        connectorOrientL = connectorOrientBase.makeChild().rename( stdHipL.replace( self.stdPrefix, 'ConnectorOrient_' ) )
+        connectorOrientR = connectorOrientBase.makeChild().rename( stdHipR.replace( self.stdPrefix, 'ConnectorOrient_' ) )
+        
+        self.ctlHipPinL = makeController( sgdata.Controllers.pinPoints, self.controllerSize, n='Ctl_HipPos_L_', makeParent=1, colorIndex = HumanRig.leftColor )
+        self.ctlHipPinR = makeController( sgdata.Controllers.pinPoints, self.controllerSize, n='Ctl_HipPos_R_', makeParent=1, colorIndex = HumanRig.rightColor )
+        self.ctlHipPinR.setAttr( 'shape_rz', 180 )
+        pCtlHipPinL = self.ctlHipPinL.parent()
+        pCtlHipPinR = self.ctlHipPinR.parent()
+        pCtlHipPinL.parentTo( self.ctlHip )
+        pCtlHipPinR.parentTo( self.ctlHip )
+        
+        connectorL = rootJnt.makeChild().rename( stdHipL.replace( self.stdPrefix, 'Connector_' ) )
+        connectorR = rootJnt.makeChild().rename( stdHipR.replace( self.stdPrefix, 'Connector_' ) )
+        
+        stdHipL.t >> connectorOrientL.t
+        stdHipR.t >> connectorOrientR.t
+        stdHipL.r >> connectorOrientL.r
+        stdHipR.r >> connectorOrientR.r
+        
+        stdHipL.t >> pCtlHipPinL.t
+        stdHipR.t >> pCtlHipPinR.t
+        constrain_rotate( connectorOrientL, pCtlHipPinL )
+        constrain_rotate( connectorOrientR, pCtlHipPinR )
+        
+        constrain_parent( self.ctlHipPinL, connectorL )
+        constrain_parent( self.ctlHipPinR, connectorR )
+        
+        self.connectorHipL = connectorL
+        self.connectorHipR = connectorR
+    
+    
+    @convertSg_dec
+    def createNeckConnector(self, stdNeck ):
+        
+        checkJnt = self.resultJnts[-1]
+        
+        connectorNeck = checkJnt.makeChild().rename( stdNeck.replace( self.stdPrefix, 'Connector_' ) )
+        
+        stdNeck.t >> connectorNeck.t
+        stdNeck.r >> connectorNeck.r
+        
+        self.connectorNeck = connectorNeck
+    
+    
+        
+        
+        
+
+
+
+
+
+class ClavicleRig:
+    
+    def __init__(self, stdBase, stdClavicle, stdShoulder ):
+
+        self.stdPrefix = 'StdJnt_'
+        self.stdBase = convertSg( stdBase )
+        self.stdClavicle = convertSg( stdClavicle )
+        self.stdShoulder = convertSg( stdShoulder )
+        self.controllerSize = 1
+    
+    
+    def createAll(self, controllerSize = 1, colorIndex=0 ):
+    
+        self.controllerSize = controllerSize
+        self.colorIndex = colorIndex
+        self.createRigBase()
+        self.createCtl()
+        self.createJoints()
+        self.createConnector()
+    
+
+
+    def createRigBase(self):
+        
+        self.rigBase = createNode( 'transform', n= self.stdClavicle.localName().replace( self.stdPrefix, 'RigBase_' ) )
+        self.rigBase.xform( ws=1, matrix= self.stdClavicle.wm.get() )
+        constrain_parent( self.stdClavicle, self.rigBase )
+    
+
+
+    def createCtl(self):
+        
+        self.ctlClavicle = makeController( sgdata.Controllers.pinPoints, self.controllerSize, typ='joint', n= self.stdClavicle.localName().replace( self.stdPrefix, 'Ctl_' ),
+                                           makeParent=1, colorIndex= self.colorIndex )
+        pCtlClavicle = self.ctlClavicle.parent()
+        pCtlClavicle.parentTo( self.rigBase )
+        self.stdShoulder.t >> pCtlClavicle.t
+        
+        if self.stdShoulder.tx.get() < 0:
+            self.ctlClavicle.attr( 'shape_sx' ).set( -1 )
+            self.ctlClavicle.attr( 'shape_sy' ).set( -1 )
+            self.ctlClavicle.attr( 'shape_sz' ).set( -1 )
+        
+        pCtlClavicle.r.set( 0,0,0 )
+
+
+    
+    def createJoints(self):
+        
+        self.joints = []
+        select( d=1 )
+        jntFirst = joint()
+        jntEnd = joint()
+        jntEndOrientor = self.rigBase.makeChild().rename( self.stdClavicle.replace( self.stdPrefix, 'connectOrientor_' ) ) 
+        self.stdShoulder.t >> jntEndOrientor.t
+        self.stdShoulder.r >> jntEndOrientor.r
+        constrain_rotate( jntEndOrientor, jntEnd )
+        
+        self.stdShoulder.t >> jntEnd.t
+        constrain_point( self.rigBase, jntFirst )
+        
+        direction = [1,0,0]
+        
+        if self.stdShoulder.tx.get() < 0:
+            direction = [-1,0,0]
+        lookAtConnect( self.ctlClavicle, jntFirst, direction=direction )
+        
+        addOptionAttribute( self.ctlClavicle )
+        self.ctlClavicle.addAttr( ln='attach', min=0, max=1, dv=0, k=1 )
+        pCtlClavicle = self.ctlClavicle.parent()
+        
+        distBase = getDistance( pCtlClavicle )
+        distCurrent = getDistance( getDecomposeMatrix(getLocalMatrix( self.ctlClavicle, self.rigBase )) )
+        
+        divNode = createNode( 'multiplyDivide' ).setAttr( 'op', 2 )
+        distCurrent.distance >> divNode.input1X
+        distBase.distance >> divNode.input2X
+        
+        blendNode = createNode( 'blendTwoAttr' ).setAttr( 'input[0]', 1 )
+        divNode.outputX >> blendNode.input[1]
+        
+        self.ctlClavicle.attach >> blendNode.ab
+        
+        blendNode.output >> jntFirst.sx
+        
+        self.jntFirst = jntFirst
+        self.jntEnd = jntEnd
+        
+        self.resultJnts = [ self.jntFirst ]
+        
+    
+    
+    def createConnector(self):
+        
+        self.connector = self.jntEnd
+        
+
+
+
 
 
 
@@ -4315,9 +5556,10 @@ class ArmRig:
     
     
     
-    def createAll(self, controllerSize, numJnt=3 ):
+    def createAll(self, controllerSize=1, colorIndex=0, numJnt=3 ):
         
         self.controllerSize = controllerSize
+        self.colorIndex = colorIndex
         self.createRigBase()
         self.createIkController()
         self.createPoleVController()
@@ -4330,9 +5572,11 @@ class ArmRig:
         self.connectBlVisibility()
         self.createBlJoints()
         self.connectAndParentBl()
-        self.makeCurve()
-        self.makeSpJointsUpper(numJnt)
-        self.makeSpJointsLower(numJnt)
+        self.createCurve()
+        self.createSpJointsUpper(numJnt)
+        self.createSpJointsLower(numJnt)
+        self.createConnector()
+        
 
 
     def createRigBase(self ):
@@ -4345,12 +5589,13 @@ class ArmRig:
     
     def createIkController(self ):
         
-        self.ctlIkEnd = makeController( sgdata.Controllers.cubePoints, self.controllerSize, typ='joint', n= self.stdEnd.localName().replace( self.stdPrefix, 'Ctl_Ik' ) )
+        self.ctlIkEnd = makeController( sgdata.Controllers.cubePoints, self.controllerSize, typ='joint', n= self.stdEnd.localName().replace( self.stdPrefix, 'Ctl_Ik' ),
+                                        makeParent=1, colorIndex = self.colorIndex )
         self.ctlIkEnd.setAttr( 'shape_sx', 0.1 )
         self.ctlIkEnd.setAttr( 'shape_sy', 1.5 )
         self.ctlIkEnd.setAttr( 'shape_sz', 1.5 )
-        self.ctlIkEnd.xform( ws=1, matrix= self.stdEnd.wm.get() )
-        pCtlIkEnd = makeParent( self.ctlIkEnd )
+        pCtlIkEnd = self.ctlIkEnd.parent()
+        pCtlIkEnd.xform( ws=1, matrix= self.stdEnd.wm.get() )
     
         dcmpStdEnd = getDecomposeMatrix( self.stdEnd )
         composeMatrix = createNode( 'composeMatrix' )
@@ -4373,18 +5618,29 @@ class ArmRig:
         dcmpJo = getDecomposeMatrix( mmIkJo )
         dcmpJo.outputRotate >> self.ctlIkEnd.jo
         
+        addOptionAttribute( self.ctlIkEnd, 'ikOptions')
         
         
-    def createPoleVController(self ):
         
-        self.ctlIkPoleV = makeController( sgdata.Controllers.diamondPoints, self.controllerSize, n= self.stdPoleV.localName().replace( self.stdPrefix, 'Ctl_PoleV' ) )
+    def createPoleVController(self, twistReverse=False ):
+        
+        self.ctlIkPoleV = makeController( sgdata.Controllers.diamondPoints, self.controllerSize, n= self.stdPoleV.localName().replace( self.stdPrefix, 'Ctl_' ),
+                                          makeParent=1, colorIndex=self.colorIndex )
         self.ctlIkPoleV.setAttr( 'shape_sx', 0.23 )
         self.ctlIkPoleV.setAttr( 'shape_sy', 0.23 )
         self.ctlIkPoleV.setAttr( 'shape_sz', 0.23 )
-        makeParent( self.ctlIkPoleV )
         pIkCtlPoleV = self.ctlIkPoleV.parent()
         pIkCtlPoleV.xform( ws=1, matrix = self.stdLookAt.wm.get() )
-        self.poleVTwist = makeParent( pIkCtlPoleV, n='Twist_PoleV' + self.stdPoleV.localName().replace( self.stdPrefix, '' ) )
+        self.poleVTwist = makeParent( pIkCtlPoleV, n='Twist_' + self.stdPoleV.localName().replace( self.stdPrefix, '' ) )
+        self.ctlIkEnd.addAttr( ln='twist', k=1, at='doubleAngle' )
+        
+        multNode = createNode( 'multDoubleLinear' )
+        self.ctlIkEnd.twist >> multNode.input1
+        multNode.output >> self.poleVTwist.rx
+        
+        multNode.input2.set( 1 )
+        if twistReverse:
+            multNode.input2.set( -1 )
         
         dcmpPoleVStd = getDecomposeMatrix( getLocalMatrix( self.stdPoleV, self.stdLookAt ))
         dcmpPoleVStd.ot >> pIkCtlPoleV.t
@@ -4440,17 +5696,20 @@ class ArmRig:
     
     def createFKController( self ):
         
-        self.fkCtlFirst = makeController( sgdata.Controllers.rhombusPoints, self.controllerSize, n= self.stdFirst.localName().replace( self.stdPrefix, 'Ctl_Fk' ) )
-        self.fkCtlSecond = makeController( sgdata.Controllers.rhombusPoints, self.controllerSize, n= self.stdSecond.localName().replace( self.stdPrefix, 'Ctl_Fk' ) )
-        self.fkCtlEnd = makeController( sgdata.Controllers.rhombusPoints, self.controllerSize, n= self.stdEnd.localName().replace( self.stdPrefix, 'Ctl_Fk' ) )
+        self.fkCtlFirst = makeController( sgdata.Controllers.rhombusPoints, self.controllerSize, n= self.stdFirst.localName().replace( self.stdPrefix, 'Ctl_Fk' ), 
+                                          makeParent=1, colorIndex = self.colorIndex )
+        self.fkCtlSecond = makeController( sgdata.Controllers.rhombusPoints, self.controllerSize, n= self.stdSecond.localName().replace( self.stdPrefix, 'Ctl_Fk' ),
+                                          makeParent=1, colorIndex = self.colorIndex )
+        self.fkCtlEnd = makeController( sgdata.Controllers.rhombusPoints, self.controllerSize, n= self.stdEnd.localName().replace( self.stdPrefix, 'Ctl_Fk' ),
+                                        makeParent=1, colorIndex = self.colorIndex )
         
-        self.fkCtlFirst.xform( ws=1, matrix = self.stdFirst.wm.get() ).setAttr( 'shape_rz', 90 ).setAttr( 'shape_sx', .7 ).setAttr( 'shape_sy', .7 ).setAttr( 'shape_sz', .7 )
-        self.fkCtlSecond.xform( ws=1, matrix = self.stdSecond.wm.get() ).setAttr( 'shape_rz', 90 ).setAttr( 'shape_sx', .7 ).setAttr( 'shape_sy', .7 ).setAttr( 'shape_sz', .7 )
-        self.fkCtlEnd.xform( ws=1, matrix = self.stdEnd.wm.get() ).setAttr( 'shape_rz', 90 ).setAttr( 'shape_sx', .7 ).setAttr( 'shape_sy', .7 ).setAttr( 'shape_sz', .7 )
+        self.fkCtlFirst.setAttr( 'shape_rz', 90 ).setAttr( 'shape_sx', .7 ).setAttr( 'shape_sy', .7 ).setAttr( 'shape_sz', .7 )
+        self.fkCtlSecond.setAttr( 'shape_rz', 90 ).setAttr( 'shape_sx', .7 ).setAttr( 'shape_sy', .7 ).setAttr( 'shape_sz', .7 )
+        self.fkCtlEnd.setAttr( 'shape_rz', 90 ).setAttr( 'shape_sx', .7 ).setAttr( 'shape_sy', .7 ).setAttr( 'shape_sz', .7 )
         
-        makeParent( self.fkCtlFirst )
-        makeParent( self.fkCtlSecond )
-        makeParent( self.fkCtlEnd )
+        self.fkCtlFirst.parent().xform( ws=1, matrix = self.stdFirst.wm.get() )
+        self.fkCtlSecond.parent().xform( ws=1, matrix = self.stdSecond.wm.get() )
+        self.fkCtlEnd.parent().xform( ws=1, matrix = self.stdEnd.wm.get() )
         parent( self.fkCtlEnd.parent(), self.fkCtlSecond )
         parent( self.fkCtlSecond.parent(), self.fkCtlFirst )
         
@@ -4492,15 +5751,16 @@ class ArmRig:
 
     def createBlController(self ):
         
-        self.ctlBl = makeController( sgdata.Controllers.switchPoints, self.controllerSize, n= self.stdEnd.localName().replace( self.stdPrefix, 'Ctl_Bl' ) )
-        pCtlBl = makeParent( self.ctlBl )
+        self.ctlBl = makeController( sgdata.Controllers.switchPoints, self.controllerSize, n= self.stdEnd.localName().replace( self.stdPrefix, 'Ctl_Bl' ),
+                                     makeParent=1, colorIndex = self.colorIndex )
+        pCtlBl = self.ctlBl.parent()
         pCtlBl.xform( ws=1, matrix= self.stdEnd.wm.get() )
         
         tyValue = 0.8
         if self.stdEnd.tx.get() < 0:
             tyValue *= -1
         
-        self.ctlBl.setAttr( 'shape_sx', 0.3 ).setAttr( 'shape_sy', 0.3 ).setAttr( 'shape_sz', 0.3 ).setAttr( 'shape_ty', tyValue * self.controllerSize )
+        self.ctlBl.setAttr( 'shape_sx', 0.3 ).setAttr( 'shape_sy', 0.3 ).setAttr( 'shape_sz', 0.3 ).setAttr( 'shape_ty', tyValue  )
         self.ctlBl.setTransformDefault()
         keyAttrs = self.ctlBl.listAttr( k=1 )
         for attr in keyAttrs:
@@ -4533,7 +5793,7 @@ class ArmRig:
     
     def createBlJoints(self ):
         
-        firstPos = self.stdFirst.xform( q=1, ws=1, matrix=1 )
+        firstPos  = self.stdFirst.xform( q=1, ws=1, matrix=1 )
         secondPos = self.stdSecond.xform( q=1, ws=1, matrix=1 )
         thirdPos  = self.stdEnd.xform( q=1, ws=1, matrix=1 )
         
@@ -4544,6 +5804,8 @@ class ArmRig:
         offsetPos = self.stdSecondoffset.xform( q=1, ws=1, matrix=1 )
         select( self.blJntSecond )
         self.blOffset = joint( n=self.stdSecondoffset.replace( self.stdPrefix, 'BlJnt_' ) ).xform( ws=1, matrix=offsetPos )
+        
+        self.blJntFirst.v.set( 0 )
     
 
 
@@ -4581,7 +5843,7 @@ class ArmRig:
         
 
 
-    def makeCurve(self):
+    def createCurve(self):
         
         self.curveUpper = curve( p=[[0,0,0],[0,0,0]], d=1 )
         self.curveLower = curve( p=[[0,0,0],[0,0,0]], d=1 )
@@ -4599,10 +5861,14 @@ class ArmRig:
         parent( self.curveLower, self.blJntSecond )
         self.curveUpper.setTransformDefault()
         self.curveLower.setTransformDefault()
+        
+        self.curveUpper.v.set(0)
+        self.curveLower.v.set(0)
+        
 
 
     
-    def makeSpJointsUpper(self, numJnt=3 ):
+    def createSpJointsUpper(self, numJnt=3 ):
         
         select( d=1 )
         self.outJntsUpper = [ joint() ]
@@ -4645,12 +5911,16 @@ class ArmRig:
         upObjectEnd.wm   >> self.handleUpper.attr( 'dWorldUpMatrixEnd' )
         
         for jnt in self.outJntsUpper:
-            jnt.attr( 'dla' ).set(1)
+            continue
         parent( self.handleUpper, self.rigBase )
+        self.handleUpper.v.set( 0 )
+        
+        self.resultJnts = self.outJntsUpper[:-1]
+        
     
 
 
-    def makeSpJointsLower(self, numJnt=3 ):
+    def createSpJointsLower(self, numJnt=3 ):
         
         self.outJntsUpper[-1].v.set( 0 )
         select( self.outJntsUpper[-2] )
@@ -4689,13 +5959,22 @@ class ArmRig:
         upObjectEnd.wm   >> self.handleLower.attr( 'dWorldUpMatrixEnd' )
         
         for jnt in self.outJntsLower:
-            jnt.attr( 'dla' ).set(1)
+            continue
         
         constrain_rotate( self.blJntEnd, self.outJntsLower[-1] )
         parent( self.handleLower, self.rigBase )
+        self.handleLower.v.set( 0 )
+        
+        self.resultJnts += self.outJntsLower[:-1]
+        
+    
+    
+    def createConnector(self):
+        
+        self.connector = self.outJntsLower[-1]
+    
     
         
-
 
 
 
@@ -4705,9 +5984,10 @@ class LegRig( ArmRig ):
         ArmRig.__init__( self,stdBase, stdFirst, stdSecond, stdEnd, stdSecondoffset, stdPoleV, stdLookAt )
         
     
-    def createAll(self, controllerSize, numJnt=3 ):
+    def createAll(self, controllerSize=1, colorIndex = 0, numJnt=3 ):
         
         self.controllerSize = controllerSize
+        self.colorIndex = colorIndex
         self.createRigBase()
         self.createIkController()
         self.createPoleVController()
@@ -4720,9 +6000,16 @@ class LegRig( ArmRig ):
         self.connectBlVisibility()
         self.createBlJoints()
         self.connectAndParentBl()
-        self.makeCurve()
-        self.makeSpJointsUpper(numJnt)
-        self.makeSpJointsLower(numJnt)
+        self.createCurve()
+        self.createSpJointsUpper(numJnt)
+        self.createSpJointsLower(numJnt)
+        if self.stdFirst.name().find( '_L_' ) != -1:
+            self.createIkFootRig( *Std.getLeftIkFootList() )
+            self.createFKFootRig( *Std.getLeftFkFootList() )
+        else:
+            self.createIkFootRig( *Std.getRightIkFootList() )
+            self.createFKFootRig( *Std.getRightFkFootList() )
+        self.createBlFootRig()
     
     
     
@@ -4732,9 +6019,10 @@ class LegRig( ArmRig ):
         self.footIkGrp = createNode( 'transform', n = self.stdEnd.localName().replace( self.stdPrefix, 'FootIkBase_' ) )
         constrain_parent( self.ctlIkEnd, self.footIkGrp )
         
-        ctlFoot = makeController( sgdata.Controllers.circlePoints, self.controllerSize, n= self.stdEnd.localName().replace( self.stdPrefix, 'Ctl_FootIk' ) )
+        ctlFoot = makeController( sgdata.Controllers.circlePoints, self.controllerSize, n= stdFootPiv.localName().replace( self.stdPrefix, 'Ctl_FootIk' ),
+                                  makeParent=1, colorIndex=self.colorIndex )
         ctlFoot.shape_rz.set( 90 )
-        pCtlFoot = makeParent( ctlFoot )
+        pCtlFoot = ctlFoot.parent()
         parent( pCtlFoot, self.footIkGrp )
         
         select( ctlFoot )
@@ -4801,17 +6089,22 @@ class LegRig( ArmRig ):
         dcmpToeEnd.ot >> footToAnkleJnt.t
         
         
-        ctlToeEnd = makeController( sgdata.Controllers.spherePoints, self.controllerSize, n= self.stdEnd.localName().replace( self.stdPrefix, 'Ctl_FootIk' ) )
+        ctlToeEnd = makeController( sgdata.Controllers.spherePoints, self.controllerSize, n= stdToeEnd.localName().replace( self.stdPrefix, 'Ctl_FootIk' ),
+                                    makeParent=1, colorIndex=self.colorIndex )
         ctlToeEnd.setAttr( 'shape_sx', 0.2 ).setAttr( 'shape_sy', 0.2 ).setAttr( 'shape_sz', 0.2 )
-        pCtlToeEnd = makeParent( ctlToeEnd )
+        pCtlToeEnd = ctlToeEnd.parent()
         parent( pCtlToeEnd, ctlFoot )
         constrain_parent( footEndJnt, pCtlToeEnd )
         ctlToeEnd.r >> pivToeJnt.r
         
-        ctlToe = makeController( sgdata.Controllers.circlePoints, self.controllerSize, n= self.stdEnd.localName().replace( self.stdPrefix, 'Ctl_FootIk' ) )
-        ctlToe.setAttr( 'shape_sx', 0.5 ).setAttr( 'shape_sy', 0.2 ).setAttr( 'shape_sz', 0.15 ).setAttr( 'shape_ry', 15 ).setAttr( 'shape_tx', 0.3 * self.controllerSize )
+        ctlToe = makeController( sgdata.Controllers.circlePoints, self.controllerSize, n= stdToe.localName().replace( self.stdPrefix, 'Ctl_FootIk' ),
+                                 makeParent=1, colorIndex=self.colorIndex )
+        if stdFootPiv.tx.get() < 0:
+            ctlToe.setAttr( 'shape_sx', 0.5 ).setAttr( 'shape_sy', 0.2 ).setAttr( 'shape_sz', 0.15 ).setAttr( 'shape_ry', 15 ).setAttr( 'shape_tx', 0.3  )
+        else:
+            ctlToe.setAttr( 'shape_sx', -0.5 ).setAttr( 'shape_sy', -0.2 ).setAttr( 'shape_sz', -0.15 ).setAttr( 'shape_ry', 15 ).setAttr( 'shape_tx', -0.3  )
         ctlToe.setAttr( 'shape_rz', 90 )
-        pCtlToe = makeParent( ctlToe )
+        pCtlToe = ctlToe.parent()
         parent( pCtlToe, ctlToeEnd )
         pCtlToe.setTransformDefault()
         localDcmpToeJnt.ot >> pCtlToe.t
@@ -4826,7 +6119,7 @@ class LegRig( ArmRig ):
         distMultNode = createNode( 'multDoubleLinear' )
         distNode.distance >> distMultNode.input1
         distMultNode.input2.set( 1 )
-        if dcmpToeEnd.otx > 0:
+        if stdFootPiv.tx.get() < 0:
             distMultNode.input2.set( -1 )
         distMultNode.output >> self.ikJntToe.tx
         
@@ -4834,12 +6127,12 @@ class LegRig( ArmRig ):
         distMultNode = createNode( 'multDoubleLinear' )
         distNode.distance >> distMultNode.input1
         distMultNode.input2.set( 1 )
-        if dcmpToeEnd.otx > 0:
+        if stdFootPiv.tx.get() < 0:
             distMultNode.input2.set( -1 )
         distMultNode.output >> self.ikJntToeEnd.tx
         
         direction = [1,0,0]
-        if dcmpToeEnd.otx > 0:
+        if stdFootPiv.tx.get() < 0:
             direction = [-1,0,0]
         
         lookAtConnect( ctlToe, self.ikJntFoot, direction=direction )
@@ -4856,7 +6149,10 @@ class LegRig( ArmRig ):
         ctlToe.toeRot >> self.ikJntToe.ry
         
         constrain_point( footToAnkleJnt, self.ikHandle )
+        constrain_point( self.ikJntEnd, self.ikJntFoot )
         parent( self.footIkGrp, self.ikGroup )
+        
+        footPivJnt.v.set( 0 )
 
 
 
@@ -4865,9 +6161,10 @@ class LegRig( ArmRig ):
         
         self.footFkGrp = createNode( 'transform', n = self.stdEnd.localName().replace( self.stdPrefix, 'FootFkBase_' ) )
         
-        ctlFkToe = makeController( sgdata.Controllers.rhombusPoints, self.controllerSize, n= stdToe.localName().replace( self.stdPrefix, 'Ctl_FootFk' ) )
+        ctlFkToe = makeController( sgdata.Controllers.rhombusPoints, self.controllerSize, n= stdToe.localName().replace( self.stdPrefix, 'Ctl_FootFk' ),
+                                   makeParent=1, colorIndex=self.colorIndex )
         ctlFkToe.setAttr( 'shape_sx', 0.63 ).setAttr( 'shape_sy', 0.31 ).setAttr( 'shape_sz', 0.28 ).setAttr( 'shape_rz', 90 )
-        pCtlFkToe = makeParent( ctlFkToe )
+        pCtlFkToe = ctlFkToe.parent()
         constrain_parent( self.fkCtlEnd, self.footFkGrp )
         parent( pCtlFkToe, self.footFkGrp )
         
@@ -4925,6 +6222,7 @@ class LegRig( ArmRig ):
         childToeEnd.t >> self.fkJntToeEnd.t
         
         parent( self.footFkGrp, self.fkGroup )
+        self.fkJntFoot.v.set( 0 )
 
         
     @convertSg_dec
@@ -4946,28 +6244,260 @@ class LegRig( ArmRig ):
         self.ctlBl.blend >> outJntToe.blend
         self.ctlBl.blend >> outJntToeEnd.blend
         
+        self.resultJnts += [outJntFoot,outJntToe,outJntToeEnd]
+        
         pass
+    
+    
 
+
+
+
+
+class HandRig:
+    
+    def __init__(self, stdBase, stdArm02, fingerString ):
+        
+        self.stdPrefix       = 'StdJnt_'
+        self.stdGripPrefix   = 'StdJntGrip_'
+        self.stdSpreadPrefix = 'StdJntSpread_'
+        
+        thumbStr = 'Thumb'
+        indexStr = 'Index'
+        middleStr = 'Middle'
+        ringStr = 'Ring'
+        pinkyStr = 'Pinky'
+        add1Str = 'Add1'
+        add2Str = 'Add2'
+        
+        thumbStds = fingerString % thumbStr
+        indexStds = fingerString % indexStr
+        middleStds = fingerString % middleStr
+        ringStds = fingerString % ringStr
+        pinkyStds = fingerString % pinkyStr
+        add1Stds = fingerString % add1Str
+        add2Stds = fingerString % add2Str
+
+        self.stdBase   = convertSg( stdBase )
+        self.stdArm02  = convertSg( stdArm02 )
+        self.thumbStds = listNodes( thumbStds, type='transform' )
+        self.indexStds = listNodes( indexStds, type='transform' )
+        self.middleStds = listNodes( middleStds, type='transform' )
+        self.ringStds = listNodes( ringStds, type='transform' )
+        self.pinkyStds = listNodes( pinkyStds, type='transform' )
+        self.add1Stds = listNodes( add1Stds, type='transform' )
+        self.add2Stds = listNodes( add2Stds, type='transform' )
+        self.controllerSize = 1
+
+    
+    @convertName_dec
+    def getSide(self, nodeName ):
+        
+        if nodeName.find( '_L_' ) != -1:
+            return '_L_'
+        else:
+            return '_R_'
 
 
     
+    def createAll(self, controllerSize = 1, colorIndex=0 ):
+        
+        self.controllerSize = controllerSize
+        self.colorIndex = colorIndex
+        self.createRigBase()
+        self.createControllers()
+        self.createJoints()
+        self.createFingerAttributeControl()
+    
+
+
+    def createRigBase(self):
+        
+        self.rigBase = createNode( 'transform', n=self.stdArm02.localName().replace( self.stdPrefix, 'RigBase_' ) )
+        self.rigBase.xform( ws=1, matrix= self.stdArm02.wm.get() )
+        constrain_parent( self.stdArm02, self.rigBase )
+
+
+
+    def createControllers(self):
+        
+        self.thumbCtls = []
+        self.indexCtls = []
+        self.middleCtls = []
+        self.ringCtls = []
+        self.pinkyCtls = []
+        
+        stdLists = [ self.thumbStds, self.indexStds, self.middleStds, self.ringStds, self.pinkyStds ]
+        ctlLists = [ self.thumbCtls, self.indexCtls, self.middleCtls, self.ringCtls, self.pinkyCtls ]
+        
+        for k in range( len( stdLists ) ):
+            currentParentCtl = self.rigBase
+            for i in range( len( stdLists[k] ) ):
+                ctl = makeController( sgdata.Controllers.cubePoints, self.controllerSize, n= stdLists[k][i].name().replace( self.stdPrefix, 'Ctl_' ), 
+                                      makeParent=1 )
+                ctl.setAttr( 'shape_ty', 0.13  )
+                pCtl = ctl.parent()
+                stdLists[k][i].t >> pCtl.t
+                stdLists[k][i].r >> pCtl.r
+                ctlLists[k].append( ctl )
+                parent( pCtl, currentParentCtl )
+                currentParentCtl = ctl
+    
+
+
+    def createJoints(self):
+        
+        ctlLists = [ self.thumbCtls, self.indexCtls, self.middleCtls, self.ringCtls, self.pinkyCtls ]
+        
+        select( d=1 )
+        baseJoint = joint()
+        constrain_parent( self.rigBase, baseJoint )
+        
+        self.thumbJnts = []
+        self.indexJnts = []
+        self.middleJnts = []
+        self.ringJnts = []
+        self.pinkyJnts = []
+        
+        jntLists = [ self.thumbJnts, self.indexJnts, self.middleJnts, self.ringJnts, self.pinkyJnts ]
+        lookAtDirection = [1,0,0]
+        if self.thumbStds[0].tx.get() < 0:
+            lookAtDirection = [-1,0,0]
+        
+        for i in range( len( ctlLists ) ):
+            select( baseJoint )
+            ctlParent = self.rigBase
+            for j in range( len( ctlLists[i] ) ):
+                newJoint = joint()
+                dcmpMove = getDecomposeMatrix( getLocalMatrix( ctlLists[i][j], ctlParent) )
+                dcmpOrig = getDecomposeMatrix( getLocalMatrix( ctlLists[i][j].parent(), ctlParent) )
+                distanceMove = getDistance( dcmpMove )
+                distanceOrig = getDistance( dcmpOrig )
+                div = createNode( 'multiplyDivide' ).setAttr( 'op', 2 )
+                distanceMove.distance >> div.input1X
+                distanceOrig.distance >> div.input2X
+                if j != 0:
+                    div.outputX >> jntLists[i][j-1].sx
+                    aimConstraint( ctlLists[i][j], jntLists[i][j-1], aim=lookAtDirection, u=[0,0,1], wu=[0,0,1], wut='objectrotation', wuo=ctlLists[i][j-1] )
+                    dcmpOrig.ot >> newJoint.t
+                else:
+                    constrain_point( ctlLists[i][j], newJoint )
+
+                jntLists[i].append( newJoint )
+                select( newJoint )
+                
+                ctlParent = ctlLists[i][j]
+        
+        self.resultJnts = [baseJoint] + jntLists
+        
+        
+    
+    
+    def createFingerAttributeControl(self):
+        
+        self.stdPrefix       = 'StdJnt_'
+        self.stdGripPrefix   = 'StdJntGrip_'
+        self.stdSpreadPrefix = 'StdJntSpread_'
+        
+        _SIDE_ = self.getSide( self.thumbStds[0] )
+        self.ctlFinger = makeController( sgdata.Controllers.circlePoints, self.controllerSize, n='Ctl_Finger' + _SIDE_, 
+                                         makeParent=1, colorIndex = self.colorIndex )
+        transMult = 1
+        if self.thumbStds[0].tx.get() < 0:
+            transMult = -1
+        self.ctlFinger.setAttr( 'shape_tx', 2.5 * transMult ).setAttr( 'shape_ty', 1.5 * transMult ).setAttr( 'shape_sx', 2 ).setAttr( 'shape_sy', 2 ).setAttr( 'shape_sz', 2 )
+        pCtlFinger = self.ctlFinger.parent()
+        pCtlFinger.parentTo( self.rigBase )
+        pCtlFinger.setTransformDefault()
+        
+        addOptionAttribute( self.ctlFinger )
+        self.ctlFinger.addAttr( ln='grip', k=1 )
+        self.ctlFinger.addAttr( ln='spread', k=1 )
+        
+        stdLists = [ self.thumbStds, self.indexStds, self.middleStds, self.ringStds, self.pinkyStds ]
+        ctlLists = [ self.thumbCtls, self.indexCtls, self.middleCtls, self.ringCtls, self.pinkyCtls ]
+        
+        for i in range( len( stdLists ) ):
+            for j in range( len( stdLists[i] ) ):
+                gripStd = convertSg( stdLists[i][j].name().replace( self.stdPrefix, self.stdGripPrefix ) )
+                spreadStd = convertSg( stdLists[i][j].name().replace( self.stdPrefix, self.stdSpreadPrefix ) )
+                offsetCtl = makeParent( ctlLists[i][j] ).rename( 'Offset' + ctlLists[i][j].name() )
+                
+                multGrip   = createNode( 'multiplyDivide' )
+                multSpread = createNode( 'multiplyDivide' )
+                plusNode   = createNode( 'plusMinusAverage' )
+                
+                gripStd.r >> multGrip.input1
+                spreadStd.r >> multSpread.input1
+                self.ctlFinger.grip >> multGrip.input2X
+                self.ctlFinger.grip >> multGrip.input2Y
+                self.ctlFinger.grip >> multGrip.input2Z
+                self.ctlFinger.spread >> multSpread.input2X
+                self.ctlFinger.spread >> multSpread.input2Y
+                self.ctlFinger.spread >> multSpread.input2Z
+                multGrip.output >> plusNode.input3D[0]
+                multSpread.output >> plusNode.input3D[1]
+                divNode = createNode( 'multiplyDivide' )
+                plusNode.output3D >> divNode.input1
+                divNode.input2.set( 0.1, 0.1, 0.1 )
+                
+                divNode.output >> offsetCtl.r
+                
+            
+    
+
+
+
+
+
 
 class StdControl:
     
     def __init__(self):
-        
         pass
     
+
+    @convertSg_dec
+    def setSymmetryElement( self, sel ):
+    
+        matList = sel.wm.get()
+        
+        matList[1]  *= -1
+        matList[2]  *= -1
+        matList[5]  *= -1
+        matList[6]  *= -1
+        matList[9] *= -1
+        matList[10] *= -1
+        matList[12] *= -1
+        sel.xform( ws=1, matrix= matList )
+    
+    
+    
+    @convertSg_dec
+    def setSymmetryElement_trans(self, sel ):
+        
+        matList = sel.wm.get()
+        
+        matList[12] *= -1
+        sel.xform( ws=1, matrix= matList )
+        
+
+
     
     @convertSg_dec
     def setSymmetry( self, targetStd, **options ):
         
         fromSide = '_L_'
         toSide = '_R_'
+        
         if options.has_key( 'from' ):
             fromSide = options['from']
         if options.has_key( 'to' ):
             toSide = options['to']
+        
+        symtype = 'default'
+        if options.has_key( 'symtype' ):
+            symtype = options['symtype']
         
         ns = targetStd.name().split( 'Std_' )[0]
         
@@ -4978,10 +6508,724 @@ class StdControl:
             if not cmds.objExists( std.name().replace( fromSide, toSide ) ): continue
             
             stdToSide = convertSg( std.name().replace( fromSide, toSide ) )
-            stdToSide.xform( ws=1, matrix= std.wm.get() )
-            setMirror( stdToSide )
+            
+            if symtype == 'trans':
+                origMtx = std.wm.get()
+                stdToSide.xform( ws=1, t= origMtx[12:-1] )
+                self.setSymmetryElement_trans( stdToSide )
+            else:
+                stdToSide.xform( ws=1, matrix= std.wm.get() )
+                self.setSymmetryElement( stdToSide )
+            
+
+
+
+
+
+def createHumanByStd( controllerSize = 1 ):
     
-            print std.name(), "--->", stdToSide.name()
+    bodyRig = BodyRig( *Std.getBodyList() )
+    bodyRig.createAll( controllerSize )
+    cmds.refresh()
+    
+    bodyRig.createClavicleConnector( Std.clavicle_SIDE_.replace( '_SIDE_', '_L_'), Std.clavicle_SIDE_.replace( '_SIDE_', '_R_'))
+    bodyRig.createHipConnector( Std.leg_SIDE_00.replace( '_SIDE_', '_L_'), Std.leg_SIDE_00.replace( '_SIDE_', '_R_') )
+    bodyRig.createNeckConnector( Std.neck )
+    cmds.refresh()
+    
+    headRig = HeadRig( *Std.getHeadList() )
+    headRig.createAll( controllerSize )
+    constrain_parent( bodyRig.connectorNeck, headRig.rigBase )
+    cmds.refresh()
+    
+    leftClavicleRig = ClavicleRig( *Std.getLeftClavicleList() )
+    leftClavicleRig.createAll(controllerSize, HumanRig.leftColor )
+    constrain_parent( bodyRig.connectorClavicleL, leftClavicleRig.rigBase )
+    cmds.refresh()
+    
+    leftArmRig = ArmRig( *Std.getLeftArmList() )
+    leftArmRig.createAll( controllerSize, HumanRig.leftColor  )
+    constrain_parent( leftClavicleRig.connector, leftArmRig.rigBase )
+    cmds.refresh()
+    
+    leftLegRig = LegRig( *Std.getLeftLegList() )
+    leftLegRig.createAll( controllerSize, HumanRig.leftColor  )
+    constrain_parent( bodyRig.connectorHipL, leftLegRig.rigBase )
+    cmds.refresh()
+    
+    leftHandRig = HandRig( *Std.getLeftHandList() )
+    leftHandRig.createAll( controllerSize * 0.3, HumanRig.leftColor )
+    constrain_parent( leftArmRig.connector, leftHandRig.rigBase )
+    cmds.refresh()
+    
+    rightClavicleRig = ClavicleRig( *Std.getRightClavicleList() )
+    rightClavicleRig.createAll(controllerSize, HumanRig.rightColor )
+    constrain_parent( bodyRig.connectorClavicleR, rightClavicleRig.rigBase )
+    cmds.refresh()
+    
+    rightArmRig = ArmRig( *Std.getRightArmList() )
+    rightArmRig.createAll( controllerSize, HumanRig.rightColor )
+    constrain_parent( rightClavicleRig.connector, rightArmRig.rigBase )
+    cmds.refresh()
+    
+    rightLegRig = LegRig( *Std.getRightLegList() )
+    rightLegRig.createAll( controllerSize, HumanRig.rightColor )
+    constrain_parent( bodyRig.connectorHipR, rightLegRig.rigBase )
+    cmds.refresh()
+    
+    rightHandRig = HandRig( *Std.getRightHandList() )
+    rightHandRig.createAll( controllerSize * 0.3, HumanRig.rightColor )
+    constrain_parent( rightArmRig.connector, rightHandRig.rigBase )
+    cmds.refresh()
+    
+    parent( headRig.resultJnts[0], bodyRig.resultJnts[-1] ); headRig.resultJnts[0].jo.set(0,0,0)
+    parent( leftClavicleRig.resultJnts[0], bodyRig.resultJnts[-1] ); leftClavicleRig.resultJnts[0].jo.set(0,0,0)
+    parent( rightClavicleRig.resultJnts[0], bodyRig.resultJnts[-1] ); rightClavicleRig.resultJnts[0].jo.set(0,0,0)
+    parent( leftArmRig.resultJnts[0], leftClavicleRig.resultJnts[-1] ); leftArmRig.resultJnts[0].jo.set(0,0,0)
+    parent( rightArmRig.resultJnts[0], rightClavicleRig.resultJnts[-1] ); rightArmRig.resultJnts[0].jo.set(0,0,0)
+    parent( leftHandRig.resultJnts[0], leftArmRig.resultJnts[-1] ); leftHandRig.resultJnts[0].jo.set(0,0,0)
+    parent( rightHandRig.resultJnts[0], rightArmRig.resultJnts[-1] ); rightHandRig.resultJnts[0].jo.set(0,0,0)
+    parent( leftLegRig.resultJnts[0], bodyRig.resultJnts[0] ); leftLegRig.resultJnts[0].jo.set(0,0,0)
+    parent( rightLegRig.resultJnts[0], bodyRig.resultJnts[0] ); rightLegRig.resultJnts[0].jo.set(0,0,0)
+    cmds.refresh()
+    
+    ctlsGrp = createNode( 'transform', n='ctls' )
+    ctlWorld = makeController( sgdata.Controllers.circlePoints, controllerSize * 3.5, n='Ctl_World', makeParent=1, colorIndex=6 )
+    pCtlWorld = ctlWorld.parent()
+    ctlMove  = makeController( sgdata.Controllers.crossArrowPoints, controllerSize * 3, n='Ctl_Move', makeParent=1, colorIndex = 29 )
+    pCtlMove = ctlMove.parent()
+    ctlFly  = makeController( sgdata.Controllers.flyPoints, controllerSize * 2, n='Ctl_Fly', makeParent=1, colorIndex=15 )
+    ctlFly.setAttr( 'shape_sy', 1.5 ).setAttr( 'shape_tz', -1 ).setAttr( 'shape_ty', 0.2 )
+    pCtlFly = ctlFly.parent()
+    pCtlFly.xform( ws=1, matrix= bodyRig.ctlRoot.parent().wm.get() )
+    
+    parent( pCtlFly, ctlMove )
+    parent( pCtlMove, ctlWorld )
+    parent( pCtlWorld, ctlsGrp )
+    
+    rootDcmp = getDecomposeMatrix( getLocalMatrix( Std.root, Std.base ) )
+    rootDcmp.outputTranslate >> pCtlFly.t
+    rootDcmp.outputRotate >> pCtlFly.r
+    
+    parent( bodyRig.rigBase, ctlFly )
+    parent( headRig.rigBase, ctlFly )
+    parent( leftClavicleRig.rigBase, ctlFly )
+    parent( rightClavicleRig.rigBase, ctlFly )
+    parent( leftArmRig.rigBase, ctlFly )
+    parent( rightArmRig.rigBase, ctlFly )
+    parent( leftHandRig.rigBase, ctlFly )
+    parent( rightHandRig.rigBase, ctlFly )
+    parent( leftLegRig.rigBase, ctlFly )
+    parent( rightLegRig.rigBase, ctlFly )
+    
+    jntGrp = createNode( 'transform', n='jointGrp' )
+    parent( bodyRig.resultJnts[0], jntGrp )
+    constrain_all( ctlFly, jntGrp )
+    
+    rigGrp = createNode( 'transform', n='rig' )
+    parent( jntGrp, ctlsGrp, rigGrp )
+
+
+
+class FollowingIk:
+    
+    stdBase  = 'StdJnt_Base'
+    stdRoot  = 'StdJnt_Root'
+    stdShoulder_SIDE_ = 'StdJnt_Arm_SIDE_00'
+    stdHip_SIDE_   = 'StdJnt_Leg_SIDE_00'
+    stdWrist_SIDE_ = 'StdJnt_Arm_SIDE_02'
+    stdAnkle_SIDE_ = 'StdJnt_Leg_SIDE_02'
+    
+    world     = 'Ctl_World'
+    move     = 'Ctl_Move'
+    fly      = 'Ctl_Fly'
+    root     = 'Ctl_Root'
+    chest    = 'Ctl_Chest'
+    
+    armBase_SIDE_ = 'RigBase_Arm_SIDE_00'
+    legBase_SIDE_ = 'RigBase_Leg_SIDE_00'
+    armIk_SIDE_ = 'Ctl_IkArm_SIDE_02'
+    legIk_SIDE_ = 'Ctl_IkLeg_SIDE_02'
+    
+    def __init__(self, targetIk, targetBase, targetStd, targetBaseStd ):
+        
+        self.targetBase = pymel.core.ls( targetBase )[0]
+        self.targetBaseStd = pymel.core.ls( targetBaseStd )[0]
+        self.targetIk = pymel.core.ls( targetIk )[0]
+        self.targetStd = pymel.core.ls( targetStd )[0]
+    
+
+    def create(self, *targets ):
+        
+        origPointer = pymel.core.createNode( 'transform' )
+        pymel.core.parent( origPointer, self.targetBase )
+        
+        def getLocalDecomposeMatrix( localObj, parentObj ):
+            
+            localObj = pymel.core.ls( localObj )[0]
+            parentObj = pymel.core.ls( parentObj )[0]
+            
+            mm = pymel.core.createNode( 'multMatrix' )
+            dcmp = pymel.core.createNode( 'decomposeMatrix' )
+            compose = pymel.core.createNode( 'composeMatrix' )
+            dcmpTrans = pymel.core.createNode( 'decomposeMatrix' )
+            localObj.wm >> dcmpTrans.imat
+            dcmpTrans.ot >> compose.it
+            compose.outputMatrix >> mm.i[0]
+            parentObj.wim >> mm.i[1]
+            mm.o >> dcmp.imat
+            return dcmp
+        
+        origDcmp = getLocalDecomposeMatrix( self.targetStd, self.targetBaseStd )
+        origPointer = pymel.core.createNode( 'transform' )
+        origDcmp.ot >> origPointer.t
+        origDcmp.outputRotate >> origPointer.r
+        pymel.core.parent( origPointer, self.targetBase )
+
+        blendMatrix = pymel.core.createNode( 'wtAddMatrix' )
+        origPointer.wm >> blendMatrix.i[0].m
+        
+        sumWeight = pymel.core.createNode( 'plusMinusAverage' )
+        rangeNode = pymel.core.createNode( 'setRange' )
+        revNode   = pymel.core.createNode( 'reverse' )
+        sumWeight.output1D >> rangeNode.valueX; rangeNode.maxX.set( 1 ); rangeNode.oldMaxX.set( 1 )
+        rangeNode.outValueX >> revNode.inputX
+        revNode.outputX >> blendMatrix.i[0].w
+        
+        divSumNode = pymel.core.createNode( 'condition' )
+        divSumNode.secondTerm.set( 1 ); divSumNode.operation.set( 2 ); divSumNode.colorIfFalseR.set( 1 )
+        sumWeight.output1D >> divSumNode.firstTerm
+        sumWeight.output1D >> divSumNode.colorIfTrueR
+        divSumAttr = divSumNode.outColorR
+
+        addOptionAttribute( self.targetIk.name(), 'followOptions' )
+
+        wIndex = 1
+        for targetCtl, targetStd in targets:
+            
+            if not pymel.core.objExists( targetCtl ):
+                print "%s is not exists" % targetCtl
+                continue
+            if not pymel.core.objExists( targetStd ):
+                print "%s is not exists" % targetStd
+                continue
+            
+            targetCtl = pymel.core.ls( targetCtl )[0]
+            targetStd = pymel.core.ls( targetStd )[0]
+            
+            cuLocalDcmp = getLocalDecomposeMatrix( self.targetStd, targetStd )
+            cuPointer = pymel.core.createNode( 'transform' )
+            cuLocalDcmp.ot >> cuPointer.t
+            cuLocalDcmp.outputRotate >> cuPointer.r
+            cuPointer.rename(  'fPointer_' + self.targetIk.name() + '_in_' + targetCtl.name() )
+            pymel.core.parent( cuPointer, targetCtl )
+            cuPointer.wm >> blendMatrix.i[wIndex].m
+            
+            try:self.targetIk.addAttr( 'follow_%s' % targetCtl.name(), k=1, min=0, max=1, dv=0 )
+            except:pass
+            divWeight = pymel.core.createNode( 'multiplyDivide' ); divWeight.op.set( 2 )
+            self.targetIk.attr( 'follow_%s' % targetCtl.name() ) >> divWeight.input1X
+            divSumAttr >> divWeight.input2X
+            divWeight.outputX >> blendMatrix.i[wIndex].w
+            
+            self.targetIk.attr( 'follow_%s' % targetCtl.name() ) >> sumWeight.input1D[ wIndex -1 ]
+            
+            wIndex += 1
+        
+        multMtx = pymel.core.createNode( 'multMatrix' )
+        dcmp = pymel.core.createNode( 'decomposeMatrix' )
+        blendMatrix.matrixSum >> multMtx.i[0]
+        self.targetIk.getParent().pim >> multMtx.i[1]
+        multMtx.matrixSum >> dcmp.imat
+        
+        dcmp.ot >> self.targetIk.getParent().t
+        dcmp.outputRotate >> self.targetIk.getParent().r
+    
+
+
+    @staticmethod
+    def getLeftArmList():
+        
+        replaceList = ( '_SIDE_', '_L_' )
+        rigBase = FollowingIk.armBase_SIDE_.replace( *replaceList )
+        ik = FollowingIk.armIk_SIDE_.replace( *replaceList )
+        stdBase = FollowingIk.stdShoulder_SIDE_.replace( *replaceList )
+        stdIk = FollowingIk.stdWrist_SIDE_.replace( *replaceList )
+        return ik, rigBase, stdIk, stdBase 
+
+
+    @staticmethod
+    def getRightArmList():
+        
+        replaceList = ( '_SIDE_', '_R_' )
+        rigBase = FollowingIk.armBase_SIDE_.replace( *replaceList )
+        ik = FollowingIk.armIk_SIDE_.replace( *replaceList )
+        stdBase = FollowingIk.stdShoulder_SIDE_.replace( *replaceList )
+        stdIk = FollowingIk.stdWrist_SIDE_.replace( *replaceList )
+        return ik, rigBase, stdIk, stdBase
+    
+
+
+    @staticmethod
+    def getLeftLegList():
+        
+        replaceList = ( '_SIDE_', '_L_' )
+        rigBase = FollowingIk.legBase_SIDE_.replace( *replaceList )
+        ik = FollowingIk.legIk_SIDE_.replace( *replaceList )
+        stdBase = FollowingIk.stdHip_SIDE_.replace( *replaceList )
+        stdIk = FollowingIk.stdAnkle_SIDE_.replace( *replaceList )
+        return ik, rigBase, stdIk, stdBase
+
+
+
+    @staticmethod
+    def getRightLegList():
+        
+        replaceList = ( '_SIDE_', '_R_' )
+        rigBase = FollowingIk.legBase_SIDE_.replace( *replaceList )
+        ik = FollowingIk.legIk_SIDE_.replace( *replaceList )
+        stdBase = FollowingIk.stdHip_SIDE_.replace( *replaceList )
+        stdIk = FollowingIk.stdAnkle_SIDE_.replace( *replaceList )
+        return ik, rigBase, stdIk, stdBase
+    
+
+
+    @staticmethod
+    def getFollowList():
+        
+        return [ [FollowingIk.root, FollowingIk.stdRoot], 
+                 [FollowingIk.fly, FollowingIk.stdRoot],
+                 [FollowingIk.move, FollowingIk.stdBase],
+                 [FollowingIk.world, FollowingIk.stdBase]]
+    
+    
+    @staticmethod
+    def createAll():
+        
+        armIkLeft = FollowingIk( *FollowingIk.getLeftArmList() )
+        armIkLeft.create( *FollowingIk.getFollowList() )
+        armIkRight = FollowingIk( *FollowingIk.getRightArmList() )
+        armIkRight.create( *FollowingIk.getFollowList() )
+        
+        legIkLeft = FollowingIk( *FollowingIk.getLeftLegList() )
+        legIkLeft.create( *FollowingIk.getFollowList() )
+        legIkRight = FollowingIk( *FollowingIk.getRightLegList() )
+        legIkRight.create( *FollowingIk.getFollowList() )
+        
+        
+
+    
+    
+
+
+@convertSg_dec
+def createRigedCurve( *ctls ):
+    
+    firstCtl = ctls[0]
+    firstCtlNext = ctls[1]
+    lastCtlBefore = ctls[-2]
+    lastCtl = ctls[-1]
+    
+    firstCtl.addAttr( ln='frontMult', cb=1, dv=0.3 )
+    lastCtl.addAttr( ln='backMult', cb=1, dv=0.3 )
+    
+    firstPointerGrp = createNode( 'transform' )
+    firstPointer1 = firstPointerGrp.makeChild()
+    firstPointer2 = firstPointerGrp.makeChild()
+    firstPointerGrp.parentTo( firstCtl ).setTransformDefault()
+    
+    lastPointerGrp = createNode( 'transform' )
+    lastPointer1 = lastPointerGrp.makeChild()
+    lastPointer2 = lastPointerGrp.makeChild()
+    lastPointerGrp.parentTo( lastCtl ).setTransformDefault()
+    
+    dcmpFirst = getDecomposeMatrix( getLocalMatrix( firstCtlNext, firstCtl ) )
+    distFirst = getDistance( dcmpFirst )
+    dcmpLast = getDecomposeMatrix( getLocalMatrix( lastCtlBefore, lastCtl ) ) 
+    distLast = getDistance( dcmpLast )
+    
+    firstDirIndex = getDirectionIndex( dcmpFirst.ot.get() )
+    firstReverseMult = -1 if firstDirIndex >= 3 else 1
+    firstTargetAttr = ['tx','ty','tz'][firstDirIndex%3]
+    lastDirIndex = getDirectionIndex( dcmpLast.ot.get() )
+    lastReverseMult = -1 if lastDirIndex >= 3 else 1
+    lastTargetAttr  = ['tx','ty','tz'][lastDirIndex%3]
+    
+    multFirstPointer1 = createNode( 'multDoubleLinear' ).setAttr( 'input2',  0.05 * firstReverseMult )
+    multFirstPointer2 = createNode( 'multDoubleLinear' ).setAttr( 'input2',  0.3 * firstReverseMult )
+    multLastPointer1 = createNode( 'multDoubleLinear' ).setAttr( 'input2',  0.05 * lastReverseMult )
+    multLastPointer2 = createNode( 'multDoubleLinear' ).setAttr( 'input2',  0.3 * lastReverseMult )
+    firstCtl.frontMult >> multFirstPointer2.input2
+    lastCtl.backMult >> multFirstPointer2.input2
+    
+    distFirst.distance >> multFirstPointer1.input1
+    distFirst.distance >> multFirstPointer2.input1
+    multFirstPointer1.output >> firstPointer1.attr( firstTargetAttr )
+    multFirstPointer2.output >> firstPointer2.attr( lastTargetAttr )
+    
+    distLast.distance >> multLastPointer1.input1
+    distLast.distance >> multLastPointer2.input1
+    multLastPointer1.output >> lastPointer1.attr( firstTargetAttr )
+    multLastPointer2.output >> lastPointer2.attr( lastTargetAttr )
+    
+    pointerList = [firstPointerGrp, firstPointer1, firstPointer2, lastPointer2, lastPointer1, lastPointerGrp]
+    
+    for i in range( 1, len( ctls )-1 ):
+        beforeCtl = ctls[i-1]
+        ctl = ctls[i]
+        nextCtl = ctls[i+1]
+        
+        ctlPointerGrp = ctl.makeChild()
+        ctlPointer1 = ctlPointerGrp.makeChild()
+        ctlPointer2 = ctlPointerGrp.makeChild()
+        
+        dcmpBefore = getDecomposeMatrix( getLocalMatrix( beforeCtl, ctl ) )
+        distBefore = getDistance( dcmpBefore )
+        dcmpAfter  = getDecomposeMatrix( getLocalMatrix( nextCtl, ctl ) ) 
+        distAfter  = getDistance( dcmpAfter )
+        
+        dirIndexB = getDirectionIndex( dcmpBefore.ot.get() )
+        reverseMultB = -1 if dirIndexB >= 3 else 1
+        targetAttrB = ['tx','ty','tz'][dirIndexB%3]
+        dirindexA = getDirectionIndex( dcmpAfter.ot.get() )
+        reverseMultA = -1 if dirindexA >= 3 else 1
+        targetAttrA = ['tx','ty','tz'][dirindexA%3]
+        
+        ctl.addAttr( 'beforeMult', dv=0.3, cb=1 )
+        ctl.addAttr( 'afterMult', dv=0.3, cb=1 )
+        multBefore = createNode( 'multDoubleLinear' ).setAttr( 'input2', reverseMultB )
+        multAfter  = createNode( 'multDoubleLinear' ).setAttr( 'input2', reverseMultA )
+        ctl.beforeMult >> multBefore.input1
+        ctl.afterMult  >> multAfter.input1
+        
+        multBeforePointer = createNode( 'multDoubleLinear' ).setAttr( 'input2',  0.3 * reverseMultB )
+        multAfterPointer  = createNode( 'multDoubleLinear' ).setAttr( 'input2',  0.3 * reverseMultA )
+        
+        distBefore.distance >> multBeforePointer.input1
+        distAfter.distance >> multAfterPointer.input1
+        multBefore.output >> multBeforePointer.input2
+        multAfter.output >> multAfterPointer.input2
+        
+        multBeforePointer.output >> ctlPointer1.attr( targetAttrB )
+        multAfterPointer.output >> ctlPointer2.attr( targetAttrA )
+        
+        pointerList.insert( -3, ctlPointer1 )
+        pointerList.insert( -3, ctlPointer2 )
+
+    return makeCurveFromSelection( pointerList )
+
+
+@convertSg_dec
+def getMultDoubleLinear( node=None ):
+    
+    multNode = createNode( 'multDoubleLinear' )
+    
+    if node:
+        if node.nodeType() == 'distanceBetween':
+            node.distance >> multNode.input1
+    
+    return multNode
+
+
+
+@convertSg_dec
+def createSquashBend( *geos ):    
+    if not type( geos ) in [ list, tuple ]:
+        geos = [geos]
+    
+    allbb = OpenMaya.MBoundingBox()
+    for geo in geos:
+        bb = cmds.exactWorldBoundingBox( geo.name() )
+        bbmin = bb[:3]
+        bbmax = bb[3:]
+        pointer00 = OpenMaya.MPoint( *bbmin )
+        pointer01 = OpenMaya.MPoint( *bbmax )
+        allbb.expand( pointer00 )
+        allbb.expand( pointer01 )
+    
+    bbmin = allbb.min()
+    bbmax = allbb.max()
+    center = allbb.center()
+    
+    upperPoint = [ center.x, bbmax.y, center.z ]
+    lowerPoint = [ center.x, bbmin.y, center.z ]
+    
+    dist = OpenMaya.MPoint( *upperPoint ).distanceTo( OpenMaya.MPoint( *lowerPoint ) )
+    squashBase = createNode( 'transform', n='sauashBase' ).setAttr( 't', lowerPoint )
+    upperCtl = makeController( sgdata.Controllers.trianglePoints, dist*0.2 )
+    upperCtl.setAttr( 'shape_ty', 1 ).setAttr( 'shape_rz', 180 )
+    pUpperCtl = makeParent( upperCtl )
+    lowerCtl = makeController( sgdata.Controllers.trianglePoints, dist*0.2 )
+    lowerCtl.setAttr( 'shape_ty', -1 )
+    pLowerCtl = makeParent( lowerCtl )
+    upperCtl.rename( 'Ctl_Upper' )
+    lowerCtl.rename( 'Ctl_Lower' )
+    pUpperCtl.t.set( *upperPoint )
+    pLowerCtl.t.set( *lowerPoint )
+    
+    parent( pUpperCtl, squashBase )
+    parent( pLowerCtl, squashBase )
+    
+    squashCenter = squashBase.makeChild().rename( 'squashCenter' ).setAttr( 'dh', 1 )
+    blendMtxNode = getBlendTwoMatrixNode( upperCtl, lowerCtl )
+    multMtx = createNode( 'multMatrix' )
+    blendMtxNode.matrixSum >> multMtx.i[0]
+    squashBase.attr( 'pim' ) >> multMtx.i[1]
+    dcmpBlend = getDecomposeMatrix( multMtx )
+    dcmpBlend.oty >> squashCenter.ty
+    
+    rigedCurve = createRigedCurve( upperCtl, lowerCtl )
+    upperFirstChild = upperCtl.listRelatives( c=1, type='transform' )[0]
+    lowerFirstChild = lowerCtl.listRelatives( c=1, type='transform' )[0]
+    parent( rigedCurve, squashBase )
+    
+    lookAtUpper = upperCtl.makeChild().rename( 'lookAtObj_' + upperCtl.name() )
+    lookAtLower = lowerCtl.makeChild().rename( 'lookAtObj_' + lowerCtl.name() )
+    lookAtConnect( squashCenter, lookAtUpper )
+    lookAtConnect( squashCenter, lookAtLower )
+    
+    multLookAtUpper = createNode( 'multiplyDivide' )
+    multLookAtLower = createNode( 'multiplyDivide' )
+    
+    lookAtUpper.r >> multLookAtUpper.input1
+    lookAtLower.r >> multLookAtLower.input1
+    addOptionAttribute( upperCtl )
+    addOptionAttribute( lowerCtl )
+    upperCtl.addAttr( ln='autoOrient', min=0, max=1, dv=1, k=1 )
+    lowerCtl.addAttr( ln='autoOrient', min=0, max=1, dv=1, k=1 )
+    upperCtl.autoOrient >> multLookAtUpper.input2X
+    upperCtl.autoOrient >> multLookAtUpper.input2Y
+    upperCtl.autoOrient >> multLookAtUpper.input2Z
+    lowerCtl.autoOrient >> multLookAtLower.input2X
+    lowerCtl.autoOrient >> multLookAtLower.input2Y
+    lowerCtl.autoOrient >> multLookAtLower.input2Z
+    
+    multLookAtUpper.output >> upperFirstChild.r
+    multLookAtLower.output >> lowerFirstChild.r
+    
+    select( geos )
+    flare, flareHandle = cmds.nonLinear( type='flare', lowBound=-1.5, highBound=1.5 )
+    cmds.setAttr( flareHandle + '.v', 0 )
+    flare       = convertSg( flare )
+    parent( flareHandle, squashBase )
+    
+    select( geos )
+    wireNode, curveName = cmds.wire( gw=False, en=1, ce=0.0, li=0.0, w=rigedCurve.name() )
+    wireNode = convertSg( wireNode )
+    wireNode.attr( 'dropoffDistance[0]' ).set( 1000000.0 )
+    baseCurve = wireNode.baseWire[0].listConnections( s=1, d=0, type='nurbsCurve' )[0]
+    baseCurve = convertSg( baseCurve )
+    
+    curveInfoMoveCurve = createNode( 'curveInfo' )
+    curveInfoOrigCurve = createNode( 'curveInfo' ) 
+    
+    rigedCurve.shape().attr( 'local' ) >> curveInfoMoveCurve.inputCurve
+    baseCurve.shape().attr( 'local' ) >> curveInfoOrigCurve.inputCurve
+    
+    divNode = createNode( 'multiplyDivide' ).setAttr( 'op', 2 )
+    curveInfoMoveCurve.arcLength >> divNode.input2X
+    curveInfoOrigCurve.arcLength  >> divNode.input1X
+    addNode = createNode( 'addDoubleLinear' ).setAttr( 'input2', -1 )
+    divNode.outputX >> addNode.input1
+    addNode.output >> flare.curve
+    
+    lowerCtl.sx >> flare.startFlareX
+    lowerCtl.sz >> flare.startFlareZ
+    upperCtl.sx >> flare.endFlareX
+    upperCtl.sz >> flare.endFlareZ
+    
+    pass
+
+
+
+
+def makeCloneObject( target, cloneLabel= '_clone', **options  ):
+    
+    target = pymel.core.ls( target )[0]
+    
+    op_cloneAttrName = 'iscloneObj'
+    op_shapeOn       = False
+    op_connectionOn  = False
+
+    targets = target.getAllParents()
+    targets.reverse()
+    targets.append( target )
+    
+    def getSourceConnection( src, trg ):
+        src = pymel.core.ls( src )[0]
+        trg = pymel.core.ls( trg )[0]
+        cons = src.listConnections( s=1, d=0, p=1, c=1 )
+    
+        if not cons: return None
+    
+        for destCon, srcCon in cons:
+            srcCon = srcCon.name()
+            destCon = destCon.name().replace( src, trg )
+            if cmds.nodeType( src ) == 'joint' and cmds.nodeType( trg ) =='transform':
+                destCon = destCon.replace( 'jointOrient', 'rotate' )
+            if not cmds.ls( destCon ): continue
+            if not cmds.isConnected( srcCon, destCon ):
+                cmds.connectAttr( srcCon, destCon, f=1 )
+
+    targetCloneParent = None
+    for cuTarget in targets:
+        if not pymel.core.attributeQuery( op_cloneAttrName, node=cuTarget, ex=1 ):
+            cuTarget.addAttr( op_cloneAttrName, at='message' )
+        cloneConnection = cuTarget.attr( op_cloneAttrName ).listConnections(s=1, d=0 )
+        if not cloneConnection:
+            targetClone = pymel.core.createNode( 'transform', n= cuTarget.split( '|' )[-1]+cloneLabel )
+            targetClone.message >> cuTarget.attr( op_cloneAttrName )
+            
+            if op_shapeOn:
+                cuTargetShape = cuTarget.getShape()
+                if cuTargetShape:
+                    duObj = pymel.core.duplicate( cuTarget, n=targetClone+'_du' )[0]
+                    duShape = duObj.getShape()
+                    pymel.core.parent( duShape, targetClone, add=1, shape=1 )[0]
+                    duShape.rename( targetClone+'Shape' )
+            if op_connectionOn:
+                getSourceConnection( cuTarget, targetClone )
+                cuTargetShape    = cuTarget.getShape()
+                targetCloneShape = targetClone.getShape()
+                
+                if cuTargetShape and targetCloneShape:
+                    getSourceConnection( cuTargetShape, targetCloneShape )
+        else:
+            targetClone = cloneConnection[0]
+        
+        targetCloneParentExpected = targetClone.getParent()
+        if targetCloneParent and targetCloneParentExpected != targetCloneParent:
+            pymel.core.parent( targetClone, targetCloneParent )
+
+        cuTargetPos = cuTarget.m.get()
+        pymel.core.xform( targetClone, os=1, matrix=cuTargetPos )
+
+        targetCloneParent = targetClone
+    return targetCloneParent.name()
+
+
+
+
+def copyShader( srcObj, dstObj ):
+    
+    srcObj = pymel.core.ls( srcObj )[0]
+    dstObj = pymel.core.ls( dstObj )[0]
+    
+    if srcObj.type() == 'transform':
+        srcObj = srcObj.getShape()
+    if dstObj.type() == 'transform':
+        dstObj = dstObj.getShape()
+    
+    shadingEngine = srcObj.listConnections( s=0, d=1, type='shadingEngine' )
+    if not shadingEngine:
+        cmds.warning( "%s has no shading endgine" % srcObj.name )
+        return None
+    cmds.sets( dstObj.name(), e=1, forceElement = shadingEngine[0].name() )
+
+
+
+
+def getDestMesh( meshGrp ):
+    
+    meshGrp = pymel.core.ls( meshGrp )[0]
+    children = meshGrp.listRelatives( c=1, ad=1, type='transform' )
+    children.append( meshGrp )
+    
+    targetMeshs = []
+    for child in children:
+        childShape = child.getShape()
+        if not childShape: continue
+        if childShape.type() != 'mesh': continue
+        targetMeshs.append( child )
+    
+    for targetMesh in targetMeshs:
+        meshShape = targetMesh.getShape()
+        clonedTransform = makeCloneObject( targetMesh )
+        copyShapeToTransform( meshShape.name(), clonedTransform )
+        
+        clonedTransform = pymel.core.ls( clonedTransform )[0]
+        clonedShape = clonedTransform.getShape()
+        
+        meshShape.outMesh >> clonedShape.inMesh
+        
+        copyShader( meshShape, clonedShape )
+
+
+
+
+
+
+def createFourByFourMatrixCube( target ):
+    
+    cubeObj, cubeNode = pymel.core.polyCube( ch=1, o=1, cuv=4 )
+    
+    xVtx = cubeObj.name() + '.vtx[7]'
+    yVtx = cubeObj.name() + '.vtx[4]'
+    zVtx = cubeObj.name() + '.vtx[0]'
+    pVtx = cubeObj.name() + '.vtx[6]'
+    
+    xFollicle = createFollicleOnVertex( xVtx, True, False )
+    yFollicle = createFollicleOnVertex( yVtx, True, False )
+    zFollicle = createFollicleOnVertex( zVtx, True, False )
+    pFollicle = createFollicleOnVertex( pVtx, True, False )
+    
+    cubeObj.addAttr( 'size', dv=1, k=1 )
+    
+    cubeShape = cubeObj.getShape()
+    composeOffset = pymel.core.createNode( 'composeMatrix' )
+    composeScale  = pymel.core.createNode( 'composeMatrix' )
+    multMatrix = pymel.core.createNode( 'multMatrix' )
+    trGeo = pymel.core.createNode( 'transformGeometry' )
+    composeOffset.it.set( .5, .5, .5 )
+    cubeObj.size >> composeScale.isx
+    cubeObj.size >> composeScale.isy
+    cubeObj.size >> composeScale.isz
+    composeOffset.outputMatrix >> multMatrix.i[0]
+    composeScale.outputMatrix >> multMatrix.i[1]
+    cubeNode.output >> trGeo.inputGeometry
+    multMatrix.matrixSum >> trGeo.transform
+    trGeo.outputGeometry >> cubeShape.inMesh
+    
+    xDcmp = getDecomposeMatrix( getLocalMatrix( xFollicle, pFollicle ) )
+    yDcmp = getDecomposeMatrix( getLocalMatrix( yFollicle, pFollicle ) )
+    zDcmp = getDecomposeMatrix( getLocalMatrix( zFollicle, pFollicle ) )
+    
+    pFollicle = pymel.core.ls( pFollicle )[0]
+    cubeObj.size >> pFollicle.sx
+    cubeObj.size >> pFollicle.sy
+    cubeObj.size >> pFollicle.sz
+    
+    fbf = pymel.core.createNode( 'fourByFourMatrix' )
+    xDcmp.otx >> fbf.in00
+    xDcmp.oty >> fbf.in01
+    xDcmp.otz >> fbf.in02
+    yDcmp.otx >> fbf.in10
+    yDcmp.oty >> fbf.in11
+    yDcmp.otz >> fbf.in12
+    zDcmp.otx >> fbf.in20
+    zDcmp.oty >> fbf.in21
+    zDcmp.otz >> fbf.in22
+    pFollicle.tx >> fbf.in30
+    pFollicle.ty >> fbf.in31
+    pFollicle.tz >> fbf.in32
+    
+    newTr = pymel.core.createNode( 'transform' )
+    newTr.attr( 'dh').set( 1 )
+    newTr.attr( 'dla').set( 1 )
+    dcmp = pymel.core.createNode( 'decomposeMatrix' )
+    fbf.output >> dcmp.imat
+    
+    dcmp.outputTranslate >> newTr.t
+    dcmp.outputRotate  >> newTr.r
+    dcmp.outputScale  >> newTr.s
+    dcmp.outputShear >> newTr.sh
+    
+    pymel.core.select( newTr )
+    pymel.core.group( newTr, cubeObj, xFollicle, yFollicle, zFollicle, pFollicle )
+    
+    cmds.xform( cubeObj.name(), ws=1, matrix= cmds.getAttr( target + '.wm' ) )
+    
+    return newTr.name(), cubeObj.name()
     
     
     

@@ -405,7 +405,6 @@ def makeController( pointList, defaultScaleMult = 1, **options ):
 
 def createDefaultPropRig( propGrp ):
     
-    import pymel.core
     from sgModules import sgdata
     propGrp = pymel.core.ls( propGrp )[0]
     
@@ -478,6 +477,12 @@ def createDefaultPropRig( propGrp ):
     dcmp.outputRotate >> propGrp.r
     dcmp.outputScale >> propGrp.s
     dcmp.outputShear >> propGrp.sh
+    
+    propGrp.attr( 'rotatePivot' ).set( 0,0,0 )
+    propGrp.attr( 'scalePivot' ).set( 0,0,0 )
+
+
+
 
 
 def putControllerToGeo( target, points, multSize = 1.0 ):
@@ -520,3 +525,262 @@ def putControllerToGeo( target, points, multSize = 1.0 ):
     makeParent( targetCtl )
     
     return targetCtl
+
+
+
+def createSubCtl( ctl ):
+    
+    ctl = pymel.core.ls( ctl )[0]
+    ctlShape = ctl.getShape()
+    
+    newCtl = pymel.core.createNode( 'transform' )
+    pymel.core.parent( ctlShape, newCtl, shape=1, add=1 )
+    
+    pCtl = ctl.getParent()
+    if pCtl:
+        pNewCtl = pymel.core.createNode( 'transform' )
+        pymel.core.parent( newCtl, pNewCtl )
+        pCtl.t  >> pNewCtl.t
+        pCtl.r  >> pNewCtl.r
+        pCtl.s  >> pNewCtl.s
+        pCtl.sh >> pNewCtl.sh
+    
+    newCtl.t >> ctl.t
+    newCtl.r >> ctl.r
+    newCtl.s >> ctl.s
+    
+    ctlName = ctl.name()
+    ctl.rename( 'sub_' + ctlName )
+    newCtl.rename( ctlName )
+    
+    if pCtl:
+        pCtlName = pCtl.name()
+        pCtl.rename( 'sub_' + pCtlName )
+        pNewCtl.rename( pCtlName )
+        
+
+
+def getSourceConnection( srcObj, dstObj ):
+    
+    srcObj = pymel.core.ls( srcObj )[0]
+    dstObj = pymel.core.ls( dstObj )[0]
+    
+    for origCon, srcCon in srcObj.listConnections( s=1, d=0, p=1, c=1 ):
+        attr = origCon.attrName()
+        if not pymel.core.attributeQuery( attr, node=dstObj, ex=1 ): continue
+        srcCon >> dstObj.attr( attr )
+
+
+def copyShader( srcObj, dstObj ):
+    
+    srcObj = pymel.core.ls( srcObj )[0]
+    dstObj = pymel.core.ls( dstObj )[0]
+    
+    if srcObj.type() == 'transform':
+        srcObj = srcObj.getShape()
+    if dstObj.type() == 'transform':
+        dstObj = dstObj.getShape()
+    
+    shadingEngine = srcObj.listConnections( s=0, d=1, type='shadingEngine' )
+    if not shadingEngine:
+        cmds.warning( "%s has no shading endgine" % srcObj.name )
+        return None
+    cmds.sets( dstObj.name(), e=1, forceElement = shadingEngine[0].name() )
+
+
+
+def makeOutputMesh( meshTr ):
+    
+    meshTr = pymel.core.ls( meshTr )[0]
+    if meshTr.type() == 'mesh':
+        mesh = meshTr
+    else:
+        mesh = meshTr.getShape()
+    
+    if not mesh:
+        cmds.error( "%s is not mesh" % meshTr.name() )
+    
+    newMesh = pymel.core.createNode( 'mesh' )
+    mesh.outMesh >> newMesh.inMesh
+    
+    newMeshTr = newMesh.getParent()
+    newMeshTr.setMatrix( meshTr.getMatrix() )
+    
+    newMeshTr.rename( meshTr.shortName() + '_output' )
+    
+    copyShader( meshTr, newMeshTr )
+    
+    return newMeshTr.name()
+    
+
+    
+
+def reverseScaleByParent( target ):
+    
+    target = pymel.core.ls( target )[0]
+    targetP = target.getParent()
+    if not targetP: return None
+    
+    multNode = pymel.core.createNode( 'multiplyDivide' )
+    multNode.input1.set( 1,1,1 )
+    multNode.op.set( 2 )
+    
+    targetP.s >> multNode.input2
+    multNode.output >> target.s
+
+
+
+
+def getUVAtPoint( point, mesh ):
+    
+    if type( point ) in [ type([]), type(()) ]:
+        point = OpenMaya.MPoint( *point )
+    
+    meshShape = pymel.core.ls( mesh )[0].getShape().name()
+    fnMesh = OpenMaya.MFnMesh( getDagPath( meshShape ) )
+    
+    util = OpenMaya.MScriptUtil()
+    util.createFromList( [0.0,0.0], 2 )
+    uvPoint = util.asFloat2Ptr()
+    fnMesh.getUVAtPoint( point, uvPoint, OpenMaya.MSpace.kWorld )
+    u = OpenMaya.MScriptUtil.getFloat2ArrayItem( uvPoint, 0, 0 )
+    v = OpenMaya.MScriptUtil.getFloat2ArrayItem( uvPoint, 0, 1 )
+    
+    return u, v
+
+
+
+
+def createFollicleOnVertex( vertexName, ct= True, cr= False ):
+    
+    vtxPos = cmds.xform( vertexName, q=1, ws=1, t=1 )
+    mesh = vertexName.split( '.' )[0]
+    meshShape = pymel.core.ls( mesh )[0].getShape().name()
+    u, v = getUVAtPoint( vtxPos, mesh )
+    
+    follicleNode = cmds.createNode( 'follicle' )
+    follicle = cmds.listRelatives( follicleNode, p=1, f=1 )[0]
+    
+    cmds.connectAttr( meshShape+'.outMesh', follicleNode+'.inputMesh' )
+    cmds.connectAttr( meshShape+'.wm', follicleNode+'.inputWorldMatrix' )
+    
+    cmds.setAttr( follicleNode+'.parameterU', u )
+    cmds.setAttr( follicleNode+'.parameterV', v )
+    
+    if ct: cmds.connectAttr( follicleNode+'.outTranslate', follicle+'.t' )
+    if cr: cmds.connectAttr( follicleNode+'.outRotate', follicle+'.r' )
+    
+    return pymel.core.ls( follicle )[0]
+
+
+
+
+def getLocalMatrix( localTarget, parentTarget ):
+    
+    localTarget = pymel.core.ls( localTarget )[0]
+    parentTarget = pymel.core.ls( parentTarget )[0]
+    
+    def createLocalMatrix( localTarget, parentTarget ): 
+        multMatrixNode = pymel.core.createNode( 'multMatrix' )
+        
+        localTarget.wm >> multMatrixNode.i[0]
+        parentTarget.wim >> multMatrixNode.i[1]
+        return multMatrixNode
+    
+    multMatrixNodes = localTarget.worldMatrix.listConnections( d=1, s=0, type='multMatrix' )
+    for multMatrixNode in multMatrixNodes:
+        firstAttr = multMatrixNode.i[0].listConnections( s=1, d=0, p=1 )
+        secondAttr = multMatrixNode.i[1].listConnections( s=1, d=0, p=1 )
+        thirdConnection = multMatrixNode.i[2].listConnections( s=1, d=0 )
+        
+        if not firstAttr or not secondAttr or thirdConnection: continue
+        
+        firstEqual = firstAttr[0].node() == localTarget and firstAttr[0].attrName() in ["wm", "worldMatrix"]
+        secondEqual = secondAttr[0].node() == parentTarget and secondAttr[0].attrName() in ["wim", "worldInverseMatrix"]
+        
+        if firstEqual and secondEqual:
+            pymel.core.select( multMatrixNode )
+            return multMatrixNode
+    
+    return createLocalMatrix( localTarget, parentTarget )
+
+
+
+def getDecomposeMatrix( node ):
+    
+    if node.type() == 'multMatrix':
+        outputMatrixAttr = node.matrixSum
+    elif node.type() == 'transform':
+        outputMatrixAttr = node.worldMatrix
+
+    if outputMatrixAttr:
+        destNodes = pymel.core.listConnections( outputMatrixAttr, s=0, d=1, type='decomposeMatrix' )
+        if destNodes: return destNodes[0]
+        decomposeMatrixNode = pymel.core.createNode( 'decomposeMatrix' )
+        outputMatrixAttr >> decomposeMatrixNode.imat
+        return decomposeMatrixNode
+
+
+
+def getLocalDecomposeMatrix( localNode, worldNode ):
+    
+    return getDecomposeMatrix( getLocalMatrix( localNode, worldNode ) )
+
+
+
+def createFourByFourMatrixCube():
+    
+    cubeObj = cmds.polyCube( ch=0, o=1, cuv=4 )[0]
+    cmds.move( -0.5, -0.5, -0.5, cubeObj + '.scalePivot',  cubeObj + '.rotatePivot' )
+    cmds.move( 0, 0, 0, cubeObj, rpr=1 )
+    cmds.makeIdentity( cubeObj, apply=True, t=1 )
+    
+    xVtx = cubeObj + '.vtx[7]'
+    yVtx = cubeObj + '.vtx[4]'
+    zVtx = cubeObj + '.vtx[0]'
+    pVtx = cubeObj + '.vtx[6]'
+    
+    xFollicle = createFollicleOnVertex( xVtx, True, False )
+    yFollicle = createFollicleOnVertex( yVtx, True, False )
+    zFollicle = createFollicleOnVertex( zVtx, True, False )
+    pFollicle = createFollicleOnVertex( pVtx, True, False )
+    
+    cubeObj = pymel.core.ls( cubeObj )[0]
+    
+    xDcmp = getLocalDecomposeMatrix( xFollicle, pFollicle )
+    yDcmp = getLocalDecomposeMatrix( yFollicle, pFollicle )
+    zDcmp = getLocalDecomposeMatrix( zFollicle, pFollicle )
+    
+    fbf = pymel.core.createNode( 'fourByFourMatrix' )
+    xDcmp.otx >> fbf.in00
+    xDcmp.oty >> fbf.in01
+    xDcmp.otz >> fbf.in02
+    yDcmp.otx >> fbf.in10
+    yDcmp.oty >> fbf.in11
+    yDcmp.otz >> fbf.in12
+    zDcmp.otx >> fbf.in20
+    zDcmp.oty >> fbf.in21
+    zDcmp.otz >> fbf.in22
+    pFollicle.tx >> fbf.in30
+    pFollicle.ty >> fbf.in31
+    pFollicle.tz >> fbf.in32
+    
+    newTr = pymel.core.createNode( 'transform' )
+    newTr.attr( 'dh').set( 1 )
+    newTr.attr( 'dla').set( 1 )
+    dcmp = pymel.core.createNode( 'decomposeMatrix' )
+    fbf.output >> dcmp.imat
+    
+    dcmp.outputTranslate >> newTr.t
+    dcmp.outputRotate  >> newTr.r
+    dcmp.outputScale  >> newTr.s
+    dcmp.outputShear >> newTr.sh
+    
+    pymel.core.select( newTr )
+    return newTr.name(), cubeObj.name()
+    
+    
+    
+    
+    
+    

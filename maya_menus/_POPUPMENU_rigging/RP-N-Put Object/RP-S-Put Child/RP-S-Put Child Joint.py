@@ -3,7 +3,7 @@ from sgModules import sgcommands
 sels = sgcommands.listNodes( sl=1 )
 
 for sel in sels:
-    putTarget = sgcommands.putObject( [sel], 'joint' )
+    putTarget = sgcommands.convertSg( sgcommands.putObject( sel, 'joint' ) )
     sgcommands.parent( putTarget, sel )
     
     selName = sel.split('|')[-1]

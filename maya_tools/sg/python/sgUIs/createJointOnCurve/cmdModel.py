@@ -32,7 +32,6 @@ class CreateJointOnCurveSet:
         eachInfos = []
         
         for i in range( self._infoNum ):
-            
             info = cmds.createNode( 'pointOnCurveInfo', n= self._curveShape+'_info%d' % i )
             cmds.connectAttr( self._curveShape+'.local', info+'.inputCurve' )
             cmds.setAttr( info+'.parameter', eachParam*i + self._minParam )
@@ -83,7 +82,7 @@ def createJointOnCurve( numJoint, distanceNode = True ):
     returnTargets = []
     for sel in sels:
         
-        selCurve = cmds.listRelatives( sel, s=1 )
+        selCurve = cmds.listRelatives( sel, s=1, f=1 )
         
         if not selCurve: continue
         

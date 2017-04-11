@@ -1,0 +1,27 @@
+global proc AEsgWobbleCurveTemplate( string $nodeName )
+{
+	editorTemplate -beginScrollLayout;
+		editorTemplate -beginLayout "Input" -collapse false;
+
+			editorTemplate -addControl "aimMatrix";
+			editorTemplate -addControl "inputCurveMatrix";
+			editorTemplate -addControl "aimIndex";
+			editorTemplate -suppress   "inputCurve";
+			editorTemplate -addControl "waves";
+			editorTemplate -addControl "waveOptions";
+
+		editorTemplate -endLayout;
+
+		AEaddRampControl ($nodeName + ".fallOff");
+
+		editorTemplate -beginLayout "Animation Input" -collapse false;
+			editorTemplate -addControl "time";
+			editorTemplate -addControl "startFrame";
+		editorTemplate -endLayout;
+
+		editorTemplate -suppress "outputCurve";
+
+	AEdependNodeTemplate $nodeName;
+	editorTemplate -addExtraControls;
+	editorTemplate -endScrollLayout;
+}

@@ -1,0 +1,12 @@
+import maya.cmds as cmds
+import sgBRig_controller
+
+reload( sgBRig_controller )
+
+sels = cmds.ls( sl=1 )
+ctls = []
+for sel in sels:
+    ctl = sgBRig_controller.createControllerOnTarget( sel )
+    ctls.append( ctl )
+
+cmds.select( ctls )

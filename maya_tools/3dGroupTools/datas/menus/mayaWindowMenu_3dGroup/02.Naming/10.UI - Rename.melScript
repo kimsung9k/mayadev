@@ -1,0 +1,671 @@
+
+//-----------------------------------------------------------------------------
+// Copyright (C) 2011 Dushyant Kumar Kashyap
+//
+// MEL script for MAYA 8.0+
+//
+// File:	comprehensiveRenamer.mel
+//
+// Desc:	This is a simple mel script that allows the user to rename multiple Objects. 
+//				With lots-n-lots of options.
+//
+// Author:	Dushyant Kumar Kashyap (dushyantk@gmail.com)
+//					http://programmerslimbo.blogspot.com/
+// Usages:  Just Source Script, it will call the required procedure automatically.
+//-----------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------
+// Main Script:
+//-----------------------------------------------------------------------------
+		
+		
+global proc pgl_renameMultiObjects ()
+{
+	
+	if (`checkBox -q -v replaceStr_chk`){
+		pgl_Replace();
+	}
+	
+	if (`checkBox -q -v insertStr_1_chk`){
+		insertStringProc();
+	}
+	
+	if (`checkBox -q -v makeChange_chk`){
+		if (`radioButton -q -sl replaceCurr`){
+				
+				int $i ,
+       		$startIndex = `textFieldGrp -query -text pgl_renameMultiObjects_startIndex` ,
+       		$stepSize   = `textFieldGrp -query -text pgl_renameMultiObjects_stepSize` ;
+
+		   	string $sel[]   = `ls -selection` ,
+		         	 $newName = `textField -query -text newName_1_string` ;
+		         	 
+			if(`radioButton -q -sl MYamRenamer2TargetHierarchyRB`) {
+				rename $sel[0] $newName;
+				string $children[] = sort(`listRelatives -ad -type transform $newName`);
+				
+				for($i = 0; $i < size($children); $i++) {
+					rename $children[$i] ( $newName + ( $stepSize * $i + $startIndex )) ;
+				}
+			}
+			else if (`radioButton -q -sl MYamRenamer2TargetSelectedRB`) {
+				for ( $i = 0 ; $i < size ( $sel ) ; $i++ )
+		     		rename $sel[$i] ( $newName + ( $stepSize * $i + $startIndex )) ;
+		   }
+		}
+	}
+    if (`radioButton -q -sl beforeCurr`){
+	    		
+	    		int $i ,
+	       	$startIndex = `textFieldGrp -query -text pgl_renameMultiObjects_startIndex` ,
+	       	$stepSize   = `textFieldGrp -query -text pgl_renameMultiObjects_stepSize` ;
+	
+			   	string $sel[]   = `ls -selection` ,
+			         	 $newName = `textField -query -text newName_1_string` ;
+			if(`radioButton -q -sl MYamRenamer2TargetHierarchyRB`) {
+				rename $sel[0] ($newName + "_" + $sel[0]);
+				string $children[] = sort(`listRelatives -ad -type transform ($newName + "_" + $sel[0])`);
+				
+				for($i = 0; $i < size($children); $i++) {
+					rename $children[$i] ( $newName + "_" + $children[$i] );
+				}
+			}
+			else if (`radioButton -q -sl MYamRenamer2TargetSelectedRB`) {
+				for ( $i = 0 ; $i < size ( $sel ) ; $i++ )
+			   		rename $sel[$i] ( $newName + ( $stepSize * $i + $startIndex ) + "_" + $sel[$i] );
+			}
+		  //for ( $obj in $sel ){
+		  //		$newName2 = `textField -query -text newName_1_string` + "_" + $obj ;
+		  //    rename $obj $newName2;
+    	//}
+    }
+    if (`radioButton -q -sl afterCurr`){
+    	int $i ,
+	       	$startIndex = `textFieldGrp -query -text pgl_renameMultiObjects_startIndex` ,
+	       	$stepSize   = `textFieldGrp -query -text pgl_renameMultiObjects_stepSize` ;
+		   	string $sel[] = `ls -selection` ,
+	        $newName = `textField -query -text newName_1_string`;
+
+		if(`radioButton -q -sl MYamRenamer2TargetHierarchyRB`) {
+				rename $sel[0] ($sel[0] + "_" + $newName);
+				string $children[] = sort(`listRelatives -ad -type transform ($sel[0] + "_" + $newName)`);
+				
+				for($i = 0; $i < size($children) ;$i++) {
+					rename $children[$i] ( $children[$i] + "_" + $newName);
+				}
+			}
+			else if (`radioButton -q -sl MYamRenamer2TargetSelectedRB`) {
+			   	for ( $i = 0 ; $i < size ( $sel ) ; $i++ )
+			     	 rename $sel[$i] ( $sel[$i] + "_" + $newName);
+			}
+	}
+}
+
+global proc altriCheck_1(int $val)
+{
+string $listaText[] = 	{
+				"newName_1" 
+				};
+for ($k in $listaText){
+	text -e   -enable $val $k;
+	}
+
+string $listaTextFields[] = 	{
+				"newName_1_string" 
+				};
+for ($k in $listaTextFields){
+	textField -e   -enable $val $k;
+	textField -e -text ( `ls -head 1 -selection` ) $k;
+	}
+
+string $listaRadioFields[] = 	{
+				"replaceCurr",
+				"beforeCurr",
+				"afterCurr"
+				};
+for ($k in $listaRadioFields){
+	radioButton -e   -enable $val $k;
+	}
+
+checkBox -e -v 0 insertStr_1_chk;
+checkBox -e -v 0 replaceStr_chk;
+altriCheck_2_2 0;
+altriCheck_4_2 0;		
+}
+
+global proc altriCheck_1_2(int $val)
+{
+string $listaText[] = 	{
+				"newName_1" 
+				};
+for ($k in $listaText){
+	text -e   -enable $val $k;
+	}
+
+string $listaTextFields[] = 	{
+				"newName_1_string" 
+				};
+for ($k in $listaTextFields){
+	textField -e   -enable $val $k;
+	}
+
+string $listaRadioFields[] = 	{
+				"replaceCurr", 
+				"beforeCurr", 
+				"afterCurr"
+				};
+for ($k in $listaRadioFields){
+	radioButton -e   -enable $val $k;
+	}
+}
+
+global proc altriCheck_2(int $val)
+{
+
+string $listaText[] = 	{
+				"newName_2" 
+				};
+for ($k in $listaText){
+	text -e   -enable $val $k;
+	}
+string $listaRadioButtons[] = 	{
+				"beforeStr" ,
+				"afterStr" 
+				};
+for ($k in $listaRadioButtons){
+	radioButton -e   -enable $val $k;
+	}		
+string $listaTextFields[] = 	{
+				"newName_2_string", 
+				
+				"insertStrThis"
+				};
+for ($k in $listaTextFields){
+	textField -e   -enable $val $k;
+	}
+
+checkBox -e -v 0 makeChange_chk;
+checkBox -e -v 0 replaceStr_chk;
+altriCheck_1_2 0;
+altriCheck_4_2 0;
+}
+
+global proc altriCheck_2_2(int $val)
+{
+
+string $listaText[] = 	{
+				"newName_2" 
+				};
+for ($k in $listaText){
+	text -e   -enable $val $k;
+	}
+string $listaRadioButtons[] = 	{
+				"beforeStr" ,
+				"afterStr" 
+				};
+for ($k in $listaRadioButtons){
+	radioButton -e   -enable $val $k;
+	}		
+string $listaTextFields[] = 	{
+				"newName_2_string", 
+				
+				"insertStrThis"
+				};
+for ($k in $listaTextFields){
+	textField -e   -enable $val $k;
+	}
+}
+
+global proc altriCheck_4(int $val)
+{
+
+string $listaText[] = 	{
+				"txtStr" ,
+				"txtWith"
+				};
+for ($k in $listaText){
+	text -e   -enable $val $k;
+	}
+
+string $listaTextFields[] = 	{
+				"pgl_ReplaceFromTF" ,
+				"pgl_ReplaceToTF"
+				};
+for ($k in $listaTextFields){
+	textField -e   -enable $val $k;
+	}
+
+	checkBox -e -v 0 makeChange_chk;
+	checkBox -e -v 0 insertStr_1_chk;
+	//checkBox -e -v 0 insertStr_2_chk;
+	altriCheck_1_2 0;
+	altriCheck_2_2 0;
+	//altriCheck_3_2 0;
+}
+
+global proc altriCheck_4_2(int $val)
+{
+
+string $listaText[] = 	{
+				"txtStr" ,
+				"txtWith"
+				};
+for ($k in $listaText){
+	text -e   -enable $val $k;
+	}
+
+string $listaTextFields[] = 	{
+				"pgl_ReplaceFromTF" ,
+				"pgl_ReplaceToTF"
+				};
+for ($k in $listaTextFields){
+	textField -e   -enable $val $k;
+	}
+}
+
+global proc pgl_renameMultiObjects_UI ()
+{
+
+   global string $mainWindow;
+   if ( `window -exists $mainWindow` )
+      deleteUI  -window $mainWindow ;
+      
+   if ( `windowPref -exists $mainWindow` )
+		windowPref -r $mainWindow;
+
+   $mainWindow = `window -resizeToFitChildren 1 
+   				-title "Rename Selected Objects " 
+   				-iconName "Rename"
+   				-widthHeight 540 525
+   				-s 0 
+   				pgl_renameMultiObjects_UI_adv` ;
+					   	
+					   	frameLayout -label "" -bs etchedIn;
+					 		frameLayout -label "Comprehensive Renamer: /" -bs etchedIn;
+					 		
+										columnLayout ;	
+										frameLayout -label "" -bs etchedIn;
+										rowColumnLayout -numberOfRows 1;		
+											text -label "renameTarget" pgl_TargetLabelTX;
+											radioCollection pgl_TargetRC;//////////////////////////////////////////////////////
+								      radioButton -label "Selection" -select MYamRenamer2TargetSelectedRB;
+								      radioButton -label "DAG Hierarchy" MYamRenamer2TargetHierarchyRB;
+										setParent ..;		setParent ..;		
+										
+								 		columnLayout -adjustableColumn true -rowSpacing 10; //<<Start>>
+								 		
+										 		frameLayout -label "Basic Operations" -bs out;
+													rowColumnLayout -numberOfRows 5;
+													checkBox -label "Simply Rename" -v 0 	-onCommand "altriCheck_1 1" -offCommand "altriCheck_1 0" makeChange_chk;
+													string $lineBreak = `text -label "..." -width 300 `;	//Blank Line
+													//>>
+													rowLayout -numberOfColumns 3 -columnWidth3 80 60 300 ;
+													string $lineBreak = `text -label "" -width 30 `;	//Blank Space
+									        text -label "New Name" -enable 0 newName_1;
+									        textField -w 250 -enable 0 newName_1_string;
+													setParent ..;																			//<<End
+													//<<
+													//>>
+													rowColumnLayout -numberOfRows 1;									//::Start
+													string $lineBreak = `text -label "" -width 80 `;	//Blank Space
+													radioCollection;
+														radioButton -label "Replace current name" -enable 0 -onCommand "" -sl replaceCurr;
+														radioButton -label "Add Before (i.e. prefix)" -enable 0 -onCommand ""  beforeCurr;
+														radioButton -label "Add After (i.e. suffix)" -enable 0 -onCommand "" afterCurr;
+													setParent ..;																			//::End
+													//<<
+													//>>
+													rowColumnLayout -numberOfRows 1;									//::Start
+													string $lineBreak = `text -label "" -width 80 `;	//Blank Space
+													textFieldGrp -columnAlign2 "right" "left"  -enable 1 -columnWidth2 100 50 -label "Start Index" -text "1" pgl_renameMultiObjects_startIndex ;
+       										textFieldGrp -columnAlign2 "right" "right" -enable 1 -columnWidth2 100 50 -label "Step Size"   -text "1" pgl_renameMultiObjects_stepSize ;
+													setParent ..;																			//::End
+													//<<	
+										
+										
+										setParent ..; setParent ..;													//<<End>>
+
+	  columnLayout -adjustableColumn true -rowSpacing 10; //Start
+	  		frameLayout -label "Advance Operations" -bs out;
+	  		rowColumnLayout -numberOfRows 9;
+													checkBox -label "Insert String" -onCommand "altriCheck_2 1" -offCommand "altriCheck_2 0" insertStr_1_chk;
+													//>>
+															rowLayout -numberOfColumns 5 -columnWidth5 80 60 300 45 110;
+															string $lineBreak = `text -label "" -width 30 `;	//Blank Space
+											        text -label "      String:" -enable 0 newName_2;
+											        textField -w 250 -enable 0 newName_2_string ;
+															setParent .. ; //<<
+													//checkBox -label "Insert String" -onCommand "altriCheck_3 1" -offCommand "altriCheck_3 0" insertStr_2_chk;
+													//>>
+															rowLayout -numberOfColumns 6 -columnWidth6 110 60 60 160 80 60;
+															string $lineBreak = `text -label "" -width 30 `;	//Blank Space
+											        radioCollection;
+																radioButton -label "  Before" -onCommand "" -enable 0 -sl beforeStr;
+																radioButton -label "  After" -onCommand ""  -enable 0 afterStr;
+											        textField -w 130 -enable 0 -text "This String" insertStrThis ;
+											        //radioButton -label "at pos #" -onCommand ""  -enable 0 atPos;
+											        //textField -w 35 -enable 0 atPosStr ;
+															setParent .. ; 
+															string $lineBreak = `text -label "" -width 300 `;	//Blank Line
+															separator ;
+															//>>
+															rowLayout -numberOfColumns 5 -columnWidth5 140 40 180 40 140;
+															checkBox -label "Replace" -onCommand "altriCheck_4 1" -offCommand "altriCheck_4 0" replaceStr_chk;
+											        text -label "String:"  -enable 0 txtStr;//////////////////////////
+											        textField -w 170 -enable 0 pgl_ReplaceFromTF ;
+											        text -label "with:" -enable 0 txtWith;
+											        textField -w 120 -enable 0 pgl_ReplaceToTF ;
+															setParent .. ; 
+															setParent .. ; 
+													
+													
+													
+				
+        setParent .. ; setParent .. ; 
+	      frameLayout -label "Rename it.." -bs out;
+			      rowLayout 
+			         -numberOfColumns 5 
+			         -columnWidth5 110 110 110 110 110;
+								
+								string $lineBreak = `text -label "" -width 10 `;	//Blank Space
+			        	button -label "Rename" -width 110 -align "left" -command "pgl_renameMultiObjects ; deleteUI -window pgl_renameMultiObjects_UI_adv" ;
+				      	button -label "Apply" -width 110 -align "left" -command "pgl_renameMultiObjects" ;
+				      	button -label "Close" -width 110 -align "left" -command "deleteUI -window pgl_renameMultiObjects_UI_adv" ;
+								string $lineBreak = `text -label "" -width 80 `;	//Blank Space
+								setParent .. ;
+								setParent .. ;
+
+	 columnLayout -adj 1;
+		//image -image "D:/MEL Scripts/renameImg.jpg" -w 520 -h  65 ;
+		text -l "http://programmerslimbo.blogspot.com/" -al "center";
+   showWindow $mainWindow ;
+}
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////		
+proc string getReplaceFrom()
+{
+  return ( `textField -q -text pgl_ReplaceFromTF` );
+}
+
+proc string getReplaceTo()
+{
+  return ( `textField -q -text pgl_ReplaceToTF` );
+}
+proc string getRenameTarget()
+{
+  return ( `radioCollection -q -select pgl_TargetRC` );
+}
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////		
+global proc pgl_Replace()
+{
+  //  Global Variable  //
+  // none //
+	
+  //  Private Variable  //
+  string $renameTarget = getRenameTarget();
+
+  string $replaceFrom = getReplaceFrom();
+  string $replaceTo = getReplaceTo();
+
+  string $selectedItemArray[];
+  string $selectedItemChildArray[];
+  string $renameTargetArray[];
+  string $tokenizedRenameTargetArray[];
+  string $newNameArray[];
+  string $renamedStringArray[];
+
+  string $overlappedNameArray[];
+
+  //  Clear Array  //
+  // none //
+
+  //  Process  //
+  switch($renameTarget)
+  {
+    case "MYamRenamer2TargetSelectedRB" :
+    {
+      // make rename target array
+      $renameTargetArray = `ls -selection -long`;
+
+      // make rename string array
+      for( $i = 0 ; $i < ( size( $renameTargetArray ) ) ; $i++ )
+      {
+        tokenize ( $renameTargetArray[$i] ) "|" $tokenizedRenameTargetArray;
+        $newNameArray[$i] = ( `substitute ( $replaceFrom ) ( $tokenizedRenameTargetArray[ ( size( $tokenizedRenameTargetArray ) -1 ) ] ) ( $replaceTo )` );
+      }
+
+      // Rename from child side.
+      // Usually, list starts from parent side.
+      // But if change parent node name, then can't search children nodes.
+      // If list was started from parent side, then reverse list for rename safely.
+      $renamedStringArray = MYamCL_renameArrayFellow( MYamCL_reverseOrderStringArray( $renameTargetArray ) ,
+                                                      MYamCL_reverseOrderStringArray( $newNameArray ) );
+
+      // overlap check and show results
+      $overlappedNameArray = MYamCL_checkOverlap( $renamedStringArray );
+      print "It's Done dude";
+
+      break;
+    };
+
+    case "MYamRenamer2TargetHierarchyRB" :
+    {
+	print "Loop\n";
+      // make rename target array
+      $selectedItemArray = `ls -selection -long`;
+      string $object[] = `ls -sl`;
+
+      if( 1 != ( size( $selectedItemArray ) ) )
+      {
+        error ( "Selection is not one item. please select one DAG object." );
+      }
+	clear($renameTargetArray);
+      $renameTargetArray = `listRelatives -ad -type transform $object[0]`;
+      
+//*********************************************************************
+// my code
+//*********************************************************************
+
+      for ($i = 0; $i < size ($renameTargetArray); $i++)
+      {
+		print ($renameTargetArray[$i] + "\n");
+      		string $subString = `substitute $replaceFrom $renameTargetArray[$i] $replaceTo`;
+      		rename $renameTargetArray[$i] $subString;
+      }
+	string $subString = `substitute $replaceFrom $object[0] $replaceTo`;
+	rename $object[0] $subString;
+//**********************************************************************
+
+      // make rename string array
+//      for( $i = 0 ; $i < ( size( $renameTargetArray ) ) ; $i++ )
+//     {
+//     		tokenize ( $renameTargetArray[$i] ) "|" $tokenizedRenameTargetArray;
+//        $newNameArray[$i] = ( `substitute ( $replaceFrom ) ( $tokenizedRenameTargetArray[ ( size( $tokenizedRenameTargetArray ) -1 ) ] ) ( $replaceTo )` );
+//      }
+
+// Rename from child side.
+// Usually, list starts from parent side.
+// But if change parent node name, then can't search children nodes.
+// If list was started from parent side, then reverse list for rename safely.
+// And function "MYamCL_renameArrayFellow" returns result new names.
+//      $renamedStringArray = MYamCL_renameArrayFellow( MYamCL_reverseOrderStringArray( $renameTargetArray ) ,
+//                                                      MYamCL_reverseOrderStringArray( $newNameArray ) );
+
+//      // overlap check and show results
+//      $overlappedNameArray = MYamCL_checkOverlap( $renamedStringArray );
+//      showResults( sort( MYamCL_toUniqueElementStringArray( $overlappedNameArray ) ) );
+
+      break;
+    };
+
+    default : { break; };
+  }
+
+  //  Return Variable  //
+  // none //
+}
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////		
+global proc string[] MYamCL_renameArrayFellow( string $beforeItemArray[] , string $afterItemArray[] )
+{
+  //  Global Variable  //
+  // none //
+
+  //  Private Variable  //
+  string $renamedItemNameArray[];
+
+  //  Clear Array  //
+  // none //
+
+  //  Pre check input variable  //
+  int $beforeItemLength = size( $beforeItemArray );
+  int $afterItemLength = size( $afterItemArray );
+
+  if( !( ( $beforeItemLength == $afterItemLength ) && ( $beforeItemLength > 0 ) ) )
+  {
+    error ( "input value has problems.\n" );
+  }
+
+  //  Process  //
+  for( $i = 0 ; $i < $beforeItemLength ; $i++ )
+  {
+    $renamedItemNameArray[$i] = `rename $beforeItemArray[$i] $afterItemArray[$i]`;
+  }
+
+  //  Return Variable  //
+  return $renamedItemNameArray;
+}
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+global proc insertStringProc()
+{
+			if (`radioButton -q -sl afterStr`){
+		  		int $i ;
+				string $selection[] = `ls -sl`;
+				string $rString = `textField -query -text newName_2_string`;
+				print $rString;
+				print "->new \n";
+				string $existingString = `textField -query -text insertStrThis`;
+				print $existingString;
+				print "-> exe\n";
+				string $finalString = $existingString + "_" + $rString;
+				print $finalString;
+				print "\n";
+				
+				if(`radioButton -q -sl MYamRenamer2TargetHierarchyRB`) {
+					string $s2;
+					string $children[] = `listRelatives -ad -type transform $selection[0]`;
+					for($i = 0; $i < size($children); $i++ ) {
+						$s2 = `substitute $existingString $children[$i] $finalString`;
+						print $s2;
+						print "\n";
+						rename $children[$i] $s2;
+					}
+					$s2 = `substitute $existingString $selection[0] $finalString`;
+					rename $selection[0] $s2;
+				}
+				else if (`radioButton -q -sl MYamRenamer2TargetSelectedRB`) {
+					for ( $i = 0 ; $i < size ( $selection ) ; $i++ ) {
+						size ($selection[$i]);
+						string $s2 = `substitute $existingString $selection[$i] $finalString`;
+						print $s2;
+						print "\n";
+						rename $selection[$i] $s2 ;
+		  		}
+		   }
+		}
+		   
+		   if (`radioButton -q -sl beforeStr`){
+		       int $i ;
+			   string $selection[] = `ls -sl`;
+			   string $rString = `textField -query -text newName_2_string` ;
+			   print $rString;
+			   print "->new \n";
+			   string $existingString = `textField -query -text insertStrThis` ;
+               print $existingString;
+				print "-> exe\n";
+				string $finalString = $rString + "_" + $existingString;
+				print $finalString;
+				print "\n";
+				
+				if(`radioButton -q -sl MYamRenamer2TargetHierarchyRB`) {
+					string $s2;
+					string $children[] = `listRelatives -ad -type transform $selection[0]`;
+					for($i = 0; $i < size($children); $i++ ) {
+						$s2 = `substitute $existingString $children[$i] $finalString`;
+						print $s2;
+						print "\n";
+						rename $children[$i] $s2 ;
+					}
+					$s2 = `substitute $existingString $selection[0] $finalString`;
+					rename $selection[0] $s2;
+				}
+				else if (`radioButton -q -sl MYamRenamer2TargetSelectedRB`) {
+					for ( $i = 0 ; $i < size ( $selection ) ; $i++ ){
+						size ($selection[$i]);
+						string $s2 = `substitute $existingString $selection[$i] $finalString`;
+						print $s2;
+						print "\n";
+						rename $selection[$i] $s2 ;
+					}
+				}
+		   }
+  //  Return Variable  //
+  // none //
+}
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////		
+global proc string[] MYamCL_reverseOrderStringArray( string $inputStringArray[] )
+{
+  //  Global Variable  //
+  // none //
+
+  //  Private Variable  //
+  string $reversedStringArray[];
+
+  //  Process  //
+  for( $i = ( ( size( $inputStringArray ) ) -1 ) ; $i >= 0 ; $i-- )
+  {
+    $reversedStringArray[$i] = $inputStringArray[ ( size( $inputStringArray ) - ( $i + 1 ) ) ];
+  }
+
+  //  Return Variable  //
+  return $reversedStringArray;
+}
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////		
+global proc string[] MYamCL_checkOverlap( string $toCheckNameArray[] )
+{
+  //  Global Variable  //
+  // none //
+
+  //  Private Variable  //
+  string $tokenizedToCheckName[];
+  string $overlappedItems[];
+  string $sortedOverlappedItems[];
+  string $results[];
+
+  //  Clear Array  //
+  // none //
+
+  //  Process  //
+  for( $toCheckName in $toCheckNameArray )
+  {
+    tokenize $toCheckName "|" $tokenizedToCheckName;
+
+    $overlappedItems = `ls -long $tokenizedToCheckName[ ( size( $tokenizedToCheckName ) -1 )]`;
+
+    if( 2 <= size( $overlappedItems ) )
+    {
+      for( $overlappedItem in $overlappedItems )
+      {
+         $results[( size( $results ) )] = ( $tokenizedToCheckName[ ( size( $tokenizedToCheckName ) -1 )] + " <-> " + $overlappedItem );
+      }
+    }
+  }
+
+  //  Return Variable  //
+  return $results;
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////		
+pgl_renameMultiObjects_UI ();
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////;

@@ -1,0 +1,109 @@
+//  Copyright (c) 2006-2010 Felix Ulber
+//
+//  Creation Date:	March 7, 2006
+//  Last Change:	November 30, 2010
+//
+//  Procedure Name:
+//	AEwobbleTemplate
+//
+//  Description Name;
+//	Creates the attribute editor controls for the wobble deformer Node
+//
+//  Input Value:
+//	nodeName
+//
+//  Output Value:
+//	None
+//
+
+
+global proc AEwobbleTemplate ( string $nodeName )
+{
+	editorTemplate -beginScrollLayout;
+	editorTemplate -beginLayout "Noise Deformer Attributes" -collapse false;
+
+      editorTemplate -addControl "noiseType";
+      editorTemplate -addControl "periodic" "togglePeriods";
+	   editorTemplate -addControl "Strength";
+      editorTemplate -addSeparator;
+	   editorTemplate -addControl "spaceFrequency";
+	   editorTemplate -addControl -label "Space Frequency Scale" "freqScale";
+      editorTemplate -addControl "spaceOffset";
+	   editorTemplate -addControl "timeFrequency";
+	   editorTemplate -addControl "periodsSpace";
+      editorTemplate -addControl "periodsTime";
+      editorTemplate -addSeparator;
+
+      editorTemplate -addControl "deformMode";
+      editorTemplate -addControl "deformationSpace";
+      editorTemplate -addControl "deformDirection";
+
+    	editorTemplate -suppress "deformerData";
+     	editorTemplate -suppress "deformSpace";
+     	editorTemplate -suppress "weightList";
+
+   editorTemplate -endLayout;
+
+   editorTemplate -beginLayout "Falloff Attributes" -collapse false;
+
+      editorTemplate -addControl "falloffType" "toggleFalloff";
+      editorTemplate -addControl "falloffDistance";
+      editorTemplate -addControl "falloffAmount";
+      editorTemplate -addControl "falloffInterpolation";
+      editorTemplate -addControl "inverseFalloff";
+      AEaddRampControl ($nodeName + ".falloffRamp");
+
+	editorTemplate -endLayout;
+
+	editorTemplate -beginLayout "Animation Input";
+
+	  editorTemplate -addControl "time";
+
+   editorTemplate -endLayout;
+
+  	AEgeometryFilterCommon $nodeName;
+
+	AEdependNodeTemplate $nodeName;
+
+	editorTemplate -addExtraControls;
+
+	editorTemplate -endScrollLayout;
+}
+
+global proc toggleFalloff ( string $nodeName )
+{
+      string	$btpAttrName = $nodeName + ".falloffType";
+   	int		$value = `getAttr $btpAttrName`;
+
+      if ($value == 0)
+      {
+         editorTemplate -dimControl $nodeName "falloffDistance" true;
+         editorTemplate -dimControl $nodeName "falloffAmount" true;
+         editorTemplate -dimControl $nodeName "falloffInterpolation" true;
+      }
+      else
+      {
+         editorTemplate -dimControl $nodeName "falloffDistance" false;
+         editorTemplate -dimControl $nodeName "falloffAmount" false;
+         editorTemplate -dimControl $nodeName "falloffInterpolation" false;
+      }
+}
+
+global proc togglePeriods ( string $nodeName )
+{
+      string	$btpAttrName = $nodeName + ".periodic";
+   	int		$value = `getAttr $btpAttrName`;
+
+      if ($value == 0)
+      {
+         editorTemplate -dimControl $nodeName "periodsSpace" true;
+         editorTemplate -dimControl $nodeName "periodsTime" true;
+
+      }
+      else
+      {
+         editorTemplate -dimControl $nodeName "periodsSpace" false;
+         editorTemplate -dimControl $nodeName "periodsTime" false;
+      }
+}
+

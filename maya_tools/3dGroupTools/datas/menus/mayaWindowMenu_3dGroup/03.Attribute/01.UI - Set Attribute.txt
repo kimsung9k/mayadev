@@ -1,0 +1,2 @@
+import sgUISetAttr 
+sgUISetAttr.Window().show()

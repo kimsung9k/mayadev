@@ -1,0 +1,18 @@
+import maya.cmds as cmds
+
+sels = cmds.ls( sl=1 )
+attrs = cmds.channelBox( 'mainChannelBox', q=1, sma=1 )
+
+if not sels or not attrs:
+    nodes = [ cmds.createNode( 'setRange' ) ]
+else:
+    target = sels[-1]
+    targetName = target.split( '|' )[-1]
+    
+    nodes = []
+    for attr in attrs:
+        setRangeNode = cmds.createNode( 'setRange', n= targetName+'_'+attr+'_setRange' )
+        cmds.connectAttr( target+'.'+attr, setRangeNode+'.valueX' )
+        nodes.append( setRangeNode )
+    
+    cmds.select( nodes )

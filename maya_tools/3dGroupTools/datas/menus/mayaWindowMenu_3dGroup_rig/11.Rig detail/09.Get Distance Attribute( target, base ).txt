@@ -1,0 +1,3 @@
+import sgBFunction_rigObject
+sels = cmds.ls( sl=1 )
+sgBFunction_rigObject.getDistanceAttribute( sels[0], sels[1] )

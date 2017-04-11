@@ -1,0 +1,248 @@
+//--------------------------------------------------------------------------------------------------------------
+//	SCRIPT:	blendShapeTools
+//	AUTHOR:	Praveen V, Sr.Rigging Artist, Paprikaas Animation Studio, Bangalore
+//	E-Mail:	praveenact@yahoo.com
+//
+// This script is used to Rename, Delete, Replace BlendShape Targets.
+//
+// Use: blendShapeTools_Win.
+//---------------------------------------------------------------------------------------------------------------
+
+
+global proc blendShapeTools_Win()
+{
+if(`window -exists blendNameChange_Win1`)
+deleteUI -window blendNameChange_Win1;
+
+window -t "Blend Shape Tools Window " blendNameChange_Win1;
+
+columnLayout -adj 1;
+
+separator -h 10 -style "singleDash";
+text -l " ---------------  Blend Shape Tools  --------------- ";
+separator -h 10 -style "singleDash";
+
+textField ChannelTxt;
+
+rowLayout -numberOfColumns 2 -columnWidth2 135 135;
+button -bgc 90 64 128 -w 135 -l "      --------  Prefix  -------" -c "blendNameChange prefix";
+button -bgc 90 64 128 -w 127 -l "      --------  Sufix  -------" -c "blendNameChange sufix";
+setParent..;
+
+button -bgc 90 64 128 -l "---------------   Rename Target  ---------------" -c "blendNameChange rename";
+button -bgc 90 64 128 -l "---------------    Delete Target    ---------------" -c "vp_BlendTargetDel 1";
+button -bgc 90 64 128 -l "---------------   Replace Target  ---------------" -c "vp_BlendTargetDel 2";
+
+rowLayout -numberOfColumns 2 -columnWidth2 50 220;
+textField -en 1 -w 50 TargetDis;
+button -bgc 90 64 128 -w 212 -l"         -------------  Add In-between  ------------ " -c "vp_BlendTargetDel(0)";
+setParent..;
+
+separator -height 10 -style "singleDash";
+text " Geo Mirror Script 4 UnSymentrical Objects";
+separator -height 10 -style "singleDash";
+
+string $toPass2 = "";
+
+rowLayout -numberOfColumns 2 -columnWidth2 135 135;
+button -bgc 90 64 128 -w 135 -l "      -- Select Base --"  -c "string $toPass2 = `vp_flipGeo1`" butRename;
+button -bgc 90 64 128 -w 127 -l "      -- Gen Flip Targets --"  -c "vp_flipGeo2 $toPass2";
+setParent..;
+
+window -e -w 270 -h 254 -s 0 blendNameChange_Win1;
+showWindow blendNameChange_Win1;
+}
+
+blendShapeTools_Win();
+
+
+global proc blendNameChange(string $modQuery)
+{
+
+string $nameQuery[] = `ls -sl`;
+string $channelQuery[] = `channelBox -q -sha mainChannelBox`;
+string $inputQuery = `textField -q -tx ChannelTxt`;
+
+if ($modQuery == "rename")
+{
+if (`size $channelQuery` <= 1)
+	aliasAttr $inputQuery ($nameQuery[0]+"."+$channelQuery[0]);
+	
+else
+	warning "  ------------->   Please Select one Atribute to Rename";
+}
+
+if ($modQuery == "prefix")
+{
+	for($objChannel in $channelQuery)
+		aliasAttr ($inputQuery+$objChannel) ($nameQuery[0]+"."+$objChannel);
+}
+
+if ($modQuery == "sufix")
+{
+	for($objChannel in $channelQuery)
+		aliasAttr ($objChannel+$inputQuery) ($nameQuery[0]+"."+$objChannel);
+}
+}
+
+
+global proc vp_BlendTargetDel (int $check)
+{
+string $nameQuery[] = `ls -sl`;
+string $channelQuery[] = `channelBox -q -sha mainChannelBox`;
+string $blendTargetT[] = `aliasAttr -q $nameQuery[0]`;
+string $blendTarget[];
+int $bit=0, $blendtargetNo=0 ;
+
+while ($blendTargetT[$blendtargetNo] != $channelQuery[0])
+	$blendtargetNo++;
+	
+
+
+string $blendtarget2Dis1[];
+
+tokenize $blendTargetT[$blendtargetNo+1] "[]" $blendtarget2Dis1;
+
+//int $induxNo = $blendtarget2Dis1[1];
+$blendtargetNo = $blendtarget2Dis1[1];
+//$blendtargetNo = $blendtargetNo+1;
+
+if ($check == 0)
+{
+
+if (`size $channelQuery` <= 1)
+{		
+float $inBwn = `textField -q -tx TargetDis`;
+blendShape -e -tc 0 -ib -t $nameQuery[2] $blendtargetNo $nameQuery[1] $inBwn $nameQuery[0];
+warning ("--------->    Selected Target Mesh is added as inbetween at  -------     "+$inBwn);
+
+}
+else
+	warning "  ------------->   Please Select one Atribute to Add InBetween";
+}
+
+if ($check ==1)
+{
+if (`size $channelQuery` <= 1)
+{		
+	polySphere -n temp2Del;
+
+	int $j, $jSiz;
+	$jSiz = vp_blendGrpElements($nameQuery[0]);
+	
+	for ($j=0; $j<=$jSiz; $j++)
+	{
+	for ($i=5000; $i<=6000; $i=$i+100)
+		{
+			connectAttr -f temp2DelShape.worldMesh[0] ($nameQuery[0]+".inputTarget["+$j+"].inputTargetGroup["+($blendtargetNo)+"].inputTargetItem["+$i+"].inputGeomTarget");
+		}
+	}
+	blendShape -e -rm -t $nameQuery[1] $blendtargetNo temp2Del 1;
+
+	delete temp2Del;
+
+	warning "----------->  The Selected Target is deleted ";
+}
+else
+	warning "  ------------->   Please Select one Atribute to Delete";
+}
+
+
+if ($check == 2)
+{
+if (`size $channelQuery` <= 1)
+{		
+	select $nameQuery[1];
+	string $newObjName1[] = `pickWalk -d "down"`;
+	connectAttr -f ($newObjName1[0]+".worldMesh[0]") ($nameQuery[0]+".inputTarget[0].inputTargetGroup["+($blendtargetNo)+"].inputTargetItem[6000].inputGeomTarget");
+
+	warning "----------->  The Selected Target is Changed ";
+}
+else
+	warning "  ------------->   Please Select one Atribute to Replace The Target Mesh";
+}
+}
+
+
+
+global proc int vp_blendGrpElements(string $blndNm)
+{
+string $conObj[];
+clear $conObj;
+string $conObjTemp[] = `listConnections $blndNm`;
+int $x = 0,$y=0;
+
+for ( $obj in $conObjTemp)
+	{
+	if (`objectType -i "transform" $obj`)
+		{
+		$conObj[$x] = $obj;
+		$x++;
+		}
+	}
+
+for ($obj in $conObj)
+	{
+	string $hisCheck[] = `listHistory $obj`;
+
+	for ($obj1 in $hisCheck)
+	{		
+	if (`objectType -i "blendShape" $obj1` && $obj1 == $blndNm)
+		$y++;
+	}
+	}
+return $y;
+}
+
+
+global proc string vp_flipGeo1()
+{
+string $ShpMir[] = `ls -sl`;
+button -e -bgc .864 1 .666 -w 135 -l ("        --  "+$ShpMir[0]+"  --") butRename;
+return $ShpMir[0];
+}
+
+
+global proc vp_flipGeo2 (string $inptShape)
+{
+if ($inptShape == "")
+	warning "-------->    Please Select Base Mesh ";
+	
+else
+{
+if (`objExists Temp2del`)
+	delete Temp2del;
+	
+if (`objExists Temp2delBase`)
+	delete Temp2delBase;
+	
+string $TarShpMir[] = `ls -sl`;
+
+for ($obj in $TarShpMir)
+{
+duplicate -n "Temp2del" $inptShape;
+setAttr -l 0 "Temp2del.tx"; setAttr -l 0 "Temp2del.ty"; setAttr -l 0 "Temp2del.tz";
+setAttr -l 0 "Temp2del.rx"; setAttr -l 0 "Temp2del.ry"; setAttr -l 0 "Temp2del.rz";
+setAttr -l 0 "Temp2del.sx"; setAttr -l 0 "Temp2del.sy"; setAttr -l 0 "Temp2del.sz";
+
+delete `parentConstraint $obj Temp2del`;
+float $ShpMirTmp = `getAttr ($obj+".tx")`;
+setAttr Temp2del.tx ($ShpMirTmp-1);
+string $TmpString1[] = `duplicate -n ($obj+"_Mirrored") Temp2del`;
+
+string $blendtmp[] = `blendShape $obj Temp2del`;
+setAttr Temp2del.sx -1;
+
+select $TmpString1[0];
+select -add Temp2del;
+string $wrapTemp[] = `doWrapArgList "6" { "1","0","50", "2", "0", "0", "0" }`;
+setAttr ($wrapTemp[0]+".maxDistance") 50;
+
+setAttr ($blendtmp[0]+"."+$obj) 1;
+
+DeleteHistory `select $TmpString1[0]`;
+delete Temp2del;
+delete Temp2delBase;
+}
+}
+}

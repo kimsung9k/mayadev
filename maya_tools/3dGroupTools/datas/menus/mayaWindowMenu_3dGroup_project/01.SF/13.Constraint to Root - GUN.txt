@@ -1,0 +1,16 @@
+import sgBFunction_dag
+import sgBFunction_connection
+
+topNodes = cmds.ls( tr=1 )
+moc = ''
+gunWorld = ''
+for node in topNodes:
+    if node.find( 'All_Moc' ) != -1:
+        moc = node
+    if node.find( 'Ctl_World' ) != -1:
+        gunWorld = node
+
+cmds.setAttr( moc+'.s', 1,1,1 )
+
+bodyRoot = 'Root_CTL'
+sgBFunction_connection.constraint( bodyRoot, gunWorld )

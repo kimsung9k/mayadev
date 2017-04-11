@@ -1,0 +1,2 @@
+import projectFunction.towerOfGod.view
+projectFunction.towerOfGod.view.Window().create()

@@ -1,0 +1,3 @@
+import sgBFunction_mesh
+sels = cmds.ls( sl=1 )
+sgBFunction_mesh.sgMeshSnap( sels[0], sels[1] )

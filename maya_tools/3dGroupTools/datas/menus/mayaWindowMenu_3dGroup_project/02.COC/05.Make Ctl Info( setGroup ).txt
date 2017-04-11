@@ -1,0 +1,25 @@
+import sgBFunction_dag
+import sgBFunction_attribute
+
+for sel in cmds.ls( sl=1 ):
+    ctls = cmds.listRelatives( sel, c=1, ad=1, f=1, type='transform' )
+    
+    for ctl in ctls:
+        if not cmds.nodeType( ctl ) in ['transform', 'joint']: continue
+        ctlShape = sgBFunction_dag.getShape( ctl )
+        if not ctlShape: continue
+        if cmds.nodeType( ctlShape ) == 'mesh': continue
+        ctlName = ctl.split( '|' )[-1]
+        
+        infoCtl = sgBFunction_dag.makeCloneObject( ctlName, '_ctlInfo' )
+        
+        ctlAttrs  = cmds.listAttr( ctl, k =1 )
+        udAttrs   = cmds.listAttr( ctl, ud=1 )
+        if not ctlAttrs: ctlAttrs = []
+        if udAttrs: ctlAttrs += udAttrs
+        for attr in ctlAttrs:
+            try:
+                attrValue = cmds.getAttr( ctl+'.' + attr )
+                sgBFunction_attribute.addAttr( infoCtl, ln=attr, k=1 )
+                cmds.setAttr( infoCtl+'.'+attr, attrValue )
+            except:pass

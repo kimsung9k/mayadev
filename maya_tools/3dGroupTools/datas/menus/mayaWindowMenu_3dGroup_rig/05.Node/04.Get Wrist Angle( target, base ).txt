@@ -1,0 +1,17 @@
+
+def getWristAngle( target, base ):
+    
+    mm = cmds.createNode( 'multMatrix' )
+    wa = cmds.createNode( 'wristAngle' )
+    
+    cmds.connectAttr( target+'.wm', mm+'.i[0]' )
+    cmds.connectAttr( base+'.wim',  mm+'.i[1]' )
+    cmds.connectAttr( mm+'.matrixSum', wa+'.inputMatrix' )
+    
+    return wa
+    
+
+sels = cmds.ls( sl=1 )
+
+wa = getWristAngle( sels[0], sels[1] )
+cmds.select( wa )

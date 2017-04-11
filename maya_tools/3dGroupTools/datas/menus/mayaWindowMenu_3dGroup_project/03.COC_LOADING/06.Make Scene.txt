@@ -1,0 +1,63 @@
+if not cmds.file( q=1, sceneName=1 ):
+    import sgBExcute_data
+    import sgBFunction_attribute
+    import cPickle
+    
+    refInfoPath = 'Z:/project_2015/cm_09/32_coc_loading_screen/dpt_cgi/scenes/sc001/td/refInfo.txt'
+    aniCamPath = 'Z:/project_2015/cm_09/32_coc_loading_screen/dpt_cgi/scenes/sc001/reference/camera/anicam'
+    
+    f = open( refInfoPath, 'r' )
+    filePaths = cPickle.load( f )
+    f.close()
+    
+    refPaths = filePaths[:-1]
+    meshImportPath = filePaths[-1]
+    
+    for refPath in refPaths:
+        NS = refPath.split( '/' )[-1].split( '.' )[0]
+        cmds.file( refPath, i=1, type="mayaBinary",  
+                   ignoreVersion=1, ra=True, mergeNamespacesOnClash=False, 
+                   namespace=NS, options="v=0;",  pr=1 )
+
+    
+    sgBExcute_data.importSgMeshDatas( meshImportPath, 0 )
+    
+    import sgBFunction_dag
+    import sgBFunction_connection
+    
+    modGrps = cmds.ls( '*:*_CHARACTER' )
+    setGrps = cmds.ls( '*:SET' )
+    
+    for modGrp in modGrps:
+        origNs = modGrp.split( ':' )[0] + ':'
+        topGrpName = modGrp.split( ':' )[-1]
+        otherTopGrps = cmds.ls( '*' + topGrpName )
+        
+        nsList = []
+        for otherTopGrp in otherTopGrps:
+            ns = otherTopGrp.replace( topGrpName, '' )
+            nsList.append( ns )
+        
+        childrenMeshs = sgBFunction_dag.getChildrenMeshExists( modGrp )
+        
+        for mesh in childrenMeshs:
+            mesh = mesh.split( '|' )[-1]
+            for ns in nsList:
+                targetMesh = mesh.replace( origNs, ns )
+                print mesh, "-->", targetMesh
+                sgBFunction_connection.copyShader( mesh, targetMesh )
+                sgBFunction_attribute.copyShapeAttr( mesh, targetMesh )
+                
+    cmds.delete( modGrps, setGrps )
+    targetCamPath = ''
+    for root, dirs, names in os.walk( aniCamPath ):
+        for name in names:
+            if name[-3:] == '.mb': targetCamPath = root + '/' + name
+    if targetCamPath:
+        cmds.file( targetCamPath, r=1, type="mayaBinary",  ignoreVersion=1,
+                  gl=1, mergeNamespacesOnClash =True, namespace=":", options= "v=0;" )
+
+    savePath = 'Z:/project_2015/cm_09/32_coc_loading_screen/dpt_cgi/scenes/sc001/ani/export/sc001_export_ani_before.mb'
+
+    cmds.file( rename=savePath )
+    cmds.file( save=1 )

@@ -1,0 +1,4 @@
+import maya.cmds as cmds
+import sgRigSkinCluster
+sels = cmds.ls( sl=1 )
+sgRigSkinCluster.replaceObjectSkined(sels[0], sels[1])

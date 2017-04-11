@@ -1,0 +1,7 @@
+import maya.cmds as cmds
+
+animCurveUA = cmds.createNode( 'animCurveUA' )
+
+cmds.setKeyframe( animCurveUA, f=-1, v=-1 )
+cmds.setKeyframe( animCurveUA, f=0, v=0 )
+cmds.setKeyframe( animCurveUA, f=1, v=1 ) 

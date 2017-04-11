@@ -3,7 +3,7 @@ from sgModules import sgcommands
 sels = sgcommands.listNodes( sl=1 )
 
 for sel in sels:
-    putTarget = sgcommands.putObject( [sel], 'transform' )
+    putTarget = sgcommands.convertSg( sgcommands.putObject( sel, 'transform' ) )
     putTarget.attr( 'dh' ).set( 1 )
     sgcommands.parent( putTarget, sel )
     

@@ -1,0 +1,2 @@
+import sgBFunction_mesh
+sgBFunction_mesh.createCombineMesh( cmds.ls( sl=1 ) )

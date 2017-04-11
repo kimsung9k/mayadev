@@ -75,7 +75,7 @@ class Win:
         cmds.columnLayout()
         cmds.gridLayout( nr=4, nc=8, cwh=[30,20] )
         for i in range( len( Win_Global.colors ) ):
-            cmds.iconTextButton( bgc=Win_Global.colors[i], c=partial( Win_Cmd.setColor, i ) )
+            cmds.button( label='%d' % i, bgc=Win_Global.colors[i], c=partial( Win_Cmd.setColor, i ) )
         
         cmds.window( Win_Global.winName, e=1,
                      width = Win_Global.width, height = Win_Global.height,

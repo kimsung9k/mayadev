@@ -1,0 +1,24 @@
+import maya.cmds as cmds
+
+def getLocalObject( target, base ):
+    
+    mmdc = cmds.createNode( 'multMatrixDecompose' )
+    localObj = cmds.createNode( 'transform' )
+    cmds.setAttr( localObj+'.dh', 1 )
+    
+    cmds.connectAttr( target+'.wm', mmdc+'.i[0]' )
+    cmds.connectAttr( base+'.wim', mmdc+'.i[1]' )
+    
+    cmds.connectAttr( mmdc+'.ot', localObj+'.t' )
+    cmds.connectAttr( mmdc+'.or', localObj+'.r' )
+    cmds.connectAttr( mmdc+'.os', localObj+'.s' )
+    cmds.connectAttr( mmdc+'.osh', localObj+'.sh' )
+    
+    localObj = cmds.parent( localObj, base )
+    
+    return localObj
+
+
+sels = cmds.ls( sl=1 )
+
+getLocalObject( sels[0], sels[1] )

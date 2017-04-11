@@ -1,0 +1,19 @@
+import sgBFunction_dag
+import sgBFunction_connection
+import sgBFunction_skinCluster
+sels = cmds.ls( sl=1 )
+sels = sgBFunction_dag.getChildrenMeshExists( sels )
+
+for sel in sels:    
+    selName = sel.split( '|' )[-1]
+    source = selName.split( '_newMesh_' )[0]
+    
+    if not cmds.objExists( source ):
+        print source
+        continue
+    
+    skinClusters = sgBFunction_dag.getNodeFromHistory( source, 'skinCluster' )
+    if not skinClusters:
+        sgBFunction_connection.getSourceConnection( source, sel )
+    else:
+        sgBFunction_skinCluster.autoCopyWeight( source, sel )

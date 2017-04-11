@@ -1,0 +1,36 @@
+import maya.cmds as cmds
+
+sels = cmds.ls( sl=1 )
+
+combindObjs = []
+
+for sel in sels:
+    
+    selShape = cmds.listRelatives( sel, s=1, f=1 )[0]
+    
+    targetShape = cmds.createNode( 'mesh' )
+    mirrorShape = cmds.createNode( 'mesh' )
+    target = cmds.listRelatives( targetShape, p=1 )[0]
+    mirror = cmds.listRelatives( mirrorShape, p=1 )[0]
+    mirrorGrp =  cmds.group( mirror )
+    
+    trGeo = cmds.createNode( 'transformGeometry' )
+    cmds.connectAttr( selShape+'.outMesh', trGeo+'.inputGeometry' )
+    cmds.connectAttr( selShape+'.wm', trGeo+'.transform' )
+    cmds.connectAttr( trGeo+'.outputGeometry', targetShape+'.inMesh' )
+    cmds.connectAttr( trGeo+'.outputGeometry', mirrorShape+'.inMesh' )
+    
+    cmds.move( 0,0,0, mirrorGrp+'.scalePivot', mirrorGrp+'.rotatePivot' )
+    cmds.setAttr( mirrorGrp+'.sx', -1 )
+    
+    combineObj, node = cmds.polyUnite( [mirror, target], ch=1 )
+    cmds.polyMergeVertex( combineObj, d=0.0001, am=0, ch=1 )
+    cmds.polySoftEdge( combineObj, a=180, ch=1 )
+    
+    bbmin = cmds.getAttr( combineObj+'.boundingBoxMin' )[0]
+    bbmax = cmds.getAttr( combineObj+'.boundingBoxMax' )[0]
+    
+    combindObjs.append( combineObj )
+    cmds.sets( combineObj, e=1, forceElement='initialShadingGroup' )
+
+cmds.select( combindObjs )

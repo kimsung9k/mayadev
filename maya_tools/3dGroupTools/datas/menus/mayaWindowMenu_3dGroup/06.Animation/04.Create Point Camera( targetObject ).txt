@@ -1,0 +1,2 @@
+import sgBFunction_simulation
+sgBFunction_simulation.createPointConstrainedCam( cmds.ls( sl=1 )[0] )

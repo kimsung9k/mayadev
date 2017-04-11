@@ -1,0 +1,6 @@
+import maya.cmds as cmds
+import sgBFunction_connection
+
+sels = cmds.ls( sl=1 )
+for sel in sels[1:]:
+	sgBFunction_connection.constraintPoint( sels[0], sel )

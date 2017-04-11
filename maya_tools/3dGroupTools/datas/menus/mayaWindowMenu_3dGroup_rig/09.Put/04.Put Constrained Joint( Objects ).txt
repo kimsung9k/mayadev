@@ -1,0 +1,16 @@
+import maya.cmds as cmds
+
+def putConstrainJoint( target ):
+    
+    import sgBFunction_connection
+    
+    trObj = cmds.createNode( 'joint', n= 'ConedJoint_' + target )
+    sgBFunction_connection.constraintAll( target, trObj )
+    return trObj
+   
+
+putNulls = []
+for sel in cmds.ls( sl=1 ):
+    putNulls.append( putConstrainJoint( sel ) )
+
+cmds.select( putNulls )

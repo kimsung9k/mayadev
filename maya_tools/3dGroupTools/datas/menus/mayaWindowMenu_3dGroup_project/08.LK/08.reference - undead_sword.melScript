@@ -1,0 +1,1 @@
+file -r -type "mayaBinary"  -ignoreVersion -gl -mergeNamespacesOnClash false -namespace "undead_sword" -options "v=0;" "Z:/project_2015/cm_07/23_lk_2_project/dpt_cgi/assets/undead_shield/reference/undead_sword.mb";

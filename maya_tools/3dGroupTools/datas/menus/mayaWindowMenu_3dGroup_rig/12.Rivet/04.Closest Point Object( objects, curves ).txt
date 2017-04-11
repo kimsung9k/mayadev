@@ -1,0 +1,8 @@
+import sgBFunction_rivet
+
+sels = cmds.ls( sl=1 )
+targets = sels[:-1]
+crv     = sels[-1]
+
+for target in targets:
+    sgBFunction_rivet.createClosestPointObjectOnCurve( target, crv, False )

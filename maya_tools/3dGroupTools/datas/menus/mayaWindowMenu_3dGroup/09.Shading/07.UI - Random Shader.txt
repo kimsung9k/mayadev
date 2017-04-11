@@ -1,0 +1,44 @@
+#               RANDOM SHADER 
+#Date 18-Nov-2009  Author Cara Kong c.kong@hotmail.co.uk
+#   
+#
+#Description:
+#Shades selected objects from random materials you select
+#
+#Instructions:
+# 1.  Open script within python tab of Maya script editor
+#     Highlight all and execute (window pops up)
+# 2.  Select all objects to be shaded
+#       then press "Load objects" button
+# 3.  Select all materials to randomly shade objects with
+#       then press "Load shaders" button
+# 4.  Finally press "Randomise and assign shaders"
+
+import random
+import maya.cmds as cmds
+
+dWin = cmds.window(title="Random Shader", wh=(182,160))
+cmds.columnLayout()
+
+cmds.button(label="Load objects", command="selObjects = cmds.ls(selection=True)")
+cmds.text(label="Load objects to shade")
+
+cmds.button(label="Load shaders", command="selShaders = cmds.ls(selection=True)")
+cmds.text(label="Load shaders")
+
+cmds.button(label="Assign shaders", command="assignShaders()")
+cmds.text(label="Randomise and assign shaders")
+
+cmds.showWindow(dWin)
+
+def assignShaders():
+    
+    selObjects = cmds.ls( sl=1 )
+    
+    sizeListObjects = len(selObjects)
+    sizeListShaders = len(selShaders)
+
+    for i in range(0,sizeListObjects,1):
+        cmds.select(selObjects[i], r=True)
+        rNo = random.randint(0,sizeListShaders-1)
+        cmds.hyperShade(assign=selShaders[rNo])

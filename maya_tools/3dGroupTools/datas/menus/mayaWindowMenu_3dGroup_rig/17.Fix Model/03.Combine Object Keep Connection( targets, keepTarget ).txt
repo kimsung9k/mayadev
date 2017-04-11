@@ -1,0 +1,21 @@
+sels = cmds.ls( sl=1 )
+
+targets = sels[:-1]
+last    = sels[-1]
+
+cons = cmds.listConnections( last, s=1, d=0, p=1, c=1 )
+
+srcCons = cons[1::2]
+destCons = cons[::2]
+
+for i in range( len( srcCons ) ):
+    srcCon = srcCons[i]
+    destCon = destCons[i]
+    cmds.disconnectAttr( srcCon, destCon )
+
+combinedObj = cmds.polyUnite( sels, ch=0, mergeUVSets=1 )[0]
+
+for i in range( len( srcCons ) ):
+    srcCon = srcCons[i]
+    destCon = combinedObj+'.' + destCons[i].split( '.' )[-1]
+    cmds.connectAttr( srcCon, destCon )

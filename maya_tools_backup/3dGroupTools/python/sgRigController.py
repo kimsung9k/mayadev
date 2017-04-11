@@ -7,7 +7,7 @@ def combineMultiShapes( shapeObjs ):
     mtxGroup = cmds.getAttr( shapeObjs[0]+'.wm' )
     mmtxInvGroup = sgModelConvert.convertMatrixToMMatrix( mtxGroup ).inverse()
     
-    shapes = cmds.listRelatives( shapeObjs[1:], c=1, ad=1, type='shape' )
+    shapes = cmds.listRelatives( shapeObjs[1:], c=1, ad=1, type='shape', f=1 )
     
     for shape in shapes:
         shapeType = cmds.nodeType( shape )
@@ -48,7 +48,6 @@ def combineMultiShapes( shapeObjs ):
     cmds.delete( shapeObjs[1:])
     
     return shapeObjs[0]
-
 
 
 mc_combineMultiShapes = """import maya.cmds as cmds
@@ -99,4 +98,3 @@ def addScaleControlObjectToSkined( ctl, target ):
         mmNode = getMultMtx( ctl, outputAttr )
         if not cmds.isConnected( mmNode+'.matrixSum', cons[i] ):
             cmds.connectAttr( mmNode+'.matrixSum', cons[i], f=1 )
-

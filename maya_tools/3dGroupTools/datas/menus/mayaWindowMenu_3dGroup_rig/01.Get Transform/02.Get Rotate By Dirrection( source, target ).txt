@@ -1,0 +1,61 @@
+import maya.cmds as cmds
+import maya.OpenMaya as om
+import math
+
+def lookAt( first, second ):
+    
+    firstPos = om.MPoint( *cmds.xform( first, q=1, ws=1, t=1 ) )
+    secondPos = om.MPoint( *cmds.xform( second, q=1, ws=1, t=1 ) )
+    
+    secondMatrix = cmds.getAttr( second+'.wm' )
+    
+    axis1 = om.MVector( *secondMatrix[:3] )
+    axis2 = om.MVector( *secondMatrix[4:7] )
+    axis3 = om.MVector( *secondMatrix[8:11] )
+    
+    aimVector = firstPos - secondPos
+    vectorList = [ axis1, axis2, axis3 ]
+    
+    maxDot = 0
+    dotIndex = 0
+    
+    for i in range( len( vectorList ) ):
+        dotValue = vectorList[i] * aimVector
+        if math.fabs( dotValue ) > math.fabs( maxDot ):
+            maxDot = dotValue
+            dotIndex = i
+    
+    if maxDot < 0:
+        vectorList[ dotIndex ] = -aimVector;
+    else:
+        vectorList[ dotIndex ] = aimVector;
+    
+    secondIndex = ( dotIndex + 1 )%3
+    thirdIndex  = ( secondIndex + 1 )%3
+    
+    vectorList[ thirdIndex ]  = vectorList[ dotIndex ] ^ vectorList[ secondIndex ]
+    vectorList[ secondIndex ] = vectorList[ thirdIndex ] ^ vectorList[ dotIndex ]
+    
+    for i in range( 3 ):
+        vectorList[i].normalize()
+    
+    mtx = [ 1,0,0,0, 
+            0,1,0,0, 
+            0,0,1,0, 
+            0,0,0,1 ]
+
+    for i in [ dotIndex, secondIndex, thirdIndex ]:
+        mtx[ i*4 + 0 ] = vectorList[ i ].x
+        mtx[ i*4 + 1 ] = vectorList[ i ].y
+        mtx[ i*4 + 2 ] = vectorList[ i ].z
+    
+    import sgBFunction_convert
+    trMtx = om.MTransformationMatrix( sgBFunction_convert.convertMatrixToMMatrix( mtx ) )
+    rotValue = trMtx.eulerRotation().asVector()
+    rot = [ math.degrees( rotValue.x ), math.degrees( rotValue.y ), math.degrees( rotValue.z ) ]
+    
+    cmds.xform( second, ws=1, ro=rot )
+
+
+sels = cmds.ls( sl=1 )
+lookAt( sels[0], sels[1] )

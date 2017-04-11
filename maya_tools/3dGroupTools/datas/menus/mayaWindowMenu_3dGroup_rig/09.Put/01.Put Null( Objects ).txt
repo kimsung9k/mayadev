@@ -1,0 +1,17 @@
+import maya.cmds as cmds
+
+def putNull( target ):
+    
+    mtx = cmds.getAttr( target+'.wm' )
+    trObj = cmds.createNode( 'transform', n=target+'_putObj' )
+    cmds.xform( trObj, ws=1, matrix=mtx )
+    cmds.setAttr( trObj+'.dh', 1 )
+    
+    return trObj
+   
+
+putNulls = []
+for sel in cmds.ls( sl=1 ):
+    putNulls.append( putNull( sel ) )
+
+cmds.select( putNulls )

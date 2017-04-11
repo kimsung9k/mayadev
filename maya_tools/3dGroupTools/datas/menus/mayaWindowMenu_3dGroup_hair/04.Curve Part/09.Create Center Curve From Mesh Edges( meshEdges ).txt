@@ -1,0 +1,5 @@
+import sgBRig_hair
+curves = sgBRig_hair.createCurveToEdgeLoop()
+curves = sgBRig_hair.createCenterRadiusEditCurve( curves )
+cmds.delete( curves[:-1] )
+cmds.select( curves[-1] )

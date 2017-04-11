@@ -1,0 +1,2 @@
+path = "Z:/project_2015/cm_06/19_MST_Project/dpt_cgi/assets/Volto/reference/vulto.mb"
+cmds.file( path, r=1, type="mayaBinary", ignoreVersion=1, gl=1, mergeNamespacesOnClash=False, namespace="vulto", options="v=0;" )

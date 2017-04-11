@@ -1,0 +1,44 @@
+def removeConvertConnection( target, attr ):
+    
+    animCurveCons = cmds.listConnections( target+'.'+attr, s=1, d=0, type='animCurve' )
+    multDoubleCons = cmds.listConnections( target+'.'+attr, s=1, d=0, type='multDoubleLinear' )
+    
+    srcNodes = []
+    
+    if not animCurveCons : animCurveCons = []
+    if not multDoubleCons : multDoubleCons = []
+    
+    srcNodes += animCurveCons
+    srcNodes += multDoubleCons
+    
+    if not srcNodes:
+        unitConversionNodes = cmds.listConnections( target+'.'+attr, s=1, d=0, type='unitConversion' )
+        if not unitConversionNodes: return None
+        return removeConvertConnection( unitConversionNodes[0], 'input' )
+           
+    srcCons = cmds.listConnections( srcNodes[0], s=1, d=0, p=1, c=1 ) 
+    if not srcCons: return None
+    
+    if cmds.nodeType( target ) == 'unitConversion' and cmds.nodeType( srcCons[1].split( '.' )[0] ) == 'unitConversion':
+        dest = cmds.listConnections( target+'.output', p=1 )
+        src  = cmds.listConnections( srcCons[1].split( '.' )[0] +'.input', p=1 )
+        cmds.connectAttr( src[0], dest[0], f=1 )
+        cmds.delete( target )
+        return removeConvertConnection( dest[0].split( '.' )[0], dest[0].split( '.' )[-1] )
+    
+    srcNode = srcCons[1].split( '.' )[0]
+    if cmds.nodeType( srcNode ) == 'unitConversion':
+        origSrcCons = cmds.listConnections( srcNode+'.input', p=1 )
+        if not origSrcCons: cmds.delete( srcNode )
+        cmds.connectAttr( origSrcCons[0], target+'.'+attr, f=1 )
+    else:
+        cmds.connectAttr( srcCons[1], target+'.'+attr, f=1 )
+    cmds.delete( srcNodes[0] )
+    return removeConvertConnection( target, attr )
+
+sels = cmds.ls( sl=1 )
+attrs = cmds.channelBox( 'mainChannelBox', q=1, sma=1 )
+
+for sel in sels:
+    for attr in attrs:
+        removeConvertConnection( sel, attr )

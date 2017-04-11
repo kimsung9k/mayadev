@@ -47,30 +47,39 @@ class SGCmdSkinCluster(OpenMayaMPx.MPxCommand):
         
         cmds.undoInfo( swf=0 )
         
-        for i in range( picked.length() ):
-            fnPicked = OpenMaya.MFnDependencyNode( picked[i] )
-            hists = cmds.listHistory( fnPicked.name() )
-            
-            skinNode = None
-            for hist in hists:
-                if cmds.nodeType( hist ) == 'skinCluster':
-                    skinNode = hist
-                    break
-            
-            fnSkinNode = OpenMaya.MFnDependencyNode( self.__getMObject( skinNode ) )
-            
-            plugMatrix = fnSkinNode.findPlug( 'matrix' )
-            plugBindPre = fnSkinNode.findPlug( 'bindPreMatrix' )
-            
-            for i in range( plugMatrix.numElements() ):
-                loIndex = plugMatrix[i].logicalIndex()
-                srcJoints = cmds.listConnections( plugMatrix[i].name(), s=1, d=0 )
-                if not srcJoints: continue
-                undoSet = [plugBindPre.elementByLogicalIndex( loIndex ).name(), cmds.getAttr( plugBindPre.elementByLogicalIndex( loIndex ).name() )]
-                cmds.setAttr( plugBindPre.elementByLogicalIndex( loIndex ).name(), cmds.getAttr( srcJoints[0] +'.wim' ), type='matrix' )
-                self.__undoSetList.append( undoSet )
-            cmds.dgdirty( fnSkinNode.name() )
-            self.__skinNodes.append( fnSkinNode.name() )
+        try:
+            for i in range( picked.length() ):
+                fnPicked = OpenMaya.MFnDagNode( picked[i] )
+                hists = cmds.listHistory( fnPicked.fullPathName() )
+                
+                skinNode = None
+                for hist in hists:
+                    if cmds.nodeType( hist ) == 'skinCluster':
+                        skinNode = hist
+                        break
+                
+                if not skinNode: continue
+                
+                fnSkinNode = OpenMaya.MFnDependencyNode( self.__getMObject( skinNode ) )
+                
+                plugGeomMatrix = fnSkinNode.findPlug( 'geomMatrix' )
+                plugMatrix  = fnSkinNode.findPlug( 'matrix' )
+                plugBindPre = fnSkinNode.findPlug( 'bindPreMatrix' )
+                
+                for i in range( plugMatrix.numElements() ):
+                    loIndex = plugMatrix[i].logicalIndex()
+                    srcJoints = cmds.listConnections( plugMatrix[i].name(), s=1, d=0 )
+                    if not srcJoints: continue
+                    undoSet = [plugBindPre.elementByLogicalIndex( loIndex ).name(), cmds.getAttr( plugBindPre.elementByLogicalIndex( loIndex ).name() )]
+                    cmds.setAttr( plugBindPre.elementByLogicalIndex( loIndex ).name(), cmds.getAttr( srcJoints[0] +'.wim' ), type='matrix' )
+                    self.__undoSetList.append( undoSet )
+    
+                self.__undoSetList.append( [plugGeomMatrix.name(), cmds.getAttr( plugGeomMatrix.name() )] )
+                cmds.setAttr( plugGeomMatrix.name(), cmds.getAttr( fnPicked.fullPathName() + '.wm' ), type='matrix' )
+                cmds.dgdirty( fnSkinNode.name() )
+                self.__skinNodes.append( fnSkinNode.name() )
+        except:pass
+
         cmds.undoInfo( swf=1 )
     
     

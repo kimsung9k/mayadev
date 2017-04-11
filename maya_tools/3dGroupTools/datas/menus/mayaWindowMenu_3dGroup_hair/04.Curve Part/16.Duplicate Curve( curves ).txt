@@ -1,0 +1,2 @@
+import sgBFunction_curve
+sgBFunction_curve.duplicateOnlyCurve( cmds.ls( sl=1 ) )

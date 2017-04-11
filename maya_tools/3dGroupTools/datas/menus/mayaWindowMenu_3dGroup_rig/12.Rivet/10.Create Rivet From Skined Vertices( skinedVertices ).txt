@@ -1,0 +1,4 @@
+import sgBFunction_rivet
+reload( sgBFunction_rivet )
+sels = cmds.ls( sl=1 )
+sgBFunction_rivet.createRivetBasedOnSkinWeights( sels )
