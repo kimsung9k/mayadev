@@ -114,16 +114,6 @@ def cmd_putObjectAtGround( *args, **kwargs ):
         source = kwargs[ 's' ]
     
     mel.eval( "sgPutObjectAtGroundCommand -s %s -n %s" %( source, name ) )
-
-
-
-def cmd_pickColor( *args, **kwargs ):
-    
-    if not cmds.pluginInfo( "sgCmdPickColor", q=1, l=1 ):
-        cmds.loadPlugin( "sgCmdPickColor" )
-    
-    cmds.sgCmdPickColor( *args, **kwargs )
-    
     
     
     

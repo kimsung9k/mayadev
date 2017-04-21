@@ -1,43 +1,7 @@
 import pymel.core
 from maya import cmds
 from maya import OpenMaya
-
-
-
-def getMObject( target ):
-    mObject = OpenMaya.MObject()
-    selList = OpenMaya.MSelectionList()
-    selList.add( target )
-    selList.getDependNode( 0, mObject )
-    return mObject
-
-
-
-def getDagPath( target ):
-    dagPath = OpenMaya.MDagPath()
-    selList = OpenMaya.MSelectionList()
-    selList.add( target )
-    try:
-        selList.getDagPath( 0, dagPath )
-        return dagPath
-    except:
-        return None
-    
-    
-
-def matrixToList( matrix ):
-    mtxList = range( 16 )
-    for i in range( 4 ):
-        for j in range( 4 ):
-            mtxList[ i * 4 + j ] = matrix( i, j )
-    return mtxList
-
-
-
-def listToMatrix( mtxList ):
-    matrix = OpenMaya.MMatrix()
-    OpenMaya.MScriptUtil.createMatrixFromList( mtxList, matrix  )
-    return matrix
+from sgModules.base import *
 
 
 
@@ -405,7 +369,7 @@ def makeController( pointList, defaultScaleMult = 1, **options ):
 
 def createDefaultPropRig( propGrp ):
     
-    from sgModules import sgdata
+    from sgModules.base import sgdata
     propGrp = pymel.core.ls( propGrp )[0]
     
     def makeParent( target ):

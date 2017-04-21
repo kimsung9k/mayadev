@@ -3,6 +3,7 @@
 	<name>MAYAMENU</name>
 	<comment></comment>
 	<projects>
+		<project>sg</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>

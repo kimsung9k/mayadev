@@ -1,5 +1,5 @@
 import maya.cmds as cmds
-import sgdata
+from sgModules.base import sgdata
 
 
 for defaultPluginName in sgdata.Plugins.defaultPlugins:

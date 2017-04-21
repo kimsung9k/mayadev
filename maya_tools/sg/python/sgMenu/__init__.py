@@ -92,14 +92,9 @@ class SGFileBaseMenu:
             targets.sort()
             targets_afterNames = []
             
-            folderIndices = []
-            
             renameIndex = 1
             for i in range( len( targets ) ):
                 target = targets[i]
-                if os.path.isdir( root + '/' + target ):
-                    folderIndices.append( i )
-
                 splits = target.split( '.' )
                 indexNameStart = 0
                 for j in range( len( splits ) ):
@@ -120,17 +115,21 @@ class SGFileBaseMenu:
                     imageExistsIndex = -1
                     if noExtensionTarget in imageNames:
                         imageExistsIndex = imageNames.index( noExtensionTarget )
-                    os.rename( root+'/'+target, root+'/%02d.' % renameIndex +'.'.join( splits[ indexNameStart: ] ) )
+                    
+                    try:
+                        os.rename( root+'/'+target, root+'/%02d.' % renameIndex +'.'.join( splits[ indexNameStart: ] ) )
+                        targets_afterNames.append( root+'/%02d.' % renameIndex +'.'.join( splits[ indexNameStart: ] ) )
+                    except:
+                        pass
+                    
                     if imageExistsIndex != -1:
                         imageSplits = imageNames[ imageExistsIndex ].split( '.' )
                         os.rename( root+'/'+images[imageExistsIndex], root+'/%02d.' % renameIndex + '.'.join( imageSplits[indexNameStart:] ) + '.' + imageExtensions[ imageExistsIndex ] )
-
-                    targets_afterNames.append( root+'/%02d.' % renameIndex +'.'.join( splits[ indexNameStart: ] ) )
                     
                 renameIndex += 1
-
-            for folderIndex in folderIndices:
-                SGFileBaseMenu.renameTargets( targets_afterNames[folderIndex] )
+                
+            for target in targets_afterNames:
+                SGFileBaseMenu.renameTargets( target )
     
 
     @staticmethod

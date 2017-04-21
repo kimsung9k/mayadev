@@ -3,7 +3,7 @@ from sgModules import sgcommands
 sels = sgcommands.listNodes( sl=1 )
 
 for sel in sels[2:]:
-    blendNode = sgcommands.getBlendTwoMatrixNode( sels[0], sels[1] )
+    blendNode = sgcommands.createBlendTwoMatrixNode( sels[0], sels[1] )
     mm = sgcommands.createNode( 'multMatrix' )
     blendNode.matrixOutput() >> mm.i[0]
     sel.pim >> mm.i[1]

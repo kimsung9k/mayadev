@@ -68,7 +68,10 @@ class SGAverageVertex( OpenMayaMPx.MPxCommand ):
             fnComp = OpenMaya.MFnSingleIndexedComponent( oComponent )
             
             for j in range( fnComp.elementCount() ):
-                weights[ fnComp.element( j ) ] = fnComp.weight(j).influence()
+                if fnComp.hasWeights():
+                    weights[ fnComp.element( j ) ] = fnComp.weight(j).influence()
+                else:
+                    weights[ fnComp.element( j ) ] = 1
             averageList.append( [dagPath, weights] )
             
 
