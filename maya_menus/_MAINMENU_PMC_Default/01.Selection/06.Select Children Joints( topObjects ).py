@@ -8,4 +8,4 @@ for sel in sels:
     if cmds.nodeType( sel ) == 'joint':
         jnts.append( sel )
     allJnts += jnts
-cmds.select( allJnts, tgl=1 )
+cmds.select( allJnts )

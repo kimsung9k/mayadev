@@ -1,6 +1,6 @@
 from sgModules import sgcommands
 
-sels = sgcommands.listNodes( sl=1 )
+sels = cmds.ls( sl=1 )
 
 for sel in sels:
     putTarget = sgcommands.convertSg( sgcommands.putObject( sel, 'transform' ) )

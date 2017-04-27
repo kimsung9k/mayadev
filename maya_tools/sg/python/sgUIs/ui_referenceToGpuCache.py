@@ -1,3 +1,6 @@
+import maya.cmds as cmds
+import os
+
 def makeFolder( pathName ):
     
     pathName = pathName.replace( '\\', '/' )
@@ -72,3 +75,17 @@ def convertAssetReferenceToGpu( selObj ):
 sels = cmds.ls( sl=1 )
 for sel in sels:
     if not convertAssetReferenceToGpu( sel ): break
+
+
+
+class Window_Global:
+    
+    winName = ''
+    title = ''
+    
+    
+    
+    
+    
+    
+

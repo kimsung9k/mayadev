@@ -1,4 +1,4 @@
-from sgModules.base import sgdata
+from sgModules import sgdata
 from sgModules import sgcommands
 slider     = sgcommands.makeController( sgdata.Controllers.move2Points, 0.5 )
 sliderBase = sgcommands.SliderBase().create( 'xy' )

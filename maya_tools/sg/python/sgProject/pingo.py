@@ -271,7 +271,7 @@ class CH_Pipi:
             ['RtThumb2_Ctrl','RtThumb1_Ctrl','LfThumb2_Ctrl','local'],
             ['RtThumbRoot_Ctrl','RtFinger_Ctrl','LfThumbRoot_Ctrl','local'],
             ['RtThumb_Ctrl','RtThumbRoot_Ctrl','LfThumb_Ctrl','local,tym,tzm'],
-            ['RtUpLeg_Ctrl','Hip_Ctrl','LfUpLeg_Ctrl','txm,rym,rzm'],
+            ['RtUpLeg_Ctrl','Hip_Ctrl','LfUpLeg_Ctrl','local,txm,rym,rzm'],
             ['SpineFk1_Ctrl','Root_Ctrl','','center'],
             ['SpineFk2_Ctrl','SpineFk1_Ctrl','','center'],
             ['SquashBend1Detail_Ctrl','Head_Ctrl','','center'],
@@ -446,6 +446,30 @@ class minion_B:
 
 
 class minion_C:
+    
+    defaultIgnore = ['Follow', 'DirectionCtrlVisibility', 'DetailCtrlVisibility']
+    reverseAttrs = []
+    
+    leftPrefix  = ['Lf', 'Left', '_L_']
+    rightPrefix = ['Rt', 'Right', '_R_']
+    
+    data = [['head_A_ctr', 'body_ctr', 'head_A_ctr', 'center'],
+            ['head_B_ctr', 'body_ctr', 'head_B_ctr', 'center'],
+            ['head_C_ctr', 'body_ctr', 'head_C_ctr', 'center'],
+            ['Ctl_Mouth', 'body_ctr', 'Ctl_Mouth', 'center'],
+            ['body_ctr', 'walk_ctr', 'body_ctr', 'center'],
+            ['walk_ctr', 'world_ctr', 'walk_ctr', 'center'],
+            ['world_ctr', 'world_ctrGrp', 'world_ctr', 'center'],
+            ['Ctl_Leg_L_01', 'Ctl_Leg_L_00', 'Ctl_Leg_R_01', 'center'],
+            ['Ctl_Leg_L_00', 'head_C_ctr', 'Ctl_Leg_R_00', 'center'],
+            ['Ctl_Leg_R_01', 'Ctl_Leg_R_00', 'Ctl_Leg_L_01', 'center'],
+            ['Ctl_Leg_R_00', 'head_C_ctr', 'Ctl_Leg_L_00', 'center']]
+
+
+
+
+
+class ChSet:
     
     defaultIgnore = ['Follow', 'DirectionCtrlVisibility', 'DetailCtrlVisibility']
     reverseAttrs = []

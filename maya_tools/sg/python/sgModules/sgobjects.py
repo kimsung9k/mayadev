@@ -2,8 +2,8 @@ from maya import OpenMaya
 from maya import cmds
 from maya import mel
 import math
-import sgModules.base.sgdata as data
-from sgModules.base import *
+import sgModules.sgdata as data
+from sgModules.sgbase import *
 
 
 class SGPoint:
@@ -415,14 +415,14 @@ class SGNode( SGObject ):
         if self.nodeType() in data.NodeType.dag:
             attrNames += data.Attrs.dagAttrs
         if not attrNames:
-            attrNames += cmds.listAttr( self.name() )
-            shortNames = cmds.listAttr( self.name(), sn=1 )
+            shortNames = cmds.listAttr( self.name() )
+            shortNames += cmds.listAttr( self.name(), sn=1 )
             for shortName in shortNames:
-                if not shortName in ['def','tg.try','try','global','ats.as','as','or', 'is', 'in', 'if']:
-                    attrNames.append( shortName )
+                if str(shortName) in ['def','tg.try','try','global','ats.as','as','or', 'is', 'in', 'if']: continue
+                attrNames.append( shortName )
 
         for attrName in attrNames:
-            exec( "self.%s = self.attr( attrName )" % attrName )
+            exec( "self.%s = self.attr( '%s' )" % (attrName,attrName) )
 
 
     def name(self):
@@ -807,8 +807,12 @@ def convertSg( nodeName ):
             returnList.append( convertSg(nodeNameElement) )
         return returnList
     
+    if str( nodeName.__class__ ).find( 'pymel.core' ) != -1:
+        return convertSg( nodeName.name() )
+    
     if not type( nodeName ) in [str, unicode]: 
         return nodeName
+    
     if nodeName.find( '.' ) != -1:
         return SGAttribute( nodeName )
     nodeType = cmds.nodeType( nodeName )

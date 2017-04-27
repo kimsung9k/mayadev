@@ -12,4 +12,4 @@ def getTopJointChildren( topNodes ):
         returnList += getTopJointChildren( cmds.listRelatives( topNode, c=1, f=1 ) )
     return returnList
 
-cmds.select( getTopJointChildren( cmds.ls( sl=1 ) ), tgl=1 )
+cmds.select( getTopJointChildren( cmds.ls( sl=1 ) ) )

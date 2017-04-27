@@ -1,7 +1,7 @@
 import pymel.core
 from maya import cmds
 from maya import OpenMaya
-from sgModules.base import *
+from sgModules.sgbase import *
 
 
 
@@ -369,7 +369,7 @@ def makeController( pointList, defaultScaleMult = 1, **options ):
 
 def createDefaultPropRig( propGrp ):
     
-    from sgModules.base import sgdata
+    from sgModules import sgdata
     propGrp = pymel.core.ls( propGrp )[0]
     
     def makeParent( target ):

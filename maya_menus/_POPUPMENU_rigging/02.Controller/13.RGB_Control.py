@@ -1,4 +1,4 @@
-from sgModules.base import sgdata
+from sgModules import sgdata
 from sgModules import sgcommands
 from maya import cmds
 
