@@ -1,8 +1,0 @@
-import maya.cmds as cmds
-
-meshs =cmds.ls( type='mesh' )
-
-for mesh in meshs:
-    if mesh.find( 'Deformed'  ) == -1: continue
-    meshP = cmds.listRelatives( mesh, p=1 )[0]
-    cmds.rename( mesh, meshP.replace( ':', '_' ) + 'Shape' )

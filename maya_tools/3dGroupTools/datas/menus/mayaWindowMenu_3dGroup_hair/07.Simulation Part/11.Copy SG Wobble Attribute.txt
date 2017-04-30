@@ -1,3 +1,0 @@
-import sgBFunction_attribute
-
-sgBFunction_attribute.copySgWobbleAttribute()

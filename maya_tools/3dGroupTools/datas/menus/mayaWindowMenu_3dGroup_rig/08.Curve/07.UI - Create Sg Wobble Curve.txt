@@ -1,2 +1,0 @@
-import sgUIsgWobbleCurve
-sgUIsgWobbleCurve.Window().show()

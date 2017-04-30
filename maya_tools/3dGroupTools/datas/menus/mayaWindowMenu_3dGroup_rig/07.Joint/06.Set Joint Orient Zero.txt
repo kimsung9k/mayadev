@@ -1,5 +1,0 @@
-import maya.cmds as cmds
-sels = cmds.ls( sl=1 )
-for sel in sels:
-    if cmds.nodeType( sel ) != 'joint': continue
-    cmds.setAttr( sel+'.jo', 0,0,0 )

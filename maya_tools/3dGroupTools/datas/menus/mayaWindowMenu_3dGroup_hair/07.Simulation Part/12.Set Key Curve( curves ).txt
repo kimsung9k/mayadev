@@ -1,5 +1,0 @@
-import sgBFunction_curve
-keyCurves = sgBFunction_curve.setKeyCurves( cmds.ls( sl=1 ) )
-cmds.select( keyCurves )
-import sgBFunction_curve
-sgBFunction_curve.tool_curveEditBrush()

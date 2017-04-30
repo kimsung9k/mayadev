@@ -1,6 +1,0 @@
-import sgBFunction_rivet
-
-sels = cmds.ls( sl=1 )
-
-for sel in sels:
-    sgBFunction_rivet.createCurveFromSelVertices_mirror( sel )

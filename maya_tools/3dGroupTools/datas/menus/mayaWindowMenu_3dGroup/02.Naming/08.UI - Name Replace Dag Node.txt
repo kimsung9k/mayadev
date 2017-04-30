@@ -1,2 +1,0 @@
-import basic.naming.ui.view
-basic.naming.ui.view.ReplaceNameUI().show()

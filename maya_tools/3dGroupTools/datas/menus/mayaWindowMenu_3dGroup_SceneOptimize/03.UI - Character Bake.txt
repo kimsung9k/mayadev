@@ -1,2 +1,0 @@
-import sgUI_characterBake
-sgUI_characterBake.UICharacterBake().create()

@@ -1,7 +1,0 @@
-global proc sgCurveEditBrush_contextProperties()
-{
-}
-
-global proc sgCurveEditBrush_contextValues( string $context )
-{
-}

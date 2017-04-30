@@ -1,1 +1,0 @@
-targetExtensions = ['mb', 'ma', 'fbx', 'obj']

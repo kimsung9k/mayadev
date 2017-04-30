@@ -1,3 +1,0 @@
-import sgBRig_fixRig
-sels = cmds.ls( sl=1 )
-sgBRig_fixRig.replaceObject( sels[0], sels[1] )

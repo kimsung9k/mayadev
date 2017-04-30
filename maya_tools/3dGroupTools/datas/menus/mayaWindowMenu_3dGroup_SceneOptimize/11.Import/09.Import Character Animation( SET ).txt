@@ -1,2 +1,0 @@
-import sgBFunction_chRig
-sgBFunction_chRig.importCharacter( cmds.ls( sl=1 )[0], None, 'CTL_', 'Ctl_' )

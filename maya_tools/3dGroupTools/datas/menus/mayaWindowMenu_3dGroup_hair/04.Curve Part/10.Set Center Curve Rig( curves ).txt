@@ -1,2 +1,0 @@
-import sgBRig_hair
-sgBRig_hair.createCenterRadiusEditCurve( cmds.ls( sl=1 ) )

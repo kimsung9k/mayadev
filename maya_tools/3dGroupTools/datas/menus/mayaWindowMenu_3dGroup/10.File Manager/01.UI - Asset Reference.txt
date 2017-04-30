@@ -1,2 +1,0 @@
-import fileManager.asset_reference.view
-fileManager.asset_reference.view.ImportAndExportFileUI().create()

@@ -1,3 +1,0 @@
-import sgPWindow_scene_selectByName
-reload( sgPWindow_scene_selectByName )
-sgPWindow_scene_selectByName.WinA().create()

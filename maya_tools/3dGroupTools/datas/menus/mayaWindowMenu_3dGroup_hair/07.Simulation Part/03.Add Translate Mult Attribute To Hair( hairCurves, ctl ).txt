@@ -1,5 +1,0 @@
-import sgBRig_hair
-sels = cmds.ls( sl=1 )
-curves = sels[:-1]
-ctl = sels[-1]
-sgBRig_hair.addTranslateMultAttributeToHair( curves, ctl )

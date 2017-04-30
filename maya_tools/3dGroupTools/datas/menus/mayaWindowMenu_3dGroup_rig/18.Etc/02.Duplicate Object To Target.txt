@@ -1,8 +1,0 @@
-import maya.cmds as cmds
-import sgRigDag
-sels = cmds.ls( sl=1 )
-
-src = sels[0]
-targets = sels[1:]
-for target in targets:
-    sgRigDag.duplicateObjectToTarget( src, target )

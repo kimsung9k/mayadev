@@ -1,3 +1,0 @@
-import sgBRig_hair
-sels = cmds.ls( sl=1 )
-cutCurves = sgBRig_hair.cutCurve( sels[:-1], sels[-1] )

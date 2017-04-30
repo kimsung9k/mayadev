@@ -1,2 +1,0 @@
-import projectFunction.yetiTool.view
-projectFunction.yetiTool.view.Window().create()

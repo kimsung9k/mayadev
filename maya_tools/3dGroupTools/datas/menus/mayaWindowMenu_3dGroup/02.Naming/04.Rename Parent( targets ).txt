@@ -1,8 +1,0 @@
-import maya.cmds as cmds
-
-sels = cmds.ls( sl=1 )
-
-for sel in sels:
-    selName = sel.split( '|' )[-1]
-    selP = cmds.listRelatives( sel, p=1, f=1 )[0]
-    cmds.rename( selP, 'P'+selName )

@@ -1,4 +1,0 @@
-fnMeshList = []
-fnCrvList  = []
-crvPoints  = []
-meshPoints = []

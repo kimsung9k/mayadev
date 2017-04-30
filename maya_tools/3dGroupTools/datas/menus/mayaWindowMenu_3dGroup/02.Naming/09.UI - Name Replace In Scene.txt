@@ -1,2 +1,0 @@
-import sgPWindow_naming_replaceName
-sgPWindow_naming_replaceName.WinA().create()

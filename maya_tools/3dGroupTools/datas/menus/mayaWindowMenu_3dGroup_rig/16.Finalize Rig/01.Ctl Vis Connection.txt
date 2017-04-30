@@ -1,7 +1,0 @@
-import sgBFunction_connection
-
-sels = cmds.ls( sl=1 )
-
-reload( sgBFunction_connection )
-
-sgBFunction_connection.ctlVisConnection( sels[-1], sels[:-1] )

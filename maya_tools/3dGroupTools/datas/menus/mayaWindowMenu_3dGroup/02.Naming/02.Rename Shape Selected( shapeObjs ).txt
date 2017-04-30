@@ -1,7 +1,0 @@
-import sgBFunction_dag
-
-sels = sgBFunction_dag.getChildrenShapeExists( cmds.ls( sl=1 ) )
-for sel in sels:
-    selName = sel.split( '|' )[-1]
-    selShape = sgBFunction_dag.getShape( sel )
-    print cmds.rename( selShape, selName + 'Shape' )

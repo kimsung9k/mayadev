@@ -1,2 +1,0 @@
-import sgPWindow_file_alembic_import
-sgPWindow_file_alembic_import.WinA().create()

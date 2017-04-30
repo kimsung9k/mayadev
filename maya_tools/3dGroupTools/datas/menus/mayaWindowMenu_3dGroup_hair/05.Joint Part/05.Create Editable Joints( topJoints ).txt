@@ -1,3 +1,0 @@
-import sgBRig_hair
-sels = cmds.ls( sl=1 )
-sgBRig_hair.createEditableJoints( sels )

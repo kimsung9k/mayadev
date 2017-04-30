@@ -1,2 +1,0 @@
-import sgCFnc_ui
-sgCFnc_ui.show3dGroupTools()

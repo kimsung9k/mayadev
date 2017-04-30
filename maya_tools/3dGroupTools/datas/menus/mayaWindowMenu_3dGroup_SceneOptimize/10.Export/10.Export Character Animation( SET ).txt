@@ -1,2 +1,0 @@
-import sgBFunction_chRig
-sgBFunction_chRig.exportCharacter( cmds.ls( sl=1 )[0] )
