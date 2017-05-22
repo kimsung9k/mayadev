@@ -7,9 +7,11 @@ if isinstance( sels[0], sgcommands.SGDagNode ):
 else:
     firstName = sels[0].localName()
 
+firstLocalName = firstName.split( '|' )[-1]
+
 digitIndices = []
-for i in range( len( firstName ) ):
-    if firstName[i].isdigit():
+for i in range( len( firstLocalName ) ):
+    if firstLocalName[i].isdigit():
         if len( digitIndices ):
             if i == digitIndices[-1]+1:
                 digitIndices.append( i )
@@ -17,17 +19,18 @@ for i in range( len( firstName ) ):
                 digitIndices = [i]
         else:
             digitIndices.append( i )
+
 if digitIndices:
-    sepNameFront = firstName[:digitIndices[0]]
-    sepNameBack  = firstName[digitIndices[-1]+1:]
+    sepNameFront = firstLocalName[:digitIndices[0]]
+    sepNameBack  = firstLocalName[digitIndices[-1]+1:]
     
     numFormat = "%0" + str(len( digitIndices )) + "d"
     
-    startNum = int( firstName[digitIndices[0]:digitIndices[-1]+1] )
+    startNum = int( firstLocalName[digitIndices[0]:digitIndices[-1]+1] )
     fullNameFormat = sepNameFront + numFormat + sepNameBack
 else:
     startNum = 0
-    fullNameFormat = firstName + '%02d'
+    fullNameFormat = firstName.split( '|' )[-1] + '%02d'
     
 for sel in sels:
     sel.rename( fullNameFormat % startNum )

@@ -10,6 +10,8 @@ class HumanRig:
     worldColor = 22
     leftColor = 17
     rightColor = 13
+    leftHandColor = 22
+    rightHandColor = 20
 
 
 
@@ -1065,21 +1067,24 @@ class BodyRig:
         self.stdBackSecond.r >> pCtlBodyRotator2.r
         self.stdChest.t >> pCtlChest.t
         self.stdChest.r >> pCtlChest.r
-        
         parent( pCtlChest, self.ctlBodyRotator2 )
 
         hipPivInWaist = createNode( 'transform', n='Pointer_hipInWaist' )
-        parent( hipPivInWaist, self.ctlWaist )
+        pHipPivInWaist = createNode( 'transform', n='PPointer_hipInWaist' )
+        parent( hipPivInWaist, pHipPivInWaist )
+        parent( pHipPivInWaist, self.ctlWaist.parent() )
+        pHipPivInWaist.setTransformDefault()
         dcmp_hipPivInWaist = getDecomposeMatrix( getLocalMatrix( self.ctlPervis, pCtlWaist ) )
         dcmp_hipPivInWaist.ot >> hipPivInWaist.t
         dcmp_hipPivInWaist.outputRotate >> hipPivInWaist.r
+        self.ctlWaist.r >> pHipPivInWaist.r
         
         constrain_parent( hipPivInWaist, pCtlHip )
         
         waistPivInPervis = createNode( 'transform', n='Pointer_waistiInPervis' )
         parent( waistPivInPervis, self.ctlPervis )
         self.stdBackFirst.t >> waistPivInPervis.t
-        
+
         constrain_point( waistPivInPervis, pCtlBodyRotator1 )
         
         self.stdBackFirst.r >> pCtlBodyRotator1.r
@@ -1207,7 +1212,8 @@ class BodyRig:
         self.stdBackSecond.t >> multForPointerInBack1_01.input1
         multForPointerInBack1_00.output >> pointerInBack1_00.t
         multForPointerInBack1_01.output >> pointerInBack1_01.t
-        connectBlendTwoMatrix( self.ctlBodyRotator1, self.ctlBodyRotator1.parent(), pointerInBack1_grp, cr=1 )
+        constrain_point( self.ctlWaist, pointerInBack1_grp )
+        connectBlendTwoMatrix( self.ctlWaist, self.ctlBodyRotator1.parent(), pointerInBack1_grp, cr=1 )
         
         pointerInBack2_grp = pointerBody2.makeChild().rename( 'pointerGrp_' + pointerBody2.name() )
         pointerInBack2_00 = pointerInBack2_grp.makeChild().rename( 'pointer00_' + pointerBody2.name() )
@@ -1303,33 +1309,31 @@ class BodyRig:
         
         waistPivInPervis = createNode( 'transform', n='Pointer_waistiInPervis' )
         parent( waistPivInPervis, self.ctlPervis )
-        self.stdBackFirst.t >> waistPivInPervis.t
         
         blendNode = getBlendTwoMatrixNode( self.stdBackFirst, self.stdBackSecond )
         mm = createNode( 'multMatrix' )
         blendNode.matrixSum >> mm.i[0]
         self.stdRoot.wim >> mm.i[1]
         dcmp_pCtlBodyRotator1 = getDecomposeMatrix( mm )
-        dcmp_pCtlBodyRotator1.ot >> pCtlBodyRotator1.t
-        self.stdBackFirst.r >> pCtlBodyRotator1.r
+        dcmp_pCtlBodyRotator1.ot >> waistPivInPervis.t
+        dcmp_pCtlBodyRotator1.outputRotate >> waistPivInPervis.r
+        constrain_point( waistPivInPervis, pCtlBodyRotator1 )
+        dcmp_pCtlBodyRotator1.outputRotate >> pCtlBodyRotator1.r
     
-        compose = createNode( 'composeMatrix' )
-        multMatrix = createNode( 'multMatrix' )
-        invMatrix = createNode( 'inverseMatrix' )
-        multMatrix2 = createNode( 'multMatrix' )
-        dcmp = createNode( 'decomposeMatrix' )
-        
-        dcmp_pCtlBodyRotator1.ot >> compose.it
-        self.stdBackFirst.r >> compose.ir
-        compose.outputMatrix >> multMatrix.i[0]
-        self.stdRoot.wm >> multMatrix.i[1]
-        multMatrix.matrixSum >> invMatrix.inputMatrix
-        self.stdChest.wm >> multMatrix2.i[0]
-        invMatrix.outputMatrix >> multMatrix2.i[1]
-        multMatrix2.matrixSum >> dcmp.imat
-        
-        dcmp.ot >> pCtlChest.t
-        dcmp.outputRotate >> pCtlChest.r
+        blendDcmp = createNode( 'decomposeMatrix' )
+        blendNode.matrixSum >> blendDcmp.imat
+        blendCompose = createNode( 'composeMatrix' )
+        blendDcmp.ot >> blendCompose.it
+        blendDcmp.outputRotate >> blendCompose.ir
+        blendInv = createNode( 'inverseMatrix' )
+        blendCompose.outputMatrix >> blendInv.inputMatrix
+        multMtx = createNode( 'multMatrix' )
+        self.stdChest.wm >> multMtx.i[0]
+        blendInv.outputMatrix >> multMtx.i[1]
+        dcmp_pChest = createNode( 'decomposeMatrix' )
+        multMtx.o >> dcmp_pChest.imat
+        dcmp_pChest.ot >> pCtlChest.t
+        dcmp_pChest.outputRotate >> pCtlChest.r
         
         parent( pCtlChest, self.ctlBodyRotator1 )
 
@@ -2017,7 +2021,7 @@ class ArmRig:
         upperShape = self.curveUpper.shape()
         lowerShape = self.curveLower.shape()
         
-        dcmpOffsetInUpper = getDecomposeMatrix( getLocalMatrix( self.stdSecondoffset, self.stdFirst ) )
+        dcmpOffsetInUpper = getDecomposeMatrix( getLocalMatrix( self.blOffset, self.blJntFirst ) )
         
         dcmpOffsetInUpper.ot >> upperShape.attr( 'controlPoints[1]' )
         self.blOffset.t    >> lowerShape.attr( 'controlPoints[0]' )
@@ -2138,59 +2142,7 @@ class ArmRig:
     def createConnector(self):
         
         self.connector = self.outJntsLower[-1]
-        
-    
-    
-    
-    @staticmethod
-    def addIkScaleAndSlide( ikCtl, ikJntTop ):
-        
-        ikJntMiddle = convertSg( cmds.listRelatives( ikJntTop, c=1, f=1 )[0] )
-        ikJntEnd    = convertSg( cmds.listRelatives( ikJntMiddle.name(), c=1, f=1 )[0] )
-        
-        upperCon = ikJntMiddle.tx.listConnections( s=1, d=0, p=1 )
-        lowerCon = ikJntEnd.tx.listConnections( s=1, d=0, p=1 )
-        
-        if upperCon:
-            upperCon = upperCon[0]
-        else:
-            upperCon = createNode( 'addDoubleLinear' ).setAttr( 'input1', ikJntMiddle.tx.get() ).output
-        if lowerCon:
-            lowerCon = lowerCon[0]
-        else:
-            lowerCon = createNode( 'addDoubleLinear' ).setAttr( 'input1', ikJntEnd.tx.get() ).output
-        
-            
-    
-        ikCtl = convertSg( ikCtl )
-        addOptionAttribute( ikCtl, 'scaleIk' )
-        ikCtl.addAttr( ln='addScale',   min=-1, max=1, k=1 )
-        ikCtl.addAttr( ln='slideScale', min=-1, max=1, k=1 )
-        
-        powNode = createNode( 'multiplyDivide' ).setAttr( 'op', 3 )
-        addUpper = createNode( 'addDoubleLinear' )
-        addLower = createNode( 'addDoubleLinear' )
-        lowerReverse = createNode( 'multDoubleLinear' ).setAttr( 'input2', -1 )
-        
-        multUpper = createNode( 'multDoubleLinear' )
-        multLower = createNode( 'multDoubleLinear' )
-        
-        powNode.input1X.set( 2 )
-        ikCtl.addScale >> powNode.input2X
-        powNode.outputX >> addUpper.input1
-        powNode.outputX >> addLower.input1
-        ikCtl.slideScale >> addUpper.input2
-        ikCtl.slideScale >> lowerReverse.input1
-        lowerReverse.output >> addLower.input2
-        addUpper.output >> multUpper.input2
-        addLower.output >> multLower.input2
-        
-        upperCon >> multUpper.input1
-        lowerCon >> multLower.input1
-        
-        multUpper.output >> ikJntMiddle.tx
-        multLower.output >> ikJntEnd.tx
-    
+
     
         
 
@@ -2465,8 +2417,6 @@ class LegRig( ArmRig ):
         self.resultJnts += [outJntFoot,outJntToe,outJntToeEnd]
         
         pass
-    
-    
 
 
 
@@ -2538,23 +2488,33 @@ class HandRig:
 
     def createControllers(self):
         
-        self.thumbCtls = []
-        self.indexCtls = []
-        self.middleCtls = []
-        self.ringCtls = []
-        self.pinkyCtls = []
+        self.stdLists = []
+        self.ctlLists = []
+        if self.thumbStds:
+            self.stdLists.append( self.thumbStds )
+            self.ctlLists.append( [] )
+        if self.indexStds:
+            self.stdLists.append( self.indexStds )
+            self.ctlLists.append( [] )
+        if self.middleStds:
+            self.stdLists.append( self.middleStds )
+            self.ctlLists.append( [] )
+        if self.ringStds:
+            self.stdLists.append( self.ringStds )
+            self.ctlLists.append( [] )
+        if self.pinkyStds:
+            self.stdLists.append( self.pinkyStds )
+            self.ctlLists.append( [] )
         
-        stdLists = [ self.thumbStds, self.indexStds, self.middleStds, self.ringStds, self.pinkyStds ]
-        ctlLists = [ self.thumbCtls, self.indexCtls, self.middleCtls, self.ringCtls, self.pinkyCtls ]
-        
-        for k in range( len( stdLists ) ):
+        for k in range( len( self.stdLists ) ):
             currentParentCtl = self.rigBase
-            for i in range( len( stdLists[k] ) ):
-                ctl = makeController( sgdata.Controllers.cubePoints, self.controllerSize, n= stdLists[k][i].name().replace( self.stdPrefix, 'Ctl_' ), makeParent=1 )
+            for i in range( len( self.stdLists[k] ) ):
+                ctl = makeController( sgdata.Controllers.cubePoints, self.controllerSize, n= self.stdLists[k][i].name().replace( self.stdPrefix, 'Ctl' ), makeParent=1 ,
+                                      colorIndex = self.colorIndex )
                 pCtl = ctl.parent()
-                stdLists[k][i].t >> pCtl.t
-                stdLists[k][i].r >> pCtl.r
-                ctlLists[k].append( ctl )
+                self.stdLists[k][i].t >> pCtl.t
+                self.stdLists[k][i].r >> pCtl.r
+                self.ctlLists[k].append( ctl )
                 parent( pCtl, currentParentCtl )
                 currentParentCtl = ctl
     
@@ -2562,30 +2522,25 @@ class HandRig:
 
     def createJoints(self):
         
-        ctlLists = [ self.thumbCtls, self.indexCtls, self.middleCtls, self.ringCtls, self.pinkyCtls ]
+        if not self.ctlLists: return None
         
         select( d=1 )
         baseJoint = joint()
         constrain_parent( self.rigBase, baseJoint )
         
-        self.thumbJnts = []
-        self.indexJnts = []
-        self.middleJnts = []
-        self.ringJnts = []
-        self.pinkyJnts = []
-        
-        jntLists = [ self.thumbJnts, self.indexJnts, self.middleJnts, self.ringJnts, self.pinkyJnts ]
+        jntLists = [ [] for i in range( len( self.ctlLists ) ) ]
         lookAtDirection = [1,0,0]
-        if self.thumbStds[0].tx.get() < 0:
+        
+        if self.stdLists[0][0].tx.get() < 0:
             lookAtDirection = [-1,0,0]
         
-        for i in range( len( ctlLists ) ):
+        for i in range( len( self.ctlLists ) ):
             select( baseJoint )
             ctlParent = self.rigBase
-            for j in range( len( ctlLists[i] ) ):
+            for j in range( len( self.ctlLists[i] ) ):
                 newJoint = joint()
-                dcmpMove = getDecomposeMatrix( getLocalMatrix( ctlLists[i][j], ctlParent) )
-                dcmpOrig = getDecomposeMatrix( getLocalMatrix( ctlLists[i][j].parent(), ctlParent) )
+                dcmpMove = getDecomposeMatrix( getLocalMatrix( self.ctlLists[i][j], ctlParent) )
+                dcmpOrig = getDecomposeMatrix( getLocalMatrix( self.ctlLists[i][j].parent(), ctlParent) )
                 distanceMove = getDistance( dcmpMove )
                 distanceOrig = getDistance( dcmpOrig )
                 div = createNode( 'multiplyDivide' ).setAttr( 'op', 2 )
@@ -2593,70 +2548,23 @@ class HandRig:
                 distanceOrig.distance >> div.input2X
                 if j != 0:
                     div.outputX >> jntLists[i][j-1].sx
-                    aimConstraint( ctlLists[i][j], jntLists[i][j-1], aim=lookAtDirection, u=[0,0,1], wu=[0,0,1], wut='objectrotation', wuo=ctlLists[i][j-1] )
+                    aimConstraint( self.ctlLists[i][j], jntLists[i][j-1], aim=lookAtDirection, u=[0,0,1], wu=[0,0,1], wut='objectrotation', wuo=self.ctlLists[i][j-1] )
                     dcmpOrig.ot >> newJoint.t
                 else:
-                    constrain_point( ctlLists[i][j], newJoint )
+                    constrain_point( self.ctlLists[i][j], newJoint )
 
                 jntLists[i].append( newJoint )
                 select( newJoint )
                 
-                ctlParent = ctlLists[i][j]
+                ctlParent = self.ctlLists[i][j]
         
         self.resultJnts = [baseJoint] + jntLists
-        
-        
-    
-    
-    def createFingerAttributeControl(self, stdHandPrefixList ):
-        
-        self.stdHandAttrList = [ stdHandPrefixList[i].replace( self.stdPrefix, '' ) for i in range( len( stdHandPrefixList ) ) ]
-        
-        _SIDE_ = self.getSide( self.thumbStds[0] )
-        self.ctlFinger = makeController( sgdata.Controllers.circlePoints, self.controllerSize, n='Ctl_Finger' + _SIDE_, 
-                                         makeParent=1, colorIndex = self.colorIndex )
-        transMult = 1
-        if self.thumbStds[0].tx.get() < 0:
-            transMult = -1
-        self.ctlFinger.setAttr( 'shape_tx', 2.5 * transMult ).setAttr( 'shape_ty', 1.5 * transMult ).setAttr( 'shape_sx', 2 ).setAttr( 'shape_sy', 2 ).setAttr( 'shape_sz', 2 )
-        pCtlFinger = self.ctlFinger.parent()
-        pCtlFinger.parentTo( self.rigBase )
-        pCtlFinger.setTransformDefault()
-        
-        addOptionAttribute( self.ctlFinger )
-        
-        stdLists = [ self.thumbStds, self.indexStds, self.middleStds, self.ringStds, self.pinkyStds ]
-        ctlLists = [ self.thumbCtls, self.indexCtls, self.middleCtls, self.ringCtls, self.pinkyCtls ]
-        
-        for i in range( len( stdLists ) ):
-            for j in range( len( stdLists[i] ) ):
-                plusNode   = createNode( 'plusMinusAverage' )
-                for k in range( len( self.stdHandPrefixList ) ):
-                    try:targetStd = convertSg( stdLists[i][j].name().replace( self.stdPrefix, self.stdHandPrefixList[k] ) )
-                    except:break
-                    multTarget = createNode( 'multiplyDivide' )
-                    
-                    if not cmds.attributeQuery( self.stdHandAttrList[k], node= self.ctlFinger.name(), ex=1 ):
-                        self.ctlFinger.addAttr( ln=self.stdHandAttrList[k], k=1 )
-                    
-                    targetStd.r >> multTarget.input1
-                    self.ctlFinger.attr( self.stdHandAttrList[k] ) >> multTarget.input2X
-                    self.ctlFinger.attr( self.stdHandAttrList[k] ) >> multTarget.input2Y
-                    self.ctlFinger.attr( self.stdHandAttrList[k] ) >> multTarget.input2Z
-                    multTarget.output >> plusNode.input3D[k]
-                
-                offsetCtl = convertSg( makeParent( ctlLists[i][j] ) ).rename( 'Offset' + ctlLists[i][j].name() )
-                
-                divNode = createNode( 'multiplyDivide' )
-                plusNode.output3D >> divNode.input1
-                divNode.input2.set( 0.1, 0.1, 0.1 )
-                
-                divNode.output >> offsetCtl.r
+
                 
 
 
 
-def StdHandDuplicator( targetStd, attrList ):
+def duplicateStdHand( targetStd, attrList ):
 
     targetStd = pymel.core.ls( targetStd )[0]
     PREFIX = 'StdJnt'
@@ -2665,7 +2573,9 @@ def StdHandDuplicator( targetStd, attrList ):
         TARGETPREFIX = PREFIX + attr    
         duStdHand = pymel.core.duplicate( targetStd, n=targetStd.shortName().replace( PREFIX, TARGETPREFIX ) )[0]    
         children = targetStd.listRelatives( c=1, ad=1, type='joint' )
-        duChildren = duStdHand.listRelatives( c=1, ad=1, type='joint' )    
+        duChildren = duStdHand.listRelatives( c=1, ad=1, type='joint' )
+        targetStd.t >> duStdHand.t
+        targetStd.r >> duStdHand.r
         for i in range( len( duChildren ) ):
             child = children[i]
             duChild = duChildren[i]
@@ -2673,6 +2583,7 @@ def StdHandDuplicator( targetStd, attrList ):
             child.t >> duChild.t
             child.r >> duChild.jo
             duChild.r.set( 0,0,0 )
+        duStdHand.v.set( 0 )
     
     
     
@@ -2780,23 +2691,23 @@ def createHumanByStd( **options ):
     
     if options.has_key( 'controllerSize' ):
         controllerSize = options['controllerSize']
-    if options.has_key( 'numBodyJoints' ):
-        numBodyJnts = options['numBodyJoints' ]
+    if options.has_key( 'numBodyJnts' ):
+        numBodyJnts = options['numBodyJnts' ]
         
-    if options.has_key( 'numArmJoints' ):
-        numArmUpperJnts = options['numArmJoints' ]
-        numArmLowerJnts = options['numArmJoints' ]
-    if options.has_key( 'numArmUpperJoints' ):
-        numArmUpperJnts = options['numArmUpperJoints' ]
-    if options.has_key( 'numArmLowerJoints' ):
-        numArmLowerJnts = options['numArmLowerJoints' ]
-    if options.has_key( 'numLegJoints' ):
-        numLegUpperJnts = options['numLegJoints' ]
-        numLegLowerJnts = options['numLegJoints' ]
-    if options.has_key( 'numLegUpperJoints' ):
-        numLegUpperJnts = options['numLegUpperJoints' ]
-    if options.has_key( 'numLegLowerJoints' ):
-        numLegLowerJnts = options['numLegLowerJoints' ]
+    if options.has_key( 'numArmJnts' ):
+        numArmUpperJnts = options['numArmJnts' ]
+        numArmLowerJnts = options['numArmJnts' ]
+    if options.has_key( 'numArmUpperJnts' ):
+        numArmUpperJnts = options['numArmUpperJnts' ]
+    if options.has_key( 'numArmLowerJnts' ):
+        numArmLowerJnts = options['numArmLowerJnts' ]
+    if options.has_key( 'numLegJnts' ):
+        numLegUpperJnts = options['numLegJnts' ]
+        numLegLowerJnts = options['numLegJnts' ]
+    if options.has_key( 'numLegUpperJnts' ):
+        numLegUpperJnts = options['numLegUpperJnts' ]
+    if options.has_key( 'numLegLowerJnts' ):
+        numLegLowerJnts = options['numLegLowerJnts' ]
         
     if options.has_key( 'bodyType' ):
         bodyType = options['bodyType']
@@ -2838,8 +2749,8 @@ def createHumanByStd( **options ):
     constrain_parent( bodyRig.connectorHipL, leftLegRig.rigBase )
     cmds.refresh()
     
-    leftHandRig = HandRig( *Std.getLeftHandList() )
-    leftHandRig.createAll( controllerSize * 0.3, HumanRig.leftColor )
+    leftHandRig = HandRig( *Std.getLeftHandList())
+    leftHandRig.createAll( controllerSize * 0.3, HumanRig.leftHandColor  )
     constrain_parent( leftArmRig.connector, leftHandRig.rigBase )
     cmds.refresh()
     
@@ -2859,7 +2770,7 @@ def createHumanByStd( **options ):
     cmds.refresh()
     
     rightHandRig = HandRig( *Std.getRightHandList() )
-    rightHandRig.createAll( controllerSize * 0.3, HumanRig.rightColor )
+    rightHandRig.createAll( controllerSize * 0.3, HumanRig.rightHandColor )
     constrain_parent( rightArmRig.connector, rightHandRig.rigBase )
     cmds.refresh()
     
@@ -2868,8 +2779,10 @@ def createHumanByStd( **options ):
     parent( rightClavicleRig.resultJnts[0], bodyRig.resultJnts[-1] ); rightClavicleRig.resultJnts[0].jo.set(0,0,0)
     parent( leftArmRig.resultJnts[0], leftClavicleRig.resultJnts[-1] ); leftArmRig.resultJnts[0].jo.set(0,0,0)
     parent( rightArmRig.resultJnts[0], rightClavicleRig.resultJnts[-1] ); rightArmRig.resultJnts[0].jo.set(0,0,0)
-    parent( leftHandRig.resultJnts[0], leftArmRig.resultJnts[-1] ); leftHandRig.resultJnts[0].jo.set(0,0,0)
-    parent( rightHandRig.resultJnts[0], rightArmRig.resultJnts[-1] ); rightHandRig.resultJnts[0].jo.set(0,0,0)
+    try:parent( leftHandRig.resultJnts[0], leftArmRig.resultJnts[-1] ); leftHandRig.resultJnts[0].jo.set(0,0,0)
+    except:pass
+    try:parent( rightHandRig.resultJnts[0], rightArmRig.resultJnts[-1] ); rightHandRig.resultJnts[0].jo.set(0,0,0)
+    except:pass
     parent( leftLegRig.resultJnts[0], bodyRig.resultJnts[0] ); leftLegRig.resultJnts[0].jo.set(0,0,0)
     parent( rightLegRig.resultJnts[0], bodyRig.resultJnts[0] ); rightLegRig.resultJnts[0].jo.set(0,0,0)
     cmds.refresh()
@@ -3076,26 +2989,757 @@ class FollowingIk:
 
 
     @staticmethod
-    def getFollowList():
+    def getFollowList( **options ):
         
-        return [ [FollowingIk.root, FollowingIk.stdRoot], 
-                 [FollowingIk.fly, FollowingIk.stdRoot],
-                 [FollowingIk.move, FollowingIk.stdBase],
-                 [FollowingIk.world, FollowingIk.stdBase]]
+        root = True
+        fly  = True
+        move = True
+        world = True
+        
+        if options.has_key( 'root' ):
+            root = options['root']
+        if options.has_key( 'fly' ):
+            fly = options['fly']
+        if options.has_key( 'move' ):
+            move = options['move']
+        if options.has_key( 'world' ):
+            world = options['world']
+        
+        returnTargets = []
+        if root: returnTargets.append( [FollowingIk.root,  FollowingIk.stdRoot] )
+        if fly: returnTargets.append( [FollowingIk.fly,   FollowingIk.stdRoot] )
+        if move: returnTargets.append( [FollowingIk.move,   FollowingIk.stdBase] )
+        if world: returnTargets.append( [FollowingIk.world,   FollowingIk.stdBase] )
+        
+        return returnTargets
     
     
     @staticmethod
     def createAll():
         
-        armIkLeft = FollowingIk( *FollowingIk.getLeftArmList() )
-        armIkLeft.create( *FollowingIk.getFollowList() )
-        armIkRight = FollowingIk( *FollowingIk.getRightArmList() )
-        armIkRight.create( *FollowingIk.getFollowList() )
+        try:
+            armIkLeft = FollowingIk( *FollowingIk.getLeftArmList() )
+            armIkLeft.create( *FollowingIk.getFollowList() )
+        except:
+            pass
+        try:
+            armIkRight = FollowingIk( *FollowingIk.getRightArmList() )
+            armIkRight.create( *FollowingIk.getFollowList() )
+        except:
+            pass
         
-        legIkLeft = FollowingIk( *FollowingIk.getLeftLegList() )
-        legIkLeft.create( *FollowingIk.getFollowList() )
-        legIkRight = FollowingIk( *FollowingIk.getRightLegList() )
-        legIkRight.create( *FollowingIk.getFollowList() )
+        try:
+            legIkLeft = FollowingIk( *FollowingIk.getLeftLegList() )
+            legIkLeft.create( *FollowingIk.getFollowList() )
+        except:pass
+        try:
+            legIkRight = FollowingIk( *FollowingIk.getRightLegList() )
+            legIkRight.create( *FollowingIk.getFollowList() )
+        except:pass
 
 
+
+
+
+class SymmetryControl:
+    
+    parentAttr    = 'ctlParent'
+    otherSideAttr = 'ctlOtherSide'
+    reverseAttrsAttr = 'ctlReverseAttrs'
+    mirrorTypeAttr   = 'ctlMirrorType'
+    
+
+    def __init__(self, name ):
+        self.__namespace = ''
+        self.__name = name
+        self.__origname = name
+        if self.__name.find( ':' ) != -1:
+            self.__namespace = ':'.join( name.split( ':' )[:-1] ) + ':'
+            self.__origname = name.split( ':' )[-1]
+        self.sgtransform = pymel.core.ls( self.__name )[0]
+
+    
+    def fullName(self, origName ):
+        return self.__namespace + origName
+
+
+    def parent(self):
+        if not cmds.attributeQuery( SymmetryControl.parentAttr, node=self.__name, ex=1 ): return None
+        return [ target.strip() for target in cmds.getAttr( self.__name + '.'+ SymmetryControl.parentAttr ).split( ',' ) ]
+    
+    
+    def side(self):
+        if self.__name.find( '_L_' ) != -1: return 'left'
+        if self.__name.find( '_R_' ) != -1: return 'right'
+        return 'center'
+
+    
+    def otherSide(self):
+        if not cmds.attributeQuery( SymmetryControl.otherSideAttr, node= self.__name, ex=1 ): return self
+        if not cmds.getAttr( self.__name + '.' + SymmetryControl.otherSideAttr ): return self
+        return SymmetryControl( self.__namespace + cmds.getAttr( self.__name + '.'+ SymmetryControl.otherSideAttr ) )
+
+
+    def mirrorType(self):
+        if not cmds.attributeQuery( SymmetryControl.mirrorTypeAttr, node= self.__name, ex=1 ): return []
+        mirrorType = cmds.getAttr( self.__name + '.' + SymmetryControl.mirrorTypeAttr )
+        return [ i.strip() for i in mirrorType.split( ',' ) ]
+
+
+    def name(self):
+        return self.__name
+
+
+    def setMatrixByMirrorType( self, mirrorTypes, srcLocalMtx ):
+        attrs  = ['tx', 'ty', 'tz','rx', 'ry', 'rz']
+        revs = [1,1,1,1,1,1]
+        values = [0,0,0,0,0,0]
+        for mirrorType in mirrorTypes[1:]:
+            for attr in attrs:
+                mirrorAttr, rev, value= mirrorType.split( '_' )
+                if mirrorAttr != attr: continue
+                if rev == 'r': revs[ attrs.index( attr ) ] *= -1
+                values[ attrs.index( attr ) ] = float( value )
+
+        trans = getTranslateFromMatrix( srcLocalMtx )
+        rots  = getRotateFromMatrix( srcLocalMtx )
+        trans[0] *= revs[0]
+        trans[1] *= revs[1]
+        trans[2] *= revs[2]
+        rots[0] *= revs[3]
+        rots[1] *= revs[4]
+        rots[2] *= revs[5]
+        srcLocalMtx = setMatrixTranslate( srcLocalMtx, trans[0], trans[1], trans[2] )
+        srcLocalMtx = setMatrixRotate( srcLocalMtx, rots[0], rots[1], rots[2] )
+        transAddValues = values[:3]
+        rotAddValues   = values[3:]
+        rotMtxInside = getMatrixFromRotate( rotAddValues )
+        transMtxOutside = getMatrixFromTranslate( transAddValues )
+        srcLocalMtx = rotMtxInside * srcLocalMtx * transMtxOutside
+        return srcLocalMtx
+
+
+    def getCtlData(self, source ):
+        
+        sourceParent = source.parent()
+        if not source.parent(): return None
+        
+        udAttrs = cmds.listAttr( source.__name, k=1, ud=1 )
+        if not udAttrs: udAttrs = []
+        udAttrValues = []
+        if cmds.attributeQuery( SymmetryControl.reverseAttrsAttr, node= source.__name, ex=1 ):
+            reverseAttrs = [ i.strip() for i in cmds.getAttr( source.__name + '.' + SymmetryControl.reverseAttrsAttr ).split( ',' ) ]
+        else:
+            reverseAttrs= []
+        for attr in udAttrs:
+            if attr in reverseAttrs:
+                udAttrValues.append( -cmds.getAttr( source.__name + '.' + attr ) )
+            else:
+                udAttrValues.append(  cmds.getAttr( source.__name + '.' + attr ) )
+
+        transformAttrs = ['tx','ty','tz','rx','ry','rz','sx','sy','sz']
+        transformAttrValues = []
+        for attr in transformAttrs:
+            transformAttrValues.append( cmds.getAttr( source.__name + '.' + attr ) )
+        worldMatrix = listToMatrix( cmds.getAttr( source.__name + '.wm' ) )
+        pivMatrix   = getPivotMatrix( sourceParent[0] ) * listToMatrix( cmds.getAttr( sourceParent[0] + '.wm' ) )
+        return udAttrs, udAttrValues, transformAttrs, transformAttrValues, worldMatrix * pivMatrix.inverse()
+    
+    
+    def setCtlData(self, source, target, ctlData, typ='mirror' ):
+
+        if not ctlData: return None
+
+        mirrorTypes = source.mirrorType()
+        udAttrs, udAttrValues, transformAttrs, transformValues, localMatrix = ctlData
+        
+        trg = target.sgtransform
+        for i in range( len( udAttrs ) ):
+            try:
+                trg.attr( udAttrs[i] ).set( udAttrValues[i] )
+            except:pass
+        for i in range( len( transformAttrs ) ):
+            try:trg.attr( transformAttrs[i] ).set( transformValues[i] )
+            except:pass
+        
+        if 'none' in mirrorTypes: return None
+
+        if 'local' in mirrorTypes:
+            trg.tx.set( -trg.tx.get() )
+            trg.ty.set( -trg.ty.get() )
+            trg.tz.set( -trg.tz.get() )
+            
+            attrs  = ['tx', 'ty', 'tz','rx', 'ry', 'rz']
+            revs = [1,1,1,1,1,1]
+            values = [0,0,0,0,0,0]
+            for mirrorType in mirrorTypes[1:]:
+                for attr in attrs:
+                    mirrorAttr, rev, value= mirrorType.split( '_' )
+                    if mirrorAttr != attr: continue
+                    if rev == 'r': revs[ attrs.index( attr ) ] *= -1
+                    values[ attrs.index( attr ) ] = float( value )
+            trg.tx.set( revs[0]*trg.tx.get() )
+            trg.ty.set( revs[1]*trg.ty.get() )
+            trg.tz.set( revs[2]*trg.tz.get() )
+            print '%s - revs : ' % source.name(), revs
+        
+        if 'txm' in mirrorTypes:
+            trg.tx.set( -trg.tx.get() )
+        if 'tym' in mirrorTypes:
+            trg.ty.set( -trg.ty.get() )
+        if 'tzm' in mirrorTypes:
+            trg.tz.set( -trg.tz.get() )
+        if 'rxm' in mirrorTypes:
+            trg.rx.set( -trg.rx.get() )
+        if 'rym' in mirrorTypes:
+            trg.ry.set( -trg.ry.get() )
+        if 'rzm' in mirrorTypes:
+            trg.rz.set( -trg.rz.get() )
+
+        if 'matrix' in mirrorTypes:
+            srcLocalMtx = getMirrorMatrix( localMatrix )
+            dstMatrix = srcLocalMtx * getPivotMatrix( target.parent()[0] ) * listToMatrix( cmds.getAttr( target.parent()[0] + '.wm' ) )
+            
+            tr = cmds.createNode( 'transform' )
+            cmds.setAttr( tr + '.dh', 1 )
+            cmds.xform( tr, ws=1, matrix= matrixToList( dstMatrix ) )
+            
+            cmds.xform( target.name(), ws=1, t=getTranslateFromMatrix(dstMatrix) )
+            rotList = getRotateFromMatrix( dstMatrix )
+            cmds.xform( target.name(), ws=1, ro= rotList )
+
+        if 'center' in mirrorTypes:
+            if typ == 'flip':
+                setMirrorLocal( target.sgtransform )
+            elif typ == 'mirror':
+                setCenterMirrorLocal( target.sgtransform )
+        
+    
+    def isMirrorAble(self):
+        
+        if not cmds.attributeQuery( SymmetryControl.mirrorTypeAttr, node=self.__name, ex=1 ): return False
+        mirrorTypes = cmds.getAttr( self.__name + '.' + SymmetryControl.mirrorTypeAttr )
+        if not mirrorTypes: return False
+        if mirrorTypes == 'none': return False
+        return True
+    
+    
+
+    def setMirror(self, side ):
+        
+        if not self.isMirrorAble(): return None
+        
+        if side == 'LtoR':
+            if self.side() == 'left':
+                source = self
+                target = self.otherSide()
+            else:
+                source = self.otherSide()
+                target = self
+                
+        if side == 'RtoL':
+            if self.side() == 'right':
+                source = self
+                target = self.otherSide()
+            else:
+                source = self.otherSide()
+                target = self
+        
+        self.setCtlData( source, target, self.getCtlData( source ), 'mirror' )
+    
+    
+    def setFlip(self):
+
+        if not self.isMirrorAble(): return None
+
+        source = self
+        target = self.otherSide()
+        dataSource = self.getCtlData( source )
+        dataTarget = self.getCtlData( target )
+        
+        self.setCtlData( source, target, dataSource, 'flip' )
+        self.setCtlData( target, source, dataTarget, 'flip' )
+    
+
+
+    def flipH(self):
+        
+        if not self.isMirrorAble(): return None
+        
+        H = self.allChildren()
+    
+        flipedList = []
+        sourceList = []
+        targetList = []
+        sourceDataList = []
+        targetDataList = []
+        
+        for h in H:
+            
+            if h.name() in flipedList: continue
+            name = h.otherSide().name()
+            if name in flipedList: continue
+            flipedList.append( h.name() )
+            
+            print "flip target : ", h.name()
+            
+            otherSide = h.otherSide()
+            sourceList.append( h )
+            targetList.append( otherSide )
+            sourceDataList.append( self.getCtlData( h ) )
+            targetDataList.append( self.getCtlData( otherSide ) )
+        
+        for i in range( len( sourceList ) ):
+            self.setCtlData( sourceList[i], targetList[i], sourceDataList[i], 'flip' )
+            self.setCtlData( targetList[i], sourceList[i], targetDataList[i], 'flip' )
+
+
+
+    def mirrorH(self, side ):
+        
+        if not self.isMirrorAble(): return None
+        
+        if side == 'LtoR':
+            if self.side() == 'left':
+                source = self
+            else:
+                source = self.otherSide()
+                
+        if side == 'RtoL':
+            if self.side() == 'right':
+                source = self
+            else:
+                source = self.otherSide()
+        
+        H = source.allChildren()
+    
+        sourceList = []
+        targetList = []
+        sourceDatas = []
+
+        for h in H:
+            if side == 'LtoR' and h.side() == 'right': continue
+            if side == 'RtoL' and h.side() == 'left' : continue
+            
+            otherSide = h.otherSide()
+            sourceList.append( h )
+            targetList.append( otherSide )
+            sourceDatas.append( self.getCtlData( h ) )
+        
+        for i in range( len( sourceList ) ):
+            self.setCtlData( sourceList[i], targetList[i], sourceDatas[i], 'mirror' )
+        
+
+
+    def children(self):
+        
+        allAttrs = cmds.ls( '*.' + SymmetryControl.parentAttr )
+        
+        targetChildren = []
+        for attr in allAttrs:
+            if attr.find( self.__namespace ) == -1: continue
+            targetParent = cmds.getAttr( attr )
+            if self.__name == self.__namespace + targetParent:
+                targetChildren.append( SymmetryControl( attr.split( '.' )[0] ) )
+        return targetChildren
+
+
+    def allChildren(self):
+        
+        localChildren = self.children()
+        childrenH = []
+        for localChild in localChildren:
+            childrenH += localChild.allChildren()
+        localChildren += childrenH
+        childrenNames = []
+
+        localChildrenSet = []
+        for localChild in localChildren:
+            name = localChild.name()
+            if name in childrenNames: continue
+            childrenNames.append( name )
+            localChildrenSet.append( localChild )
+        
+        return localChildrenSet
+    
+    
+    def hierarchy(self):
+        
+        localChildren = [self]
+        localChildren += self.allChildren()
+        return localChildren
+    
+
+    def setDefault(self):
+
+        attrs = self.sgtransform.listAttr( k=1 )
+        for attr in attrs:
+            if attr in self.dataPtr.defaultIgnore: continue
+            try:self.sgtransform.attr(attr).setToDefault()
+            except:pass
+
+
+
+class AddAndFixRig:
+
+    @staticmethod
+    def fixSplineJointConnections( inputCurveShape, *inputJnts ):
+        
+        curveShape = pymel.core.ls( inputCurveShape )[0]
+        jnts = pymel.core.ls( inputJnts )
+        beforeInfo = pymel.core.createNode( 'pointOnCurveInfo' )
+        curveShape.local >> beforeInfo.inputCurve
+        beforeInfo.top.set( 1 )
+        eachParam = 1.0/( len( jnts ) )
+        for i in range( len( jnts ) ):
+            cuInfo = pymel.core.createNode( 'pointOnCurveInfo' )
+            curveShape.local >> cuInfo.inputCurve
+            cuInfo.top.set( 1 )
+            cuInfo.parameter.set( eachParam * i )
+            distNode = pymel.core.createNode( 'distanceBetween' )
+            beforeInfo.position >> distNode.point1
+            cuInfo.position >> distNode.point2
+            multNode = pymel.core.createNode( 'multDoubleLinear' )
+            distNode.distance >> multNode.input1
+            multNode.input2.set( 1 )
+            if jnts[i].tx.get() < 0:
+                multNode.input2.set( -1 )
+            multNode.output >> jnts[i].tx
+            beforeInfo = cuInfo
+
+    @staticmethod
+    def addIkScaleAndSlide( ikCtl, ikJntTop ):
+        
+        ikJntGrp    = convertSg( cmds.listRelatives( ikJntTop, p=1, f=1 )[0] )
+        ikJntMiddle = convertSg( cmds.listRelatives( ikJntTop, c=1, f=1 )[0] )
+        ikJntEnd    = convertSg( cmds.listRelatives( ikJntMiddle.name(), c=1, f=1 )[0] )
+        
+        upperCon = ikJntMiddle.tx.listConnections( s=1, d=0, p=1 )
+        lowerCon = ikJntEnd.tx.listConnections( s=1, d=0, p=1 )
+        
+        if upperCon:
+            upperCon = upperCon[0]
+        else:
+            upperCon = createNode( 'addDoubleLinear' ).setAttr( 'input1', ikJntMiddle.tx.get() ).output
+        if lowerCon:
+            lowerCon = lowerCon[0]
+        else:
+            lowerCon = createNode( 'addDoubleLinear' ).setAttr( 'input1', ikJntEnd.tx.get() ).output
+    
+        ikCtl = convertSg( ikCtl )
+        addOptionAttribute( ikCtl, 'scaleIk' )
+        ikCtl.addAttr( ln='addScale',   min=-1, max=1, k=1 )
+        ikCtl.addAttr( ln='slideScale', min=-1, max=1, k=1 )
+        ikCtl.addAttr( ln='stretch', min=0, max=1, k=1 )
+        
+        powNode = createNode( 'multiplyDivide' ).setAttr( 'op', 3 )
+        addUpper = createNode( 'addDoubleLinear' )
+        addLower = createNode( 'addDoubleLinear' )
+        lowerReverse = createNode( 'multDoubleLinear' ).setAttr( 'input2', -1 )
+        
+        multUpper = createNode( 'multDoubleLinear' )
+        multLower = createNode( 'multDoubleLinear' )
+        
+        powNode.input1X.set( 2 )
+        ikCtl.addScale >> powNode.input2X
+        powNode.outputX >> addUpper.input1
+        powNode.outputX >> addLower.input1
+        ikCtl.slideScale >> addUpper.input2
+        ikCtl.slideScale >> lowerReverse.input1
+        lowerReverse.output >> addLower.input2
+        addUpper.output >> multUpper.input2
+        addLower.output >> multLower.input2
+        
+        upperCon >> multUpper.input1
+        lowerCon >> multLower.input1
+        
+        multUpper.output >> ikJntMiddle.tx
+        multLower.output >> ikJntEnd.tx
+    
+        distTarget = ikCtl.name().replace( 'Ctl_IkLeg', 'FootIkJnt_Toe' ).replace( '02', '_end' )
+        if cmds.objExists( distTarget ):
+            distIk = getDistance( getLocalDecomposeMatrix( distTarget, ikJntGrp ) )
+        else:
+            distIk = getDistance( getLocalDecomposeMatrix( ikCtl, ikJntGrp ) )
+        
+        cuUpperAndLowerAdd = createNode( 'addDoubleLinear' )
+        cuUpperAndLowerDist = createNode( 'distanceBetween' )
+        multUpper.output >> cuUpperAndLowerAdd.input1
+        multLower.output >> cuUpperAndLowerAdd.input2
+        cuUpperAndLowerAdd.output >> cuUpperAndLowerDist.point1X
+        
+        distCondition = createNode( 'condition' )
+        distIk.distance >> distCondition.firstTerm
+        cuUpperAndLowerDist.distance >> distCondition.secondTerm
+        distCondition.op.set( 2 )
+        
+        distRate = createNode( 'multiplyDivide' )
+        distRate.op.set( 2 )
+        distIk.distance >> distRate.input1X
+        cuUpperAndLowerDist.distance >> distRate.input2X
+        
+        stretchedUpper = createNode( 'multDoubleLinear' )
+        stretchedLower = createNode( 'multDoubleLinear' )
+        
+        multUpper.output >> stretchedUpper.input1
+        multLower.output >> stretchedLower.input1
+        distRate.outputX >> stretchedUpper.input2
+        distRate.outputX >> stretchedLower.input2
+        
+        blendNodeUpper = createNode( 'blendTwoAttr' )
+        blendNodeLower = createNode( 'blendTwoAttr' )
+        ikCtl.stretch >> blendNodeUpper.ab
+        ikCtl.stretch >> blendNodeLower.ab
+        
+        multUpper.output >> blendNodeUpper.input[0]
+        multLower.output >> blendNodeLower.input[0]
+        stretchedUpper.output >> blendNodeUpper.input[1]
+        stretchedLower.output >> blendNodeLower.input[1]
+        
+        blendNodeUpper.output >> distCondition.colorIfTrueR
+        blendNodeLower.output >> distCondition.colorIfTrueG
+        multUpper.output >> distCondition.colorIfFalseR
+        multLower.output >> distCondition.colorIfFalseG
+        
+        distCondition.outColorR >> ikJntMiddle.tx
+        distCondition.outColorG >> ikJntEnd.tx
+    
+    @staticmethod
+    def addFlexibleControlToCurve( inputTargetCurve ):
+        
+        targetCurve= pymel.core.ls( inputTargetCurve )[0]
+        targetCurveShape = targetCurve.getShape()
+        curveBase = targetCurve.getParent()
+        
+        point1Con = targetCurveShape.controlPoints[0].listConnections( s=1, d=0, p=1 )
+        point2Con = targetCurveShape.controlPoints[1].listConnections( s=1, d=0, p=1 )
+        
+        lookAtObject = pymel.core.createNode( 'transform' )
+        pymel.core.parent( lookAtObject, curveBase )
+        lookAtObject.t.set( 0,0,0 )
+        angleNode = pymel.core.createNode( 'angleBetween' )
+        
+        ctl, circleNode = pymel.core.circle()
+        curvePoint1 = pymel.core.createNode( 'transform' )
+        curvePoint2 = pymel.core.createNode( 'transform' )
+        pymel.core.parent( curvePoint1, curvePoint2, ctl )
+        pymel.core.parent( ctl, lookAtObject )
+        ctl.t.set( 0,0,0 ); ctl.r.set( 0,0,0 )
+        
+        pointAttrs = []
+        if point1Con:
+            pointNode = pymel.core.createNode( 'plusMinusAverage' )
+            vectorNode = pymel.core.createNode( 'plusMinusAverage' )
+            point2Con[0] >> vectorNode.input3D[0]
+            point1Con[0] >> vectorNode.input3D[1]
+            pointNode.op.set( 3 )
+            vectorNode.op.set( 2 )
+            baseVector = getDirection( vectorNode.output3D.get() )
+            angleNode.vector1.set( baseVector )
+            vectorNode.output3D >> angleNode.vector2
+            point1Con[0] >> pointNode.input3D[0]
+            point2Con[0] >> pointNode.input3D[1]
+            pointNode.output3D >> lookAtObject.t
+            angleNode.euler >> lookAtObject.r
+            
+            circleNode.normal.set( baseVector )
+            
+            curvePoint1Mult = pymel.core.createNode( 'multDoubleLinear' )
+            curvePoint2Mult = pymel.core.createNode( 'multDoubleLinear' )
+            curvePoint1Compose = pymel.core.createNode( 'composeMatrix' )
+            curvePoint2Compose = pymel.core.createNode( 'composeMatrix' )
+            vectorNode.output3Dx >> curvePoint1Mult.input1
+            vectorNode.output3Dx >> curvePoint2Mult.input1
+            curvePoint1Mult.input2.set( -.3 )
+            curvePoint2Mult.input2.set( 0.3 )
+            curvePoint1Mult.output >> curvePoint1Compose.itx
+            curvePoint2Mult.output >> curvePoint2Compose.itx
+            
+            mmPoint1 = pymel.core.createNode( 'multMatrix' )
+            dcmpPoint1 = pymel.core.createNode( 'decomposeMatrix' )
+            curvePoint1Compose.outputMatrix >> mmPoint1.i[0]
+            ctl.m >> mmPoint1.i[1]
+            lookAtObject.m >> mmPoint1.i[2]
+            mmPoint1.o >> dcmpPoint1.imat
+            mmPoint2 = pymel.core.createNode( 'multMatrix' )
+            dcmpPoint2 = pymel.core.createNode( 'decomposeMatrix' )
+            curvePoint2Compose.outputMatrix >> mmPoint2.i[0]
+            ctl.m >> mmPoint2.i[1]
+            lookAtObject.m >> mmPoint2.i[2]
+            mmPoint2.o >> dcmpPoint2.imat
+            
+            pointAttrs = [ point1Con[0], dcmpPoint1.ot, dcmpPoint2.ot, point2Con[0] ]
+        else:
+            pointNode = pymel.core.createNode( 'multiplyDivide' )
+            baseVector = getDirection( point2Con[0].get() )
+            angleNode.vector1.set( baseVector )
+            point2Con[0] >> pointNode.input1
+            point2Con[0] >> angleNode.vector2
+            pointNode.input2.set( 0.5, 0.5, 0.5 )
+            pointNode.output >> lookAtObject.t
+            angleNode.euler >> lookAtObject.r
+            
+            circleNode.normal.set( baseVector )
+            
+            curvePoint1Mult = pymel.core.createNode( 'multDoubleLinear' )
+            curvePoint2Mult = pymel.core.createNode( 'multDoubleLinear' )
+            curvePoint1Compose = pymel.core.createNode( 'composeMatrix' )
+            curvePoint2Compose = pymel.core.createNode( 'composeMatrix' )
+            point2Con[0].getChildren()[0] >> curvePoint1Mult.input1
+            point2Con[0].getChildren()[0] >> curvePoint2Mult.input1
+            curvePoint1Mult.input2.set( -.3 )
+            curvePoint2Mult.input2.set( 0.3 )
+            curvePoint1Mult.output >> curvePoint1Compose.itx
+            curvePoint2Mult.output >> curvePoint2Compose.itx
+            
+            mmPoint1 = pymel.core.createNode( 'multMatrix' )
+            dcmpPoint1 = pymel.core.createNode( 'decomposeMatrix' )
+            curvePoint1Compose.outputMatrix >> mmPoint1.i[0]
+            ctl.m >> mmPoint1.i[1]
+            lookAtObject.m >> mmPoint1.i[2]
+            mmPoint1.o >> dcmpPoint1.imat
+            mmPoint2 = pymel.core.createNode( 'multMatrix' )
+            dcmpPoint2 = pymel.core.createNode( 'decomposeMatrix' )
+            curvePoint2Compose.outputMatrix >> mmPoint2.i[0]
+            ctl.m >> mmPoint2.i[1]
+            lookAtObject.m >> mmPoint2.i[2]
+            mmPoint2.o >> dcmpPoint2.imat
+            
+            pointAttrs = [ None, dcmpPoint1.ot, dcmpPoint2.ot, point2Con[0] ]
+        
+        newCurve = pymel.core.curve( p=[[0,0,0] for i in range(4)], d=3 )
+        newCurveShape = newCurve.getShape()
+        for i in range( 4 ):
+            if not pointAttrs[i]: continue
+            pointAttrs[i] >> newCurveShape.controlPoints[i]
+        
+        pymel.core.parent( newCurve, curveBase )
+        newCurve.t.set( 0,0,0 )
+        newCurve.r.set( 0,0,0 )
+        
+        for origCon, destCon in targetCurveShape.listConnections( s=0, d=1, p=1, c=1 ):
+            attrName = origCon.attrName()
+            newCurve.attr( attrName ) >> destCon
+    
+    
+    @staticmethod
+    def fixFootAttribute( inputCtlFootPiv ):
+        
+        inputCtlToeEnd = inputCtlFootPiv.replace( 'FootIkFootPiv', 'FootIkToe' ) + 'End'
+        inputCtlToe = inputCtlFootPiv.replace( 'FootIkFootPiv', 'FootIkToe' )
+        
+        ctlFootPiv = pymel.core.ls( inputCtlFootPiv )[0]
+        ctlToeEnd  = pymel.core.ls( inputCtlToeEnd )[0]
+        ctlToe     = pymel.core.ls( inputCtlToe )[0]
+        
+        ctlFootPiv.addAttr( 'liftBall', k=1 )
+        ctlFootPiv.addAttr( 'hillTwist', k=1 )
+        ctlFootPiv.addAttr( 'ballTwist', k=1 )
+        ctlFootPiv.addAttr( 'toeTwist',  k=1 )
+        ctlFootPiv.addAttr( 'toeRot', k=1 )
+        
+        conTargets = ctlFootPiv.ballRot.listConnections( s=0, d=1, p=1 )
+        
+        ctlFootPiv.liftBall >> ctlToe.ry
+        ctlFootPiv.hillTwist >> ctlFootPiv.rx
+        for conTarget in conTargets:
+            ctlFootPiv.ballTwist >> conTarget
+        ctlFootPiv.toeTwist >> ctlToeEnd.rx
+        ctlFootPiv.toeRot >> ctlToe.toeRot
+        
+        ctlToeEnd.v.set( 0 )
+        
+        if pymel.core.attributeQuery( 'ballRot', node=ctlFootPiv, ex=1 ):
+            ctlFootPiv.ballRot.delete()
+        
+        
+    @staticmethod
+    def addAutoTwistPoleVector( ctlIk ):
+        
+        twistTarget = ctlIk.replace( 'Ctl_IkLeg', 'FootIkJnt_Toe' ).replace( '02', '_end' )
+        twistTargetBase = cmds.createNode( 'transform' )
+        cmds.connectAttr( ctlIk + '.jo', twistTargetBase + '.r' )
+        cmds.connectAttr( ctlIk + '.t', twistTargetBase + '.t' )
+        selP = cmds.listRelatives( ctlIk, p=1, f=1 )[0]
+        twistTargetBase = cmds.parent( twistTargetBase, selP )[0]
+        localMtx = cmds.createNode( 'multMatrix' )
+        dcmp = cmds.createNode( 'decomposeMatrix' )
+        cmds.connectAttr( twistTarget + '.wm', localMtx + '.i[0]' )
+        cmds.connectAttr( twistTargetBase + '.wim', localMtx + '.i[1]' )
+        cmds.connectAttr( localMtx + '.o', dcmp + '.imat' )
+        localTwistObj = cmds.createNode( 'transform' )
+        cmds.connectAttr( dcmp + '.or', localTwistObj + '.r' )
+        localTwistObj = cmds.parent( localTwistObj, twistTargetBase )[0]
+        cmds.setAttr( localTwistObj + '.t', 0,0,0 )
+        autoTwistNode = getAutoTwistNode( localTwistObj )
+        dcmpAutoTwistNode = cmds.createNode( 'decomposeMatrix' )
+        cmds.connectAttr( autoTwistNode + '.matrixSum', dcmpAutoTwistNode + '.imat' )
+        
+        twistLegPoleV = ctlIk.replace( 'Ctl_IkLeg', 'Twist_Leg' ).replace( '02', 'PoleV' )
+        baseTwistLegPoleV = cmds.listRelatives( twistLegPoleV, p=1, f=1 )[0]
+        
+        pTwist = cmds.parent( cmds.createNode( 'transform', n='Auto_' + twistLegPoleV ), baseTwistLegPoleV )[0]
+        cmds.setAttr( pTwist + '.t', 0,0,0 )
+        cmds.connectAttr( dcmpAutoTwistNode + '.or', pTwist + '.r' )
+        
+        addOptionAttribute( ctlIk, 'autoPoleVTwist' )
+        cmds.addAttr( ctlIk, ln='autoTwistPoleV', min=0, max=1, dv=1 )
+        cmds.setAttr( ctlIk + '.autoTwistPoleV', e=1, k=1 )
+        cmds.connectAttr( ctlIk + '.autoTwistPoleV', autoTwistNode + '.blend' )
+        
+        cmds.parent( twistLegPoleV, pTwist )[0]
+        
+        
+        
+    @staticmethod
+    def createFingerAttributeControl( fingerCtl ):
+    
+        side = ''
+        if fingerCtl.find( '_L_' ) != -1:
+            baseStdNames = 'StdJnt*_Arm_L_02'
+            side = 'L'
+        else:
+            baseStdNames = 'StdJnt*_Arm_R_02'
+            side = 'R'
+    
+        baseStdName = 'StdJnt_Arm_%s_02' % side
+        baseStds = cmds.ls( baseStdNames )
+        handAttrList = []
+        for baseStd in baseStds:
+            if baseStd == baseStdName: continue
+            attrName = baseStd.replace( 'StdJnt', '' ).replace( '_Arm_%s_02' % side, '' )
+            handAttrList.append( attrName )
+    
+        stdLists = []
+        for fingerName in ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky']:
+            fingers = cmds.ls( baseStdName.replace( 'Arm', fingerName ).replace( '02', '*' ), type='joint' )
+            if not fingers: continue
+            stdLists.append( fingers )
+        
+        for i in range( len( stdLists ) ):
+            for j in range( len( stdLists[i] ) ):
+                plusNode   = cmds.createNode( 'plusMinusAverage' )
+                for k in range( len( handAttrList ) ):
+                    targetStd = stdLists[i][j].replace( 'StdJnt', 'StdJnt' + handAttrList[k] )
+                    multTarget = cmds.createNode( 'multiplyDivide' )
+                    addAttr( fingerCtl, ln=handAttrList[k], k=1 )   
+                    cmds.connectAttr( targetStd + '.r', multTarget + '.input1' )                 
+                    cmds.connectAttr( fingerCtl + '.' + handAttrList[k], multTarget + '.input2X' )
+                    cmds.connectAttr( fingerCtl + '.' + handAttrList[k], multTarget + '.input2Y' )
+                    cmds.connectAttr( fingerCtl + '.' + handAttrList[k], multTarget + '.input2Z' )
+                    cmds.connectAttr( multTarget + '.output', plusNode + '.input3D[%d]' % k )
+                
+                offsetCtl = stdLists[i][j].replace( 'StdJnt', 'OffsetCtl' )
+                
+                divNode = cmds.createNode( 'multiplyDivide' )
+                cmds.connectAttr( plusNode + '.output3D', divNode + '.input1' )
+                cmds.setAttr( divNode + '.input2', 0.1, 0.1, 0.1 )
+                
+                cmds.connectAttr( divNode + '.output', offsetCtl + '.r', f=1 )
+            
+        
+        
+        
+        
+        
 

@@ -841,7 +841,6 @@ def createBlendMatrix( *args, **options ):
         constMatrixAttr >> wtAddMtx.attr( 'i[%d].m' % i )
         divNode.outputX >> wtAddMtx.attr( 'i[%d].w' % i )
     
-    outDcmp.ot >> target.t
     outDcmp.outputRotate >> target.r
    
 
@@ -856,7 +855,7 @@ def addBlendMatrix( *args, **options ):
     wtAddMtx = target.getNodeFromHistory( 'wtAddMatrix' )
     averages = target.getNodeFromHistory( 'plusMinusAverage' )
     
-    if not wtAddMtx:
+    if not averages:
         createBlendMatrix( *args, **options )
         return 0
     
@@ -1093,8 +1092,10 @@ def setMirror( sel ):
     matList = sel.wm.get()
     matList[1]  *= -1
     matList[2]  *= -1
-    matList[4]  *= -1
-    matList[8]  *= -1
+    matList[5]  *= -1
+    matList[6]  *= -1
+    matList[9]  *= -1
+    matList[10]  *= -1
     matList[12] *= -1
     sel.xform( ws=1, matrix= matList )
 
@@ -1144,6 +1145,14 @@ def setMirrorLocal( sel ):
     trMtx = OpenMaya.MTransformationMatrix( mtx )
     rotValue = trMtx.eulerRotation().asVector()
     rotList = [math.degrees(rotValue.x), math.degrees(rotValue.y), math.degrees(rotValue.z)]
+    
+    if cmds.nodeType( sel.name() ) == 'joint':
+        joValue = sel.jo.get()
+        joMtx = getMatrixFromRotate( joValue )
+        rotMtx = getMatrixFromRotate( rotList )
+        localRotMtx = rotMtx * joMtx.inverse()
+        rotList = getRotateFromMatrix( localRotMtx )
+    
     sel.xform( os=1, ro=rotList )
     sel.tx.set( -sel.tx.get() )
 
@@ -1177,8 +1186,35 @@ def setCenterMirrorLocal( sel ):
     rotList = [math.degrees(rotValue.x), math.degrees(rotValue.y), math.degrees(rotValue.z)]
     
     sel.tx.set( 0 )
+    
+    if cmds.nodeType( sel.name() ) == 'joint':
+        joValue = sel.jo.get()
+        joMtx = getMatrixFromRotate( joValue )
+        rotMtx = getMatrixFromRotate( rotList )
+        localRotMtx = rotMtx * joMtx.inverse()
+        rotList = getRotateFromMatrix( localRotMtx )
+    
     sel.xform( os=1, ro=rotList )
 
+
+
+
+def getMirrorMatrix( mtxValue ):
+
+    if type( mtxValue ) == list:
+        mtxList = mtxValue
+    else:
+        mtxList = matrixToList( mtxValue )
+        
+    mtxList[1]  *= -1
+    mtxList[2]  *= -1
+    mtxList[5]  *= -1
+    mtxList[6]  *= -1
+    mtxList[9]  *= -1
+    mtxList[10]  *= -1
+    mtxList[12] *= -1
+    
+    return listToMatrix( mtxList )
 
 
 
@@ -1210,6 +1246,14 @@ def getLookAtMatrixValue( aimTarget, rotTarget, **options ):
 
 
 
+
+def getTranslateFromMatrix( targetMtx ):
+    if type( targetMtx ) == list:
+        return OpenMaya.MPoint( targetMtx[12], targetMtx[13], targetMtx[14] )
+    return [targetMtx( 3, 0 ), targetMtx( 3,1 ), targetMtx( 3,2 )]
+
+
+
 def getRotateFromMatrix( mtxValue ):
     
     if type( mtxValue ) == list:
@@ -1218,7 +1262,7 @@ def getRotateFromMatrix( mtxValue ):
     trMtx = OpenMaya.MTransformationMatrix( mtxValue )
     rotVector = trMtx.eulerRotation().asVector()
     
-    return math.degrees(rotVector.x), math.degrees(rotVector.y), math.degrees(rotVector.z)
+    return [math.degrees(rotVector.x), math.degrees(rotVector.y), math.degrees(rotVector.z)]
 
 
 
@@ -1329,10 +1373,9 @@ def getSourceList( node, nodeList = [] ):
             cons += node.attr( attr ).listConnections( s=1, d=0, p=1, c=1 )
     else:
         cons = node.listConnections( s=1, d=0, p=1, c=1 )
-
     srcs = cons[1::2]
     
-    returnList = [node]
+    returnList = [node.name()]
     for i in range( len( srcs ) ):
         results = getSourceList( srcs[i].node(), nodeList )
         if not results: continue
@@ -1633,7 +1676,7 @@ def makeController( pointList, defaultScaleMult = 1, **options ):
     mp = False
     if options.has_key( 'makeParent' ):
         mp = options.pop('makeParent')
-        
+    
     colorIndex = -1
     if options.has_key( 'colorIndex' ):
         colorIndex = options.pop('colorIndex')
@@ -1650,11 +1693,15 @@ def makeController( pointList, defaultScaleMult = 1, **options ):
         name = None
     
     jnt = pymel.core.ls( cmds.createNode( typ ) )[0]
+    pJnt = None
+    
+    if mp:
+        pJnt = pymel.core.ls( makeParent( jnt ) )[0]
+    
     if name:
-        if mp:
-            pJnt = pymel.core.ls( makeParent( jnt ) )[0]
-            pJnt.rename( 'P' + name )
         jnt.rename( name )
+        if pJnt:
+            pJnt.rename( 'P' + name )
 
     parent( crvShape, jnt, add=1, shape=1 )
     delete( crv )
@@ -1942,7 +1989,7 @@ class SliderBase:
     
         baseData = [[-.5,-.5,0],[.5,-.5,0],[.5,.5,0],[-.5,.5,0],[-.5,-.5,0]]
         baseCurve = curve( p=baseData, d=1 )
-        baseCurveOrigShape=  addIOShape( baseCurve )
+        baseCurveOrigShape=  convertSg( addIOShape( baseCurve ) )
         baseCurveShape = baseCurve.shape()
         
         trGeo = createNode( 'transformGeometry' )
@@ -1969,7 +2016,7 @@ class SliderBase:
         composeMatrix.outputMatrix >> trGeo.transform
         baseCurveOrigShape.outputGeometry() >> trGeo.inputGeometry
         trGeo.outputGeometry >> baseCurveShape.inputGeometry()
-        
+
         return baseCurve
 
 
@@ -2028,9 +2075,50 @@ def getMatrixFromSelection( *sels ):
 
 
 
+
+def getMatrixFromTranslate( transValue ):
+    
+    defaultMtx = matrixToList( OpenMaya.MMatrix() )
+    defaultMtx[12] = transValue[0]
+    defaultMtx[13] = transValue[1]
+    defaultMtx[14] = transValue[2]
+    return listToMatrix( defaultMtx )
+
+
+
+def getMatrixFromRotate( rotValue ):
+    
+    trMtx = OpenMaya.MTransformationMatrix()
+    radRotValues = [ math.radians(i) for i in rotValue ]
+    trMtx.rotateTo( OpenMaya.MEulerRotation( OpenMaya.MVector( *radRotValues ) ) ) 
+    return trMtx.asMatrix()
+
+
+
+def setMatrixTranslate( mtx, *transValue ):
+    
+    mtxList = matrixToList( mtx )
+    mtxList[12] = transValue[0]
+    mtxList[13] = transValue[1]
+    mtxList[14] = transValue[2]
+    return listToMatrix( mtxList )
+
+
+def setMatrixRotate( mtx, *rotValue ):
+    
+    mtxList = matrixToList( getMatrixFromRotate( rotValue ) )
+    mtxList[12] = mtx(3,0)
+    mtxList[13] = mtx(3,1)
+    mtxList[14] = mtx(3,2)
+    return listToMatrix( mtxList )
+
+
+
+
+
 @convertName_dec
 def joint( *args, **options ):
-    return SGTransformNode( cmds.joint( *args, **options ) )
+    return convertSg( cmds.joint( *args, **options ) )
 
 
 
@@ -2133,6 +2221,10 @@ def addAnimCurveConnection( node, attr ):
           
     cons = cmds.listConnections( node+'.'+attr, s=1, d=0, p=1, c=1 )
     if not cons: return None
+    if cmds.nodeType( cons[1].split( '.' )[0] ) == 'unitConversion':
+        srcCon = cmds.listConnections( cons[1].split( '.' )[0], s=1, d=0, p=1 )
+        if srcCon:
+            cons[1] = srcCon[0]
     
     attrType = cmds.attributeQuery( attr, node= node, attributeType=1 )
     
@@ -2148,9 +2240,7 @@ def addAnimCurveConnection( node, attr ):
     cmds.connectAttr( animCurve+'.output', cons[0], f=1 )
     
     cmds.setKeyframe( animCurve, f= -1, v= -1 )
-    cmds.setKeyframe( animCurve, f=-.5, v=-.5 )
     cmds.setKeyframe( animCurve, f=  0, v=  0 )
-    cmds.setKeyframe( animCurve, f= .5, v= .5 )
     cmds.setKeyframe( animCurve, f=  1, v=  1 )
     
     cmds.setAttr( animCurve + ".postInfinity", 1 )
@@ -2173,26 +2263,37 @@ def getOrigShape( shape ):
 
 
 
-@convertSg_dec
-def createPointOnCurve( curve ):
+def createPointOnCurve( inputCurve, **options ):
     
-    selShape = curve.shape()
-    pointInfoNode = createNode( 'pointOnCurveInfo' )
-    trNode = createNode( 'transform' ).setAttr( 'dh', 1 )
-    selShape.attr( 'worldSpace' ) >> pointInfoNode.inputCurve
+    curve = pymel.core.ls( inputCurve )[0]
+    curveShape = curve.getShape()
+    pointInfoNode = pymel.core.createNode( 'pointOnCurveInfo' )
+    trNode = pymel.core.createNode( 'transform' )
+    trNode.dh.set( 1 )
     
-    composeNode = createNode( 'composeMatrix' )
-    mm = createNode( 'multMatrix' )
-    dcmp = createNode( 'decomposeMatrix' )
     
-    pointInfoNode.position >> composeNode.inputTranslate
-    composeNode.outputMatrix >> mm.i[0]
-    trNode.pim >> mm.i[1]
-    mm.matrixSum >> dcmp.imat
+    local = False
+    if options.has_key( 'local' ):
+        local = options[ 'local' ]
     
-    dcmp.ot >> trNode.t
-    trNode.addAttr( ln='parameter', k=1, 
-                    min=selShape.attr( 'minValue' ).get(), max=selShape.attr( 'maxValue' ).get() )
+    if local:
+        curveShape.attr( 'local' ) >> pointInfoNode.inputCurve
+        pointInfoNode.position >> trNode.t
+    else:
+        curveShape.attr( 'worldSpace' ) >> pointInfoNode.inputCurve
+        composeNode = pymel.core.createNode( 'composeMatrix' )
+        mm = pymel.core.createNode( 'multMatrix' )
+        dcmp = pymel.core.createNode( 'decomposeMatrix' )
+        
+        pointInfoNode.position >> composeNode.inputTranslate
+        composeNode.outputMatrix >> mm.i[0]
+        trNode.pim >> mm.i[1]
+        mm.matrixSum >> dcmp.imat
+        
+        dcmp.ot >> trNode.t
+    
+    trNode.addAttr( 'parameter', k=1, 
+                    min=curveShape.attr( 'minValue' ).get(), max=curveShape.attr( 'maxValue' ).get() )
     trNode.parameter >> pointInfoNode.parameter
     return trNode.name()
 
@@ -2328,6 +2429,16 @@ def getDataPtrFromMirrorInfo( rootMirrorInfo, leftPrefixList, rightPrefixList ):
         parent = info.parent()
         dataPtrInst.data.append( [info.origName(), parent.origName(), otherSide.origName(), info.getMirrorType()] )
     return dataPtrInst
+
+
+
+def getPivotMatrix( target ):
+    piv = OpenMaya.MPoint( *cmds.getAttr( target + '.rotatePivot' )[0] )
+    mtxList = matrixToList( OpenMaya.MMatrix() )
+    mtxList[ 12 ] = piv.x
+    mtxList[ 13 ] = piv.y
+    mtxList[ 14 ] = piv.z
+    return listToMatrix( mtxList )
 
 
 
@@ -2712,6 +2823,36 @@ def getCloseMatrixOnMesh( matrixObj, mesh  ):
 
 
 
+
+def addAttr( target, **options ):
+    
+    items = options.items()
+    
+    attrName = ''
+    channelBox = False
+    keyable = False
+    for key, value in items:
+        if key in ['ln', 'longName']:
+            attrName = value
+        elif key in ['cb', 'channelBox']:
+            channelBox = True
+            options.pop( key )
+        elif key in ['k', 'keyable']:
+            keyable = True 
+            options.pop( key )
+    
+    if cmds.attributeQuery( attrName, node=target, ex=1 ): return None
+    
+    cmds.addAttr( target, **options )
+    
+    if channelBox:
+        cmds.setAttr( target+'.'+attrName, e=1, cb=1 )
+    elif keyable:
+        cmds.setAttr( target+'.'+attrName, e=1, k=1 )
+
+
+
+
 def createTextureFileNode( filePath ):
     
     fileNode = convertSg( cmds.shadingNode( "file", asTexture=1, isColorManaged=1 ) )
@@ -2738,7 +2879,7 @@ def createTextureFileNode( filePath ):
     place2d.outUV >> fileNode.uv
     place2d.outUvFilterSize >> fileNode.uvFilterSize
     
-    return fileNode, place2d
+    return fileNode.name(), place2d.name()
 
 
 
@@ -3107,7 +3248,8 @@ def setGeometryMatrixToTarget( geo, matrixTarget ):
     inputAttr = ''
     
     for geoShape in geoShapes:
-        ioShape = addIOShape( geoShape )
+        ioShape = convertSg( addIOShape( geoShape ) )
+        print "io shape : ", ioShape
         if geoShape.nodeType() == 'mesh':
             outputAttr = 'outMesh'
             inputAttr = 'inMesh'
@@ -3836,6 +3978,7 @@ def aimConstraint( *args, **kwargs ):
 
 
 
+
 @convertSg_dec
 def getMultDoubleLinear( node=None ):
     
@@ -3849,10 +3992,14 @@ def getMultDoubleLinear( node=None ):
 
 
 
+
 @convertSg_dec
-def createSquashBend( *geos ):    
+def createSquashBend( *geos, **options ):
+        
     if not type( geos ) in [ list, tuple ]:
         geos = [geos]
+        
+    geoNames = [ geo.name() for geo in geos ]
     
     allbb = OpenMaya.MBoundingBox()
     for geo in geos:
@@ -3870,15 +4017,16 @@ def createSquashBend( *geos ):
     
     upperPoint = [ center.x, bbmax.y, center.z ]
     lowerPoint = [ center.x, bbmin.y, center.z ]
+    bbSize = max( bbmax.x-bbmin.x, bbmax.z-bbmin.z )
     
     dist = OpenMaya.MPoint( *upperPoint ).distanceTo( OpenMaya.MPoint( *lowerPoint ) )
     squashBase = createNode( 'transform', n='sauashBase' ).setAttr( 't', lowerPoint )
     upperCtl = makeController( sgdata.Controllers.trianglePoints, dist*0.2 )
     upperCtl.setAttr( 'shape_ty', 1 ).setAttr( 'shape_rz', 180 )
-    pUpperCtl = makeParent( upperCtl )
+    pUpperCtl = convertSg( makeParent( upperCtl ) )
     lowerCtl = makeController( sgdata.Controllers.trianglePoints, dist*0.2 )
     lowerCtl.setAttr( 'shape_ty', -1 )
-    pLowerCtl = makeParent( lowerCtl )
+    pLowerCtl = convertSg( makeParent( lowerCtl ) )
     upperCtl.rename( 'Ctl_Upper' )
     lowerCtl.rename( 'Ctl_Lower' )
     pUpperCtl.t.set( *upperPoint )
@@ -3893,9 +4041,11 @@ def createSquashBend( *geos ):
     blendMtxNode.matrixSum >> multMtx.i[0]
     squashCenter.attr( 'pim' ) >> multMtx.i[1]
     dcmpBlend = getDecomposeMatrix( multMtx )
+    squashCenter.tx.set( pUpperCtl.tx.get() )
+    squashCenter.tz.set( pUpperCtl.tz.get() )
     dcmpBlend.oty >> squashCenter.ty
     
-    rigedCurve = createRigedCurve( upperCtl, lowerCtl )
+    rigedCurve = createRigedCurve( lowerCtl, upperCtl )
     cmds.setAttr( rigedCurve + '.v' , 0 )
     upperFirstChild = upperCtl.listRelatives( c=1, type='transform' )[0]
     lowerFirstChild = lowerCtl.listRelatives( c=1, type='transform' )[0]
@@ -3925,41 +4075,84 @@ def createSquashBend( *geos ):
     multLookAtUpper.output >> upperFirstChild.r
     multLookAtLower.output >> lowerFirstChild.r
     
-    select( geos )
-    flare, flareHandle = cmds.nonLinear( type='flare', lowBound=-1.5, highBound=1.5 )
-    cmds.setAttr( flareHandle + '.v', 0 )
-    cmds.setAttr( flareHandle + '.r', 0,0,0 )
-    flare       = convertSg( flare )
-    parent( flareHandle, squashBase )
+    rebuildCurve, rebuildNode = cmds.rebuildCurve( rigedCurve, ch=1, rpo=0, rt=0, end=1, kr=0, kcp=0, kep=1, kt=0, s=3, d=3, tol=0.01 )
+    rebuildCurve = cmds.parent( rebuildCurve, squashBase.name() )
     
-    select( geos )
-    rigedCurve = convertSg( rigedCurve )
-    wireNode, curveName = cmds.wire( gw=False, en=1, ce=0.0, li=0.0, w=rigedCurve.name() )
-    wireNode = convertSg( wireNode )
-    wireNode.attr( 'dropoffDistance[0]' ).set( 1000000.0 )
-    baseCurve = wireNode.baseWire[0].listConnections( s=1, d=0, type='nurbsCurve' )[0]
-    baseCurve = convertSg( baseCurve )
+    numDiv = 4
+    if options.has_key( 'numDiv' ):
+        numDiv = options['numDiv']
     
-    curveInfoMoveCurve = createNode( 'curveInfo' )
-    curveInfoOrigCurve = createNode( 'curveInfo' ) 
+    eachParam = 1.0 / (numDiv-1)
+    targetNodes = []
+    circleTrs = []
+    for i in range( numDiv ):
+        targetNode = createPointOnCurve( rebuildCurve, local=1 )
+        cmds.setAttr( targetNode + '.dh', 0 )
+        cmds.setAttr( targetNode + '.parameter', eachParam * i )
+        targetNode = cmds.parent( targetNode, squashBase.name() )[0]
+        targetNodes.append( targetNode )
+        circle, circleNode = cmds.circle( normal=[0,1,0], radius=bbSize/1.8 )
+        circle = cmds.parent( circle, targetNode )[0]
+        cmds.setAttr( circle + '.t', 0,0,0 )
+        cmds.setAttr( circle + '.r', 0,0,0 )
+        circleTrs.append( circle )
     
-    rigedCurve.shape().attr( 'local' ) >> curveInfoMoveCurve.inputCurve
-    baseCurve.shape().attr( 'local' ) >> curveInfoOrigCurve.inputCurve
+    cmds.tangentConstraint( rebuildCurve, targetNodes[0], aim=[0,1,0], u=[0,0,1], wu=[0,0,1], wut='objectrotation', wuo=lookAtLower.name() )[0]
+    cmds.tangentConstraint( rebuildCurve, targetNodes[-1], aim=[0,1,0], u=[0,0,1], wu=[0,0,1], wut='objectrotation', wuo=lookAtUpper.name() )[0]
     
-    divNode = createNode( 'multiplyDivide' ).setAttr( 'op', 2 )
-    curveInfoMoveCurve.arcLength >> divNode.input2X
-    curveInfoOrigCurve.arcLength  >> divNode.input1X
-    addNode = createNode( 'addDoubleLinear' ).setAttr( 'input2', -1 )
-    divNode.outputX >> addNode.input1
-    addNode.output >> flare.curve
-    
-    lowerCtl.sx >> flare.startFlareX
-    lowerCtl.sz >> flare.startFlareZ
-    upperCtl.sx >> flare.endFlareX
-    upperCtl.sz >> flare.endFlareZ
-    
+    eachParam = 1.0/(numDiv-1)
+    for i in range( 1, numDiv-1 ):
+        blendNode = createBlendTwoMatrixNode( lookAtLower.name(), lookAtUpper.name() )
+        cmds.setAttr( blendNode + '.blend', eachParam * i )
+        tangentNode = cmds.tangentConstraint( rebuildCurve, targetNodes[i], aim=[0,1,0], u=[0,0,1], wu=[0,0,1], wut='objectrotation')[0]
+        cmds.connectAttr( blendNode+ '.matrixSum', tangentNode + '.worldUpMatrix' )
     pass
 
+    cmds.select( geoNames )
+    ffd, ffdLattice, ffdLatticeBase = cmds.lattice( geoNames,  divisions=[2, numDiv, 2], objectCentered=True, ldv=[2,numDiv+1,2] )
+    ffdLattice, ffdLatticeBase = cmds.parent( ffdLattice, ffdLatticeBase, squashBase.name() )
+    
+    cmds.setAttr( ffdLattice + '.inheritsTransform', 0 )
+    cmds.setAttr( ffdLattice + '.v', 0 )
+    
+    for i in range( numDiv ):
+        cmds.select( ffdLattice + '.pt[0:1][%d][0]' % i, ffdLattice + '.pt[0:1][%d][1]' % i )
+        cluster, clusterHandle = cmds.cluster()
+        clusterHandle = cmds.parent( clusterHandle, circleTrs[i] )[0]
+        cmds.setAttr( clusterHandle + '.v', 0 )
+    
+    distNode = cmds.createNode( 'distanceBetween' )
+    cmds.connectAttr( pUpperCtl.name() + '.wm', distNode + '.inMatrix1' )
+    cmds.connectAttr( pLowerCtl.name() + '.wm', distNode + '.inMatrix2' )
+    curveInfoNode = cmds.createNode( 'curveInfo' )
+    cmds.connectAttr( rigedCurve + '.worldSpace', curveInfoNode + '.inputCurve' )
+    squashDiv = cmds.createNode( 'multiplyDivide' ); cmds.setAttr( squashDiv + '.op', 2 )
+    squashPow = cmds.createNode( 'multiplyDivide' ); cmds.setAttr( squashPow + '.op', 3 )
+    cmds.connectAttr( distNode + '.distance', squashDiv + '.input1X' )
+    cmds.connectAttr( curveInfoNode + '.arcLength', squashDiv + '.input2X' )
+    cmds.connectAttr( squashDiv  + '.outputX', squashPow + '.input1X' )
+    cmds.setAttr( squashPow + '.input2X', 0.5 )
+    
+    upperCtl.addAttr( 'squash', min=0, dv=1, k=1 )
+    upperCtl.addAttr( 'showDetail', min=0, max=1, cb=1 )
+    eachParam = 1.0/(numDiv-1)
+    for i in range( numDiv ):
+        cmds.addAttr( circleTrs[i], ln='squashMult', min=0, dv=1 - 4*( i * eachParam - 0.5 )**2, k=1 )
+        multNode1 = cmds.createNode( 'multDoubleLinear' )
+        cmds.connectAttr( upperCtl + '.squash', multNode1 + '.input1' )
+        cmds.connectAttr( circleTrs[i] + '.squashMult', multNode1 + '.input2' )
+        
+        blendNode = cmds.createNode( 'blendTwoAttr' )
+        cmds.setAttr( blendNode + '.input[0]', 1 )
+        cmds.connectAttr( squashPow + '.outputX', blendNode + '.input[1]' )
+        
+        cmds.connectAttr( multNode1 + '.output', blendNode + '.ab' )
+        cmds.connectAttr( blendNode + '.output', targetNodes[i] + '.sx' )
+        cmds.connectAttr( blendNode + '.output', targetNodes[i] + '.sz' )
+        
+        cmds.connectAttr( upperCtl.name() + '.showDetail', targetNodes[i] + '.v' )
+    
+    
 
 
 
@@ -4016,6 +4209,7 @@ def makeCloneObject( target, **options  ):
                     duShape = duObj.getShape()
                     pymel.core.parent( duShape, targetClone, add=1, shape=1 )[0]
                     duShape.rename( targetClone+'Shape' )
+                    pymel.core.delete( duObj )
             if op_connectionOn:
                 getSourceConnection( cuTarget, targetClone )
                 cuTargetShape    = cuTarget.getShape()
@@ -4490,7 +4684,470 @@ def getDotWeight( first, second, firstVector, secondVector ):
     dcmp.ot >> vectorNode.input1
     vectorNode.input2.set( secondVector )
     pymel.core.select( vectorNode )
-    return vectorNode
+    return vectorNode.name()
+    
+    
+    
+    
+    
+def makeSameChildren( first, second ):
+    
+    pSecond = cmds.listRelatives( second, p=1, f=1 )[0]
+    return cmds.parent( first, pSecond )[0]
+
+
+
+def freezeJointJo( sel ):
+    
+    mtxValue = cmds.getAttr( sel + '.wm' )
+    cmds.setAttr( sel + '.jo', 0,0,0 )
+    cmds.xform( sel, ws=1, matrix= mtxValue  )
+
+
+
+def scaleConnect( point1Obj, point2Obj, scaleTarget ):
+    
+    dcmp = pymel.core.ls( getLocalDecomposeMatrix( point1Obj, point2Obj ).name() )[0]
+    distNode = pymel.core.createNode( 'distanceBetween' )
+    cmds.connectAttr( dcmp)
+    
+    
+    
+def makePivParent( target ):
+    
+    targetP = cmds.listRelatives( target, p=1, f=1 )[0]
+    pivParent = cmds.group( em=1, n='Piv' + target )
+    
+    if targetP:
+        pivParent = cmds.parent( pivParent, targetP )[0]
+        cmds.xform( pivParent, os=1, matrix= matrixToList( OpenMaya.MMatrix() ) )
+    
+    target = cmds.parent( target, pivParent )[0]
+    return target, pivParent
+    
+        
+
+def copySkinWeightCombineObj( *args ):
+    
+    skinObjs = args[:-1]
+    target = args[-1]
+    
+    bindJoints = []
+    
+    for sel in skinObjs:
+        skinNodes = getNodeFromHistory( sel, 'skinCluster' )
+        
+        if not skinNodes: continue
+        joints = cmds.listConnections( skinNodes[0] + '.matrix' )
+        
+        bindJoints += joints
+    
+    print bindJoints
+    print target
+    
+    cmds.skinCluster( bindJoints, target, tsb=1 )
+    cmds.select( skinObjs, target )
+    cmds.copySkinWeights( noMirror=True, surfaceAssociation='closestPoint', influenceAssociation ='oneToOne' )
+
+
+
+def addAttr( target, **options ):
+    
+    items = options.items()
+    
+    attrName = ''
+    channelBox = False
+    keyable = False
+    for key, value in items:
+        if key in ['ln', 'longName']:
+            attrName = value
+        elif key in ['cb', 'channelBox']:
+            channelBox = True
+            options.pop( key )
+        elif key in ['k', 'keyable']:
+            keyable = True 
+            options.pop( key )
+    
+    if cmds.attributeQuery( attrName, node=target, ex=1 ): return None
+    
+    cmds.addAttr( target, **options )
+    
+    if channelBox:
+        cmds.setAttr( target+'.'+attrName, e=1, cb=1 )
+    elif keyable:
+        cmds.setAttr( target+'.'+attrName, e=1, k=1 )
+
+
+
+def createSquashObject( distTarget, distBase, scaleTarget ):
+
+    import math
+    
+    scaleTargetMtx = cmds.getAttr( scaleTarget+'.wm' )
+    
+    xVector = OpenMaya.MVector( *scaleTargetMtx[0:3] )
+    yVector = OpenMaya.MVector( *scaleTargetMtx[4:4+3] )
+    zVector = OpenMaya.MVector( *scaleTargetMtx[8:8+3] )
+    
+    targetPos = cmds.xform( distTarget, q=1, ws=1, t=1 )
+    basePos   = cmds.xform( distBase, q=1, ws=1, t=1 )
+    aimVector = OpenMaya.MVector( targetPos[0] - basePos[0], targetPos[1] - basePos[1], targetPos[2] - basePos[2] )
+    
+    vectors = [ xVector, yVector, zVector ]
+    maxDotValue = 0
+    aimIndex = 0
+    for i in range( 3 ):
+        dotValue = math.fabs( aimVector * vectors[i] )
+        if dotValue > maxDotValue:
+            maxDotValue = dotValue
+            aimIndex = i
+
+    otherIndex1 = ( aimIndex + 1 ) % 3
+    otherIndex2 = ( aimIndex + 2 ) % 3
+        
+    mm = cmds.createNode( 'multMatrix' )
+    dcmp = cmds.createNode( 'decomposeMatrix' )
+    distNode = cmds.createNode( 'distanceBetween' )
+    cmds.connectAttr( mm + '.o', dcmp + '.imat' )
+    cmds.connectAttr( distTarget+'.wm', mm+'.i[0]' )
+    cmds.connectAttr( distBase+'.wim', mm+'.i[1]' )
+    cmds.connectAttr( dcmp + '.ot', distNode + '.point2' )
+    
+    addAttr( scaleTarget, ln='distanceDefault', k=1 )
+    addAttr( scaleTarget, ln='distanceCurrent', cb=1 )
+    addAttr( scaleTarget, ln='lengthRate', k=1 )
+    addAttr( scaleTarget, ln='squashRate', k=1 )
+    
+    cmds.connectAttr( distNode+'.distance', scaleTarget+'.distanceCurrent', f=1 )
+    cmds.setAttr( scaleTarget+'.distanceDefault', cmds.getAttr( distNode+'.distance' ) )
+    
+    divNode    = cmds.createNode( 'multiplyDivide' )
+    squashNode = cmds.createNode( 'multiplyDivide' )
+    cmds.setAttr( divNode+'.operation', 2 )
+    cmds.setAttr( squashNode + '.operation', 3 )
+    cmds.setAttr( squashNode + '.input2X', 0.5 )
+    
+    cmds.connectAttr( scaleTarget+'.distanceDefault', divNode+'.input2X' )
+    cmds.connectAttr( scaleTarget+'.distanceCurrent', divNode+'.input1X' )
+    cmds.connectAttr( divNode + '.outputX', squashNode + '.input1X' )
+    
+    axisChar = ['X', 'Y', 'Z' ]
+    
+    blendTwoAttrForLength = cmds.createNode( 'blendTwoAttr' )
+    blendTwoAttrForSqush  = cmds.createNode( 'blendTwoAttr' )
+    
+    cmds.setAttr( blendTwoAttrForLength + '.input[0]', 1 )
+    cmds.setAttr( blendTwoAttrForSqush + '.input[0]', 1 )
+    cmds.connectAttr( squashNode+'.outputX', blendTwoAttrForSqush+'.input[1]' )
+    cmds.connectAttr( divNode+'.outputX', blendTwoAttrForLength+'.input[1]' )
+    
+    cmds.connectAttr( blendTwoAttrForSqush+'.output', scaleTarget+'.scale%s' % axisChar[ otherIndex1 ] )
+    cmds.connectAttr( blendTwoAttrForSqush+'.output', scaleTarget+'.scale%s' % axisChar[ otherIndex2 ] )
+    cmds.connectAttr( blendTwoAttrForLength+'.output', scaleTarget+'.scale%s' % axisChar[ aimIndex ] )
+    
+    cmds.connectAttr( scaleTarget + '.lengthRate', blendTwoAttrForLength + '.ab' )
+    cmds.connectAttr( scaleTarget + '.squashRate', blendTwoAttrForSqush + '.ab' )
+    
+    
+
+def createFollicleOnSurface( surface, paramU=0.5, paramV=0.5 ):
+    
+    surfaceShape = surface
+    if cmds.nodeType( surfaceShape ) == 'transform':
+        surfaceShape = cmds.listRelatives( surfaceShape, s=1, f=1 )[0]
+    
+    follicleNode = cmds.createNode( 'follicle' )
+    follicleTr = cmds.listRelatives( follicleNode, p=1, f=1 )[0]
+    
+    cmds.connectAttr( surface + '.worldMatrix', follicleNode + '.inputWorldMatrix' )
+    cmds.connectAttr( surface + '.local', follicleNode + '.inputSurface' )
+    
+    compose = cmds.createNode( 'composeMatrix' )
+    mm = cmds.createNode( 'multMatrix' )
+    dcmp = cmds.createNode( 'decomposeMatrix' )
+    
+    cmds.connectAttr( follicleNode + '.outTranslate', compose + '.it' )
+    cmds.connectAttr( follicleNode + '.outRotate', compose + '.ir' )
+    cmds.connectAttr( compose + '.outputMatrix', mm + '.i[0]' )
+    cmds.connectAttr( follicleTr + '.pim', mm + '.i[1]' )    
+    cmds.connectAttr( mm + '.o', dcmp + '.imat' )
+    cmds.connectAttr( dcmp + '.ot', follicleTr + '.t' )
+    cmds.connectAttr( dcmp + '.or', follicleTr + '.r' )
+    
+    cmds.setAttr( follicleNode + '.parameterU', paramU )
+    cmds.setAttr( follicleNode + '.parameterV', paramV )
+
+
+
+def getClosestPointOnMesh( pointer_input, mesh_input ):
+    
+    pointer = pymel.core.ls( pointer_input )[0]
+    mesh  = pymel.core.ls( mesh_input )[0]
+    
+    if mesh.type() == 'mesh':
+        meshShape = mesh
+    else:
+        meshShape = mesh.getShape()
+    
+    closeNode = pymel.core.createNode( 'closestPointOnMesh' )
+    
+    meshShape.outMesh >> closeNode.inMesh
+    meshShape.worldMatrix >> closeNode.inputMatrix
+    
+    worldPointDcmp = pymel.core.createNode( 'decomposeMatrix' )
+    pointer.wm >> worldPointDcmp.imat
+    
+    worldPointDcmp.ot >> closeNode.inPosition
+    
+    composeNode = pymel.core.createNode( 'composeMatrix' )
+    closeNode.position >> composeNode.inputTranslate
+    mm = pymel.core.createNode( 'multMatrix' )
+    dcmp = pymel.core.createNode( 'decomposeMatrix' )
+    mm.o >> dcmp.imat
+    
+    composeNode.outputMatrix >> mm.i[0]
+    newTr = pymel.core.createNode( 'transform' )
+    newTr.dh.set( 1 )
+    newTr.pim >> mm.i[1]    
+    dcmp.ot >> newTr.t
+    
+    return newTr.name()
+    
+    
+def makeSubCtl( inputCtl ):
+    
+    ctl = pymel.core.ls( inputCtl )[0]
+    
+    ctlP = ctl.getParent()
+    duCtlP = pymel.core.duplicate( ctlP )[0]
+    duCtl = duCtlP.listRelatives( c=1, f=1 )[0]
+    
+    ctl.rename( 'sub_' + ctl.nodeName() )
+    
+    keyAttrs = pymel.core.listAttr( duCtl, k=1 )
+    keyAttrs += pymel.core.listAttr( duCtl, cb=1 )
+    for attr in keyAttrs:
+        duCtl.attr( attr ) >> ctl.attr( attr )
+    
+    keyAttrsP = pymel.core.listAttr( duCtlP, k=1 )
+    keyAttrs += pymel.core.listAttr( duCtlP, cb=1 )
+    for attr in keyAttrsP:
+        ctlP.attr( attr ) >> duCtlP.attr( attr )
+    
+    pymel.core.parent( duCtlP, w=1 )
+    
+    return duCtlP.name()
+
+
+
+    
+def makeTranslateSquash( inputTarget ):
+    
+    target = pymel.core.ls( inputTarget )[0]
+    
+    txValue = cmds.getAttr( target + '.tx' )
+    tyValue = cmds.getAttr( target + '.ty' )
+    tzValue = cmds.getAttr( target + '.tz' )
+    
+    directionIndex = getDirectionIndex( [txValue, tyValue, tzValue ] )
+    axis = ['x', 'y', 'z' ][directionIndex%3]
+    
+    if not pymel.core.attributeQuery( 'origDist', node=target, ex=1 ):
+        target.addAttr( 'origDist' )
+        target.origDist.set( cb=1 )
+    if not pymel.core.attributeQuery( 'cuDist', node=target, ex=1 ):
+        target.addAttr( 'cuDist' )
+        target.cuDist.set( cb=1 )
+    if not pymel.core.attributeQuery( 'squashValue', node=target, ex=1 ):
+        target.addAttr( 'squashValue', k=1, min=0, max=1 )
+    
+    otherAxis = ['x','y','z']
+    otherAxis.remove( axis )
+    
+    distNode = pymel.core.createNode( 'distanceBetween' )
+    target.attr( 't' + axis.lower() ) >>  distNode.point1X
+    
+    target.origDist.set( distNode.distance.get() )
+    distNode.distance >> target.cuDist
+    
+    multNode = pymel.core.createNode( 'multiplyDivide' )
+    powNode = pymel.core.createNode( 'multiplyDivide' )
+    multNode.op.set( 2 )
+    powNode.op.set( 3 )
+    target.origDist >> multNode.input1X
+    target.cuDist >> multNode.input2X
+    multNode.outputX >> powNode.input1X
+    powNode.input2X.set( 0.5 )
+    
+    scaleNode = pymel.core.createNode( 'multiplyDivide' )
+    scaleNode.op.set( 2 )
+    target.cuDist >> scaleNode.input1X
+    target.origDist >> scaleNode.input2X
+    
+    for attr in otherAxis:
+        blendNode = pymel.core.createNode( 'blendTwoAttr' )
+        blendNode.input[0].set( 1 )
+        powNode.outputX >> blendNode.input[1]
+        target.squashValue >> blendNode.ab
+        blendNode.output >> target.attr( 's' + attr )
+    
+    scaleNode.outputX >> target.attr( 's' + axis )
+    
+   
+    
+
+
+def addMiddleTranslateJoint( targetJnt ):
+    
+    parentJnt = cmds.listRelatives( targetJnt, p=1, f=1 )[0]
+    cmds.select( parentJnt )
+    try:
+        radiusValue = cmds.getAttr( parentJnt + '.radius' ) * 1.5
+    except:
+        radiusValue = 1
+    
+    newJnt = cmds.joint( radius = radiusValue )
+    cmds.addAttr( newJnt, ln='transMult', dv=0.5 )
+    cmds.setAttr( newJnt + '.transMult', e=1, k=1 )
+    
+    multNode = cmds.createNode( 'multiplyDivide' )
+    cmds.connectAttr( targetJnt + '.t', multNode + '.input1' )
+    cmds.connectAttr( newJnt + '.transMult', multNode + '.input2X' )
+    cmds.connectAttr( newJnt + '.transMult', multNode + '.input2Y' )
+    cmds.connectAttr( newJnt + '.transMult', multNode + '.input2Z' )
+    cmds.connectAttr( multNode + '.output', newJnt + '.t' )
+    return newJnt
+
+
+
+def getFutureByType( nodeName, nodeType ):
+
+    node = pymel.core.ls( nodeName )[0]
+    
+    destTargets = node.listConnections( s=0, d=1 )
+    targets = []
+    for destTarget in destTargets:
+        futures = destTarget.listFuture()
+        for future in futures:
+            if future.type() == 'ikHandle':
+                targets.append( (len( futures ),future ) )
+    targets = sorted( targets, key= lambda target : target[0] )
+    returnTargets = []
+    for numConnection, connectedNode in targets:
+        returnTargets.append( connectedNode.name() )
+    return returnTargets
+
+
+
+def setMatrixToTarget( mtxValue, inputTarget ):
+
+    mtx = OpenMaya.MMatrix()
+    if type( mtxValue ) == list:
+        mtx = listToMatrix( mtxValue )
+    else:
+        mtx = mtxValue
+    transMtxList = [1,0,0,0,
+                    0,1,0,0,
+                    0,0,1,0,
+                    mtx(3,0), mtx(3,1), mtx(3,2), 1]
+    target = pymel.core.ls( inputTarget )[0]
+    
+    if target.type() == 'joint':
+        joValue = target.jo.get()
+        rotMtx = getMatrixFromRotate( joValue )
+        parentMtx = listToMatrix( target.pm.get() )
+        localRotMtx = mtx * ( rotMtx * parentMtx ).inverse()
+        pymel.core.xform( target, ws=1, matrix= transMtxList )
+        rotValue = getRotateFromMatrix( localRotMtx )
+        target.r.set( rotValue )
+    else:
+        pymel.core.xform( target, ws=1, matrix= matrixToList( mtx ) )
+    
+    
+
+def getAutoTwistNode( inputTarget, **options ):
+
+    axis = [1,0,0]
+    if options.has_key( 'axis' ):
+        axis = options['axis']
+
+    target = pymel.core.ls( inputTarget )[0]
+    composeAxis = pymel.core.createNode( 'composeMatrix' )
+    composeRot = pymel.core.createNode( 'composeMatrix' )
+    composeAxis.it.set( axis )
+    target.r >> composeRot.ir
+    multRotMtx = pymel.core.createNode( 'multMatrix' )
+    composeAxis.outputMatrix >> multRotMtx.i[0]
+    composeRot.outputMatrix >> multRotMtx.i[1]
+    dcmpRotMtx = pymel.core.createNode( 'decomposeMatrix' )
+    multRotMtx.matrixSum >> dcmpRotMtx.imat
+    angleNode = pymel.core.createNode( 'angleBetween' )
+    angleNode.vector1.set( axis )
+    dcmpRotMtx.ot >> angleNode.vector2
+    composeAngle = pymel.core.createNode( 'composeMatrix' )
+    invAngle = pymel.core.createNode( 'inverseMatrix' )
+    multInvAngle = pymel.core.createNode( 'multMatrix' )
+    angleNode.euler >> composeAngle.ir
+    composeAngle.outputMatrix >> invAngle.inputMatrix
+    composeRot.outputMatrix >> multInvAngle.i[0]
+    invAngle.outputMatrix >> multInvAngle.i[1]
+    composeDefault = pymel.core.createNode( 'composeMatrix' )
+    wtAddMtx = pymel.core.createNode( 'wtAddMatrix' )
+    composeDefault.outputMatrix >> wtAddMtx.i[0].m
+    multInvAngle.matrixSum >> wtAddMtx.i[1].m
+    wtAddMtx.addAttr( 'blend', min=0, max=1, dv=0, k=1 )
+    wtAddMtx.blend >> wtAddMtx.i[1].w
+    reverseWeight = pymel.core.createNode( 'reverse' )
+    wtAddMtx.blend >> reverseWeight.inputX
+    reverseWeight.outputX >> wtAddMtx.i[0].w
+    return wtAddMtx.name()
+    
+    
+    
+    
+    
+    
+def connectBindPreMatrix( joint, bindPreObj, targetMesh ):
+    
+    skinNodes = getNodeFromHistory( targetMesh, 'skinCluster' )
+    
+    if not skinNodes: return None
+    
+    cons = cmds.listConnections( joint+'.wm', type='skinCluster', p=1, c=1 )
+    
+    for con in cons[1::2]:
+        skinCluster = con.split( '.' )[0]
+        if skinCluster != skinNodes[0]: continue
+        
+        index = int( con.split( '[' )[-1].replace( ']', '' ) )
+        if not cmds.isConnected( bindPreObj+'.wim', skinCluster+'.bindPreMatrix[%d]' % index ):
+            cmds.connectAttr( bindPreObj+'.wim', skinCluster+'.bindPreMatrix[%d]' % index, f=1 )
+    
+    
+
+
+
+def addMiddleJoint( jnt ):
+    
+    jntC = cmds.listRelatives( jnt, c=1, f=1 )[0]
+    middleTransJnt = addMiddleTranslateJoint( jntC )
+    cmds.setAttr( middleTransJnt + '.transMult', 0.05 )
+    
+    compose = cmds.createNode( 'composeMatrix' )
+    inverse = cmds.createNode( 'inverseMatrix' )
+    addMtx = cmds.createNode( 'addMatrix' )
+    dcmp = cmds.createNode( 'decomposeMatrix' )
+    
+    cmds.connectAttr( jnt + '.matrix', inverse+ '.inputMatrix' )
+    cmds.connectAttr( compose + '.outputMatrix', addMtx + '.matrixIn[0]' )
+    cmds.connectAttr( inverse + '.outputMatrix', addMtx + '.matrixIn[1]' )
+    cmds.connectAttr( addMtx + '.matrixSum', dcmp + '.imat' )
+    
+    cmds.connectAttr( dcmp + '.or', middleTransJnt + '.r' )
+    
+    cmds.setAttr( middleTransJnt + '.radius', cmds.getAttr( jnt + '.radius' ) * 1.5 )
+    return middleTransJnt
+    
     
     
     

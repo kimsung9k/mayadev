@@ -211,7 +211,7 @@ class SGFileBaseMenu:
                         extention = name.split( '.' )[-1]
                         if extention.lower() in ['py', 'txt', 'mel']: continue
                         if '.'.join( name.split( '.' )[:-1] ) != '.'.join( target.split( '.' )[:-1] ): continue
-                        cmds.menuItem( targetMenuItem, e=1, image= root + '/' + name )
+                        #print cmds.menuItem( targetMenuItem, e=1, image= root + '/' + name )
 
 
 class Menu_Global:

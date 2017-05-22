@@ -1,7 +1,9 @@
 from sgModules import sgcommands
+import maya.cmds as cmds
 
-sels = sgcommands.listNodes( sl=1 )
+sels = cmds.ls( sl=1 )
+target = sels[-1]
+targetMtxList = cmds.getAttr( target + '.wm' )
 
-selPos = sels[-1].wm.get()
 for sel in sels[:-1]:
-    sel.xform( ws=1, matrix=selPos )
+    sgcommands.setMatrixToTarget( targetMtxList, sel )

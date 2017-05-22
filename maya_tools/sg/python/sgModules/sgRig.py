@@ -478,6 +478,9 @@ def putControllerToGeo( target, points, multSize = 1.0 ):
         if not sizeZ: sizeZ = 1
         worldCenter = OpenMaya.MPoint( *center ) * parentMatrix
     else:
+        sizeX = 1
+        sizeY = 1
+        sizeZ = 1
         worldCenter = OpenMaya.MPoint()
 
     targetCtl = makeController( points )
