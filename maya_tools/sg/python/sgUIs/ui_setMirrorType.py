@@ -26,6 +26,20 @@ def makeFolder( pathName ):
 
 
 
+class InfoAttrs:
+    
+    origNameAttr = 'rig_origName'
+    parentAttr   = 'rig_parents'
+    reverseAttrs = 'rig_reverseAttrs'
+    sidePrefixAttr = 'rig_sidePrefix'
+    outerMatrixAttr= 'rig_outerMatrix'
+    innerMatrixAttr= 'rig_innerMatrix'
+    
+    leftPrefixList = ['left', 'Left', '_L_']
+    rightPrefixList = ['right', 'Right', '_R_']
+
+
+
 class Win_Global:
     
     winName = 'sgui_setMirrorType_v01'
@@ -51,124 +65,180 @@ class Win_Global:
 
 
 
-
 class Win_Cmd:
     
-    parentAttr    = 'ctlParent'
-    otherSideAttr = 'ctlOtherSide'
-    reverseAttrsAttr = 'ctlReverseAttrs'
-    mirrorTypeAttr   = 'ctlMirrorType'
-    
     @staticmethod
-    def loadBaseCtl( *args ):
-        sels = cmds.ls( sl=1 )
-        if not sels: return None
-        cmds.textField( Win_Global.txf_base, e=1, tx=sels[0] )
+    def addAttr( target, **options ):
+    
+        items = options.items()
         
-        otherSideCtl = ''
-        otherSideCtlStr = ''
-        if sels[0].find( '_L_' ) != -1:
-            otherSideCtl = sels[0].replace( '_L_', '_R_' )
-        if sels[0].find( '_R_' ) != -1:
-            otherSideCtl = sels[0].replace( '_R_', '_L_' )
+        attrName = ''
+        channelBox = False
+        keyable = False
+        for key, value in items:
+            if key in ['ln', 'longName']:
+                attrName = value
+            elif key in ['cb', 'channelBox']:
+                channelBox = True
+                options.pop( key )
+            elif key in ['k', 'keyable']:
+                keyable = True 
+                options.pop( key )
         
-        if cmds.objExists( otherSideCtl ):
-            otherSideCtlStr = otherSideCtl
+        if cmds.attributeQuery( attrName, node=target, ex=1 ): return None
         
-        parentCtlStr = ''
-        mirrorTypeStr = ''
-        if cmds.attributeQuery( Win_Cmd.parentAttr, node=sels[0], ex=1 ):
-            parentCtlStr = cmds.getAttr( sels[0] + '.' + Win_Cmd.parentAttr )
-        if cmds.attributeQuery( Win_Cmd.otherSideAttr, node=sels[0], ex=1 ):
-            otherSideCtlStr = cmds.getAttr( sels[0] + '.' + Win_Cmd.otherSideAttr )
-        if cmds.attributeQuery( Win_Cmd.mirrorTypeAttr, node=sels[0], ex=1 ):
-            mirrorTypeStr = cmds.getAttr( sels[0] + '.' + Win_Cmd.mirrorTypeAttr )
+        cmds.addAttr( target, **options )
         
-        mirrorTypeSplits = mirrorTypeStr.split( ',' )
-        
-        cmds.textField( Win_Global.txf_parent, e=1, tx=parentCtlStr )
-        cmds.textField( Win_Global.txf_otherSide, e=1, tx=otherSideCtlStr )
-        if mirrorTypeStr:
-            cmds.optionMenu( Win_Global.options, e=1, sl= Win_Global.mirrorTypeList.index( mirrorTypeSplits[0] ) + 1 )
-        cmds.textField( Win_Global.txf_mirrorType, e=1, tx= ','.join( mirrorTypeSplits[1:] ) )
+        if channelBox:
+            cmds.setAttr( target+'.'+attrName, e=1, cb=1 )
+        elif keyable:
+            cmds.setAttr( target+'.'+attrName, e=1, k=1 )
 
+    
+    
+    @staticmethod
+    def loadTargetCtl( *args ):
+        sels = cmds.ls( sl=1 )
+        if not sels: return None
+        targetCtl = sels[-1]
+        cmds.textField( Win_Global.txf_targetCtl, e=1, tx=targetCtl )
 
-    @staticmethod
-    def loadParentCtl( *args ):        
-        sels = cmds.ls( sl=1 )
-        if not sels: return None
-        selsStr = ','.join( sels )
-        cmds.textField( Win_Global.txf_parent, e=1, tx=selsStr )
-    
-    
-    @staticmethod
-    def loadOtherSide( *args ):
+        if cmds.attributeQuery( InfoAttrs.parentAttr, node=targetCtl, ex=1 ):
+            parentNameStr = cmds.getAttr( targetCtl + '.' + InfoAttrs.parentAttr )
+            cmds.textField( Win_Global.txf_parentAttr, e=1, tx=parentNameStr )
+        else:
+            cmds.textField( Win_Global.txf_parentAttr, e=1, tx='' )
+
+        if cmds.attributeQuery( InfoAttrs.sidePrefixAttr, node=targetCtl, ex=1 ):
+            sidePrefixStr = cmds.getAttr( targetCtl + '.' + InfoAttrs.sidePrefixAttr )
+            cmds.textField( Win_Global.txf_sidePrefixAttr, e=1, tx=sidePrefixStr )
+        else:
+            cmds.textField( Win_Global.txf_sidePrefixAttr, e=1, tx='' )
+
+        if cmds.attributeQuery( InfoAttrs.reverseAttrs, node=targetCtl, ex=1 ):
+            revereAttrStr = cmds.getAttr( targetCtl + '.' + InfoAttrs.reverseAttrs )
+            cmds.textField( Win_Global.txf_reverseAttrs, e=1, tx=revereAttrStr )
+        else:
+            cmds.textField( Win_Global.txf_reverseAttrs, e=1, tx='' )
+            
+        if cmds.attributeQuery( InfoAttrs.outerMatrixAttr, node=targetCtl, ex=1 ):
+            outerMatrixStr = cmds.getAttr( targetCtl + '.' + InfoAttrs.outerMatrixAttr )
+            cmds.textField( Win_Global.txf_outerMatrixAttr, e=1, tx=outerMatrixStr )
+        else:
+            cmds.textField( Win_Global.txf_outerMatrixAttr, e=1, tx='' )
+            
+        if cmds.attributeQuery( InfoAttrs.innerMatrixAttr, node=targetCtl, ex=1 ):
+            outerMatrixStr = cmds.getAttr( targetCtl + '.' + InfoAttrs.innerMatrixAttr )
+            cmds.textField( Win_Global.txf_innerMatrixAttr, e=1, tx=outerMatrixStr )
+        else:
+            cmds.textField( Win_Global.txf_innerMatrixAttr, e=1, tx='' )
+
+        prefixStr = ''
+        for i in range( len( InfoAttrs.leftPrefixList ) ):
+            if targetCtl.find( InfoAttrs.leftPrefixList[i] ) != -1:
+                prefixStr = InfoAttrs.leftPrefixList[i]
+                break
+        for i in range( len( InfoAttrs.rightPrefixList ) ):
+            if targetCtl.find( InfoAttrs.rightPrefixList[i] ) != -1:
+                prefixStr = InfoAttrs.rightPrefixList[i]
+                break
         
-        sels = cmds.ls( sl=1 )
-        if not sels: return None
-        cmds.textField( Win_Global.txf_otherSide, e=1, tx=sels[0] )
+        cmds.textField( Win_Global.txf_origNameAttr, e=1, tx= targetCtl )
+        if prefixStr:
+            cmds.textField( Win_Global.txf_sidePrefixAttr, e=1, tx=prefixStr )
 
 
     @staticmethod
     def setMirrorType( *args ):
         
-        targetCtl      = cmds.textField( Win_Global.txf_base, q=1, tx=1 )
-        parentCtls     = cmds.textField( Win_Global.txf_parent, q=1, tx=1 )
-        otherSideCtl   = cmds.textField( Win_Global.txf_otherSide, q=1, tx=1 )
-        mirrorTypeStr  = Win_Global.mirrorTypeList[ cmds.optionMenu( Win_Global.options, q=1, sl=1 )-1]
-        mirrorTypeStrOther = cmds.textField( Win_Global.txf_mirrorType, q=1, tx=1 )
+        targetCtl = cmds.textField( Win_Global.txf_targetCtl, q=1, tx=1 )
         
-        if mirrorTypeStrOther:
-            mirrorTypeStrs = mirrorTypeStr + ',' + mirrorTypeStrOther
-        else:
-            mirrorTypeStrs = mirrorTypeStr
+        origNameAttrValue = cmds.textField( Win_Global.txf_origNameAttr, q=1, tx=1 )
+        parentAttrValue = cmds.textField( Win_Global.txf_parentAttr, q=1, tx=1 )
+        sidePrefixAttrValue = cmds.textField( Win_Global.txf_sidePrefixAttr, q=1, tx=1 )
+        reverseAttrsValue = cmds.textField( Win_Global.txf_reverseAttrs, q=1, tx=1 )
+        outerMatrixAttrValue = cmds.textField( Win_Global.txf_outerMatrixAttr, q=1, tx=1 )
+        innerMatrixAttrValue = cmds.textField( Win_Global.txf_innerMatrixAttr, q=1, tx=1 )
         
-        if not cmds.attributeQuery( Win_Cmd.parentAttr, node=targetCtl, ex=1 ):
-            cmds.addAttr( targetCtl, ln=Win_Cmd.parentAttr, dt='string' )
-        cmds.setAttr( targetCtl + '.' + Win_Cmd.parentAttr, parentCtls, type='string' )
-        if not cmds.attributeQuery( Win_Cmd.otherSideAttr, node=targetCtl, ex=1 ):
-            cmds.addAttr( targetCtl, ln=Win_Cmd.otherSideAttr, dt='string' )
-        cmds.setAttr( targetCtl + '.' + Win_Cmd.otherSideAttr, otherSideCtl, type='string' )
-        if not cmds.attributeQuery( Win_Cmd.mirrorTypeAttr, node=targetCtl, ex=1 ):
-            cmds.addAttr( targetCtl, ln=Win_Cmd.mirrorTypeAttr, dt='string' )
-        cmds.setAttr( targetCtl + '.' + Win_Cmd.mirrorTypeAttr, mirrorTypeStrs, type='string' )
-
+        Win_Cmd.addAttr( targetCtl, ln=InfoAttrs.origNameAttr, dt='string' )
+        Win_Cmd.addAttr( targetCtl, ln=InfoAttrs.parentAttr, dt='string' )
+        Win_Cmd.addAttr( targetCtl, ln=InfoAttrs.sidePrefixAttr, dt='string' )
+        Win_Cmd.addAttr( targetCtl, ln=InfoAttrs.reverseAttrs, dt='string' )
+        Win_Cmd.addAttr( targetCtl, ln=InfoAttrs.outerMatrixAttr, dt='string' )
+        Win_Cmd.addAttr( targetCtl, ln=InfoAttrs.innerMatrixAttr, dt='string' )
+        
+        cmds.setAttr( targetCtl + '.' + InfoAttrs.origNameAttr, origNameAttrValue, type='string' )
+        cmds.setAttr( targetCtl + '.' + InfoAttrs.parentAttr, parentAttrValue, type='string' )
+        cmds.setAttr( targetCtl + '.' + InfoAttrs.sidePrefixAttr, sidePrefixAttrValue, type='string' )
+        cmds.setAttr( targetCtl + '.' + InfoAttrs.reverseAttrs, reverseAttrsValue, type='string' )
+        cmds.setAttr( targetCtl + '.' + InfoAttrs.outerMatrixAttr, outerMatrixAttrValue, type='string' )
+        cmds.setAttr( targetCtl + '.' + InfoAttrs.innerMatrixAttr, innerMatrixAttrValue, type='string' )
+        
+        prefixStr = ''
+        otherPrefixStr = ''
+        otherSideCtl = ''
+        for i in range( len( InfoAttrs.leftPrefixList ) ):
+            if targetCtl.find( InfoAttrs.leftPrefixList[i] ) != -1:
+                prefixStr = InfoAttrs.leftPrefixList[i]
+                otherPrefixStr = InfoAttrs.rightPrefixList[i]
+                otherSideCtl = targetCtl.replace( InfoAttrs.leftPrefixList[i], InfoAttrs.rightPrefixList[i] )
+                break
+        for i in range( len( InfoAttrs.rightPrefixList ) ):
+            if targetCtl.find( InfoAttrs.rightPrefixList[i] ) != -1:
+                prefixStr = InfoAttrs.rightPrefixList[i]
+                otherPrefixStr = InfoAttrs.leftPrefixList[i]
+                otherSideCtl = targetCtl.replace( InfoAttrs.rightPrefixList[i], InfoAttrs.leftPrefixList[i] )
+                break
+        
         if otherSideCtl:
-            if not cmds.attributeQuery( Win_Cmd.parentAttr, node=otherSideCtl, ex=1 ):
-                cmds.addAttr( otherSideCtl, ln=Win_Cmd.parentAttr, dt='string' )
-            otherParentCtls = []
-            for parentCtl in [ i.strip() for i in parentCtls.split( ',' ) ]:
-                otherParentCtl = ''
-                if parentCtl.find( '_L_' ) != -1:
-                    otherParentCtl = parentCtl.replace( '_L_', '_R_' )
-                elif parentCtl.find( '_R_' ) != -1:
-                    otherParentCtl = parentCtl.replace( '_R_', '_L_' )
-                otherParentCtls.append(otherParentCtl)
-            otherParentCtlString = ','.join( otherParentCtls )
-            cmds.setAttr( otherSideCtl + '.' + Win_Cmd.parentAttr, otherParentCtlString, type='string' )
-            if not cmds.attributeQuery( Win_Cmd.otherSideAttr, node=otherSideCtl, ex=1 ):
-                cmds.addAttr( otherSideCtl, ln=Win_Cmd.otherSideAttr, dt='string' )
-            cmds.setAttr( otherSideCtl + '.' + Win_Cmd.otherSideAttr, targetCtl, type='string' )
-            if not cmds.attributeQuery( Win_Cmd.mirrorTypeAttr, node=otherSideCtl, ex=1 ):
-                cmds.addAttr( otherSideCtl, ln=Win_Cmd.mirrorTypeAttr, dt='string' )
-            cmds.setAttr( otherSideCtl + '.' + Win_Cmd.mirrorTypeAttr, mirrorTypeStrs, type='string' )
+            Win_Cmd.addAttr( otherSideCtl, ln=InfoAttrs.origNameAttr, dt='string' )
+            Win_Cmd.addAttr( otherSideCtl, ln=InfoAttrs.parentAttr, dt='string' )
+            Win_Cmd.addAttr( otherSideCtl, ln=InfoAttrs.sidePrefixAttr, dt='string' )
+            Win_Cmd.addAttr( otherSideCtl, ln=InfoAttrs.reverseAttrs, dt='string' )
+            Win_Cmd.addAttr( otherSideCtl, ln=InfoAttrs.outerMatrixAttr, dt='string' )
+            Win_Cmd.addAttr( otherSideCtl, ln=InfoAttrs.innerMatrixAttr, dt='string' )
+            cmds.setAttr( otherSideCtl + '.' + InfoAttrs.origNameAttr, origNameAttrValue.replace( prefixStr,otherPrefixStr), type='string' )
+            cmds.setAttr( otherSideCtl + '.' + InfoAttrs.parentAttr, parentAttrValue.replace( prefixStr,otherPrefixStr), type='string' )
+            cmds.setAttr( otherSideCtl + '.' + InfoAttrs.sidePrefixAttr, otherPrefixStr, type='string' )
+            cmds.setAttr( otherSideCtl + '.' + InfoAttrs.reverseAttrs, reverseAttrsValue, type='string' )
+            cmds.setAttr( otherSideCtl + '.' + InfoAttrs.outerMatrixAttr, outerMatrixAttrValue, type='string' )
+            cmds.setAttr( otherSideCtl + '.' + InfoAttrs.innerMatrixAttr, outerMatrixAttrValue, type='string' )
+    
+    
+    @staticmethod
+    def loadParentCtls( *args ):
+        cmds.textField( Win_Global.txf_parentAttr, e=1, tx= ','.join( cmds.ls( sl=1 ) ) )
+    
+    
+    @staticmethod
+    def getOuterMatrix( *args ):
+        sels = cmds.ls( sl=1 )
+        cmds.textField( Win_Global.txf_outerMatrixAttr, e=1, tx= str( cmds.getAttr( sels[0] + '.m' ) ) )
+
+
+    @staticmethod
+    def getInnerMatrix( *args ):
+        sels = cmds.ls( sl=1 )
+        cmds.textField( Win_Global.txf_innerMatrixAttr, e=1, tx= str( cmds.getAttr( sels[0] + '.m' ) ) )
+        
 
 
 
 
-class UI_baseCtl:
+class UI_targetCtl:
     
     def __init__(self):
         
         pass
-    
+
+
     
     def create(self):
         
         form = cmds.formLayout()
-        text = cmds.text( l='Base Ctl : ', al='right', h=25, w=80 )
+        text = cmds.text( l='Target Ctl : ', al='right', h=25, w=80 )
         txf  = cmds.textField( h=25 )
-        button = cmds.button( l='Load', h=25, w=80, c= Win_Cmd.loadBaseCtl ) 
+        button = cmds.button( l='Load', h=25, w=80, c= Win_Cmd.loadTargetCtl ) 
         cmds.setParent( '..' )
         
         cmds.formLayout( form, e=1, 
@@ -177,127 +247,86 @@ class UI_baseCtl:
                               (button, 'top', 0 ), (button, 'right', 0 ) ],
                          ac=[ (txf, 'left', 0, text ), (txf, 'right', 0, button ) ] )
         
-        Win_Global.txf_base = txf
+        Win_Global.txf_targetCtl = txf
         
         return form
-
-
-
-
-class UI_ParentStrs:
-    
-    def __init__(self):
-        
-        pass
-    
-    
-    def create(self):
-        
-        form = cmds.formLayout()
-        text = cmds.text( l='Parent Ctls : ', al='right', h=22, w=80 )
-        txf  = cmds.textField( h=22 )
-        button = cmds.button( l='Load', h=22, w=80, c= Win_Cmd.loadParentCtl )
-        cmds.setParent( '..' )
-        
-        cmds.formLayout( form, e=1, 
-                         af=[ (text, 'top', 0 ), (text, 'left', 0 ), 
-                              (txf, 'top', 0 ),
-                              (button, 'top', 0 ), (button, 'right', 0 ) ],
-                         ac=[ (txf, 'left', 0, text ), (txf, 'right', 0, button ) ] )
-        
-        Win_Global.txf_parent = txf
-        
-        return form
-
-
-
-
-class UI_OtherSideStr:
-    
-    def __init__(self):
-        
-        pass
-    
-    
-    def create(self):
-        
-        form = cmds.formLayout()
-        text = cmds.text( l='Other Side Ctl : ', al='right', h=22, w=80 )
-        txf  = cmds.textField( h=22 )
-        button = cmds.button( l='Load', h=22, w=80, c= Win_Cmd.loadOtherSide )
-        cmds.setParent( '..' )
-        
-        cmds.formLayout( form, e=1, 
-                         af=[ (text, 'top', 0 ), (text, 'left', 0 ), 
-                              (txf, 'top', 0 ),
-                              (button, 'top', 0 ), (button, 'right', 0 ) ],
-                         ac=[ (txf, 'left', 0, text ), (txf, 'right', 0, button ) ] )
-        
-        Win_Global.txf_otherSide = txf
-        
-        return form
-
-
-
-class UI_MirrorType:
-    
-    def __init__(self):
-        
-        pass
-
-
-    def create(self):
-        
-        form = cmds.formLayout()
-        text = cmds.text( l='Mirror Type : ', al='right', h=22, w=80 )
-        optionMenu = cmds.optionMenu()
-        txf  = cmds.textField( h=22 )
-        cmds.setParent( '..' )
-        
-        cmds.formLayout( form, e=1, 
-                         af=[ (text, 'top', 0 ), (text, 'left', 0 ), 
-                              (optionMenu, 'top', 0 ),
-                              (txf, 'top', 0 ), (txf, 'right', 0 ) ],
-                         ac=[ (optionMenu, 'left', 0, text), 
-                              (txf, 'left', 0, optionMenu) ] )
-        
-        Win_Global.txf_mirrorType = txf
-        Win_Global.options = optionMenu
-        
-        for mirrorType in Win_Global.mirrorTypeList:
-            cmds.menuItem( mirrorType, p = optionMenu )
-        
-        return form
-
 
 
 
 class UI_infomation:
     
+    def __init__(self, infoAttrName ):
+        
+        self.infoAttrName = infoAttrName
+    
+    
+    def create(self):
+        
+        form = cmds.formLayout()
+        text = cmds.text( l= self.infoAttrName, w=100, al='right' )
+        txf  = cmds.textField()
+        cmds.setParent( '..' )
+        
+        cmds.formLayout( form, e=1, 
+                         af = [( text, 'top', 0 ), ( text, 'left', 0 ), ( text, 'bottom', 0 ),
+                               ( txf, 'top', 0 ), ( txf, 'right', 0 ), ( txf, 'bottom', 0 )],
+                         ac = [( txf, 'left', 5, text )] )
+        
+        self.txf = txf
+        
+        return form
+
+
+
+
+
+class UI_infomations:
+    
     def __init__(self):
         
-        self.ui_parentStrs = UI_ParentStrs()
-        self.ui_otherSideStr = UI_OtherSideStr()
-        self.ui_mirrorType = UI_MirrorType()
+        self.ui_origName     = UI_infomation( InfoAttrs.origNameAttr )
+        self.ui_parents      = UI_infomation( InfoAttrs.parentAttr )
+        self.ui_reverseAttrs = UI_infomation( InfoAttrs.reverseAttrs )
+        self.ui_sidePrefix   = UI_infomation( InfoAttrs.sidePrefixAttr )
+        self.ui_outerMatrix = UI_infomation( InfoAttrs.outerMatrixAttr )
+        self.ui_innerMatrix = UI_infomation( InfoAttrs.innerMatrixAttr )
     
     
     def create(self):
         
         frame = cmds.frameLayout( bv=1, lv=0 )
         form = cmds.formLayout()
-        parentStrsForm = self.ui_parentStrs.create()
-        otherSideForm  = self.ui_otherSideStr.create()
-        mirrorTypeForm = self.ui_mirrorType.create()
+        
+        form_origName   = self.ui_origName.create()
+        form_parents    = self.ui_parents.create()
+        form_sidePrefix = self.ui_sidePrefix.create()
+        form_reverseAttrs   = self.ui_reverseAttrs.create()
+        form_outerMatrix   = self.ui_outerMatrix.create()
+        form_innerMatrix   = self.ui_innerMatrix.create()
+        
         cmds.setParent( '..' )
         cmds.setParent( '..' )
         
         cmds.formLayout( form, e=1,
-                         af=[(parentStrsForm, 'top', 5), (parentStrsForm, 'left', 5), (parentStrsForm, 'right', 5),
-                             (otherSideForm, 'left', 5), (otherSideForm, 'right', 5), 
-                             (mirrorTypeForm, 'left', 5), (mirrorTypeForm, 'right', 5), (mirrorTypeForm, 'bottom', 5)],
-                         ac=[(otherSideForm, 'top', 5, parentStrsForm ),
-                             (mirrorTypeForm, 'top', 5, otherSideForm )],
+                         af=[(form_origName, 'top', 5), (form_origName, 'left', 5), (form_origName, 'right', 5),
+                             (form_parents, 'left', 5), (form_parents, 'right', 5), 
+                             (form_sidePrefix, 'left', 5), (form_sidePrefix, 'right', 5), 
+                             (form_reverseAttrs, 'left', 5), (form_reverseAttrs, 'right', 5), 
+                             (form_outerMatrix, 'left', 5), (form_outerMatrix, 'right', 5),
+                             (form_innerMatrix, 'left', 5), (form_innerMatrix, 'right', 5), (form_innerMatrix, 'bottom', 5)],
+                         ac=[(form_parents, 'top', 5, form_origName ),
+                             (form_sidePrefix, 'top', 5, form_parents ),
+                             (form_reverseAttrs, 'top', 5, form_sidePrefix ),
+                             (form_outerMatrix, 'top', 5, form_reverseAttrs ),
+                             (form_innerMatrix, 'top', 5, form_outerMatrix )],
                          ap=[] )
+        
+        Win_Global.txf_origNameAttr = self.ui_origName.txf
+        Win_Global.txf_parentAttr = self.ui_parents.txf
+        Win_Global.txf_sidePrefixAttr = self.ui_sidePrefix.txf
+        Win_Global.txf_reverseAttrs = self.ui_reverseAttrs.txf
+        Win_Global.txf_outerMatrixAttr = self.ui_outerMatrix.txf
+        Win_Global.txf_innerMatrixAttr = self.ui_innerMatrix.txf
         
         return frame
         
@@ -330,8 +359,8 @@ class Win:
     
     def __init__(self ):
         
-        self.ui_baseCtl    = UI_baseCtl()
-        self.ui_infomation = UI_infomation()
+        self.ui_targetCtl    = UI_targetCtl()
+        self.ui_infomation = UI_infomations()
         self.ui_buttons    = UI_Buttons()
 
     
@@ -343,22 +372,36 @@ class Win:
         cmds.window( Win_Global.winName, title= Win_Global.title )
         
         formOuter = cmds.formLayout()
-        baseCtlForm = self.ui_baseCtl.create()
+        targetCtlForm = self.ui_targetCtl.create()
         infomationForm = self.ui_infomation.create()
         buttonsForm = self.ui_buttons.create()
         cmds.setParent( '..' )
 
         cmds.formLayout( formOuter, e=1, 
-                         af=[( baseCtlForm, 'top', 5 ), ( baseCtlForm, 'left', 5 ), ( baseCtlForm, 'right', 5 ),
+                         af=[( targetCtlForm, 'top', 5 ), ( targetCtlForm, 'left', 5 ), ( targetCtlForm, 'right', 5 ),
                              ( infomationForm, 'left', 5 ), ( infomationForm, 'right', 5 ),
                              ( buttonsForm, 'left', 5 ), ( buttonsForm, 'right', 5 ), ( buttonsForm, 'bottom', 5 ) ],
-                         ac=[( infomationForm, 'top', 5, baseCtlForm ),
+                         ac=[( infomationForm, 'top', 5, targetCtlForm ),
                              ( buttonsForm, 'top', 5, infomationForm )] )
         
         cmds.window( Win_Global.winName, e=1, width = Win_Global.width, height= Win_Global.height )
         cmds.showWindow( Win_Global.winName )
         
         Win_Global.loadInfo()
+        
+        cmds.popupMenu( p=Win_Global.txf_parentAttr )
+        cmds.menuItem( l='Load Parent Ctls', c= Win_Cmd.loadParentCtls )
+        
+        cmds.popupMenu( p=Win_Global.txf_outerMatrixAttr )
+        cmds.menuItem( l='Get Matrix From Selection', c= Win_Cmd.getOuterMatrix )
+        
+        cmds.popupMenu( p=Win_Global.txf_innerMatrixAttr )
+        cmds.menuItem( l='Get Matrix From Selection', c= Win_Cmd.getInnerMatrix )
+        
+        
+        
+        
+        
         
         
     

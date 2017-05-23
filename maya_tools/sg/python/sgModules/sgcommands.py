@@ -57,6 +57,8 @@ def getDirection( inputVector ):
     
     
 def matrixToList( matrix ):
+    if type( matrix ) == 'list':
+        return matrix
     mtxList = range( 16 )
     for i in range( 4 ):
         for j in range( 4 ):
@@ -66,6 +68,8 @@ def matrixToList( matrix ):
 
 
 def listToMatrix( mtxList ):
+    if type( mtxList ) == OpenMaya.MMatrix:
+        return mtxList
     matrix = OpenMaya.MMatrix()
     OpenMaya.MScriptUtil.createMatrixFromList( mtxList, matrix  )
     return matrix
@@ -1216,6 +1220,32 @@ def getMirrorMatrix( mtxValue ):
     
     return listToMatrix( mtxList )
 
+
+
+
+def getTransformFromMatrix( mtxValue ):
+    
+    print "print mtx : "
+    printMatrix( listToMatrix(mtxValue) )
+    trMtx = OpenMaya.MTransformationMatrix( listToMatrix(mtxValue) )
+    rotValue = trMtx.eulerRotation().asVector()
+    trValue = trMtx.getTranslation( OpenMaya.MSpace.kObject )
+    scriptUtil = OpenMaya.MScriptUtil()
+    scriptUtil.createFromList( [1.0,1.0,1.0], 3 )
+    doublePtr = scriptUtil.asDoublePtr()
+    trMtx.getScale( doublePtr, OpenMaya.MSpace.kTransform )
+    sValueX = OpenMaya.MScriptUtil.getDoubleArrayItem( doublePtr, 0 )
+    sValueY = OpenMaya.MScriptUtil.getDoubleArrayItem( doublePtr, 1 )
+    sValueZ = OpenMaya.MScriptUtil.getDoubleArrayItem( doublePtr, 2 )
+    return trValue.x, trValue.y, trValue.z, rotValue.x, rotValue.y, rotValue.z, sValueX, sValueY, sValueZ
+
+
+
+def printMatrix( mtxValue ):
+    
+    for i in range( 4 ):
+        print "%5.3f, %5.3f, %5.3f, %5.3f" %( mtxValue(i,0), mtxValue(i,1), mtxValue(i,2), mtxValue(i,3) )
+    print
 
 
 
@@ -5151,7 +5181,341 @@ def addMiddleJoint( jnt ):
     
     
     
+class SymmetryControl_:
+    
+    parentAttr    = 'ctlParent'
+    otherSideAttr = 'ctlOtherSide'
+    reverseAttrsAttr = 'ctlReverseAttrs'
+    mirrorTypeAttr   = 'ctlMirrorType'
+    
+
+    def __init__(self, name ):
+        self.__namespace = ''
+        self.__name = name
+        self.__origname = name
+        if self.__name.find( ':' ) != -1:
+            self.__namespace = ':'.join( name.split( ':' )[:-1] ) + ':'
+            self.__origname = name.split( ':' )[-1]
+        self.sgtransform = pymel.core.ls( self.__name )[0]
+
+    
+    def fullName(self, origName ):
+        return self.__namespace + origName
+
+
+    def parent(self):
+        if not cmds.attributeQuery( SymmetryControl.parentAttr, node=self.__name, ex=1 ): return None
+        return [ target.strip() for target in cmds.getAttr( self.__name + '.'+ SymmetryControl.parentAttr ).split( ',' ) ]
     
     
+    def side(self):
+        if self.__name.find( '_L_' ) != -1: return 'left'
+        if self.__name.find( '_R_' ) != -1: return 'right'
+        return 'center'
+
+    
+    def otherSide(self):
+        if not cmds.attributeQuery( SymmetryControl.otherSideAttr, node= self.__name, ex=1 ): return self
+        if not cmds.getAttr( self.__name + '.' + SymmetryControl.otherSideAttr ): return self
+        return SymmetryControl( self.__namespace + cmds.getAttr( self.__name + '.'+ SymmetryControl.otherSideAttr ) )
+
+
+    def mirrorType(self):
+        if not cmds.attributeQuery( SymmetryControl.mirrorTypeAttr, node= self.__name, ex=1 ): return []
+        mirrorType = cmds.getAttr( self.__name + '.' + SymmetryControl.mirrorTypeAttr )
+        return [ i.strip() for i in mirrorType.split( ',' ) ]
+
+
+    def name(self):
+        return self.__name
+
+
+    def setMatrixByMirrorType( self, mirrorTypes, srcLocalMtx ):
+        attrs  = ['tx', 'ty', 'tz','rx', 'ry', 'rz']
+        revs = [1,1,1,1,1,1]
+        values = [0,0,0,0,0,0]
+        for mirrorType in mirrorTypes[1:]:
+            for attr in attrs:
+                mirrorAttr, rev, value= mirrorType.split( '_' )
+                if mirrorAttr != attr: continue
+                if rev == 'r': revs[ attrs.index( attr ) ] *= -1
+                values[ attrs.index( attr ) ] = float( value )
+
+        trans = getTranslateFromMatrix( srcLocalMtx )
+        rots  = getRotateFromMatrix( srcLocalMtx )
+        trans[0] *= revs[0]
+        trans[1] *= revs[1]
+        trans[2] *= revs[2]
+        rots[0] *= revs[3]
+        rots[1] *= revs[4]
+        rots[2] *= revs[5]
+        srcLocalMtx = setMatrixTranslate( srcLocalMtx, trans[0], trans[1], trans[2] )
+        srcLocalMtx = setMatrixRotate( srcLocalMtx, rots[0], rots[1], rots[2] )
+        transAddValues = values[:3]
+        rotAddValues   = values[3:]
+        rotMtxInside = getMatrixFromRotate( rotAddValues )
+        transMtxOutside = getMatrixFromTranslate( transAddValues )
+        srcLocalMtx = rotMtxInside * srcLocalMtx * transMtxOutside
+        return srcLocalMtx
+
+
+    def getCtlData(self, source ):
+        
+        sourceParent = source.parent()
+        if not source.parent(): return None
+        
+        udAttrs = cmds.listAttr( source.__name, k=1, ud=1 )
+        if not udAttrs: udAttrs = []
+        udAttrValues = []
+        if cmds.attributeQuery( SymmetryControl.reverseAttrsAttr, node= source.__name, ex=1 ):
+            reverseAttrs = [ i.strip() for i in cmds.getAttr( source.__name + '.' + SymmetryControl.reverseAttrsAttr ).split( ',' ) ]
+        else:
+            reverseAttrs= []
+        for attr in udAttrs:
+            if attr in reverseAttrs:
+                udAttrValues.append( -cmds.getAttr( source.__name + '.' + attr ) )
+            else:
+                udAttrValues.append(  cmds.getAttr( source.__name + '.' + attr ) )
+
+        transformAttrs = ['tx','ty','tz','rx','ry','rz','sx','sy','sz']
+        transformAttrValues = []
+        for attr in transformAttrs:
+            transformAttrValues.append( cmds.getAttr( source.__name + '.' + attr ) )
+        worldMatrix = listToMatrix( cmds.getAttr( source.__name + '.wm' ) )
+        pivMatrix   = getPivotMatrix( sourceParent[0] ) * listToMatrix( cmds.getAttr( sourceParent[0] + '.wm' ) )
+        return udAttrs, udAttrValues, transformAttrs, transformAttrValues, worldMatrix * pivMatrix.inverse()
+    
+    
+    def setCtlData( self, source, target, ctlData, typ='mirror' ):
+
+        if not ctlData: return None
+
+        mirrorTypes = source.mirrorType()
+        udAttrs, udAttrValues, transformAttrs, transformValues, localMatrix = ctlData
+        
+        trg = target.sgtransform
+        for i in range( len( udAttrs ) ):
+            try:
+                trg.attr( udAttrs[i] ).set( udAttrValues[i] )
+            except:pass
+        for i in range( len( transformAttrs ) ):
+            try:trg.attr( transformAttrs[i] ).set( transformValues[i] )
+            except:pass
+        
+        if 'none' in mirrorTypes: return None
+
+        if 'local' in mirrorTypes:
+            trg.tx.set( -trg.tx.get() )
+            trg.ty.set( -trg.ty.get() )
+            trg.tz.set( -trg.tz.get() )
+            
+            attrs  = ['tx', 'ty', 'tz','rx', 'ry', 'rz']
+            revs = [1,1,1,1,1,1]
+            values = [0,0,0,0,0,0]
+            for mirrorType in mirrorTypes[1:]:
+                for attr in attrs:
+                    mirrorAttr, rev, value= mirrorType.split( '_' )
+                    if mirrorAttr != attr: continue
+                    if rev == 'r': revs[ attrs.index( attr ) ] *= -1
+                    values[ attrs.index( attr ) ] = float( value )
+            trg.tx.set( revs[0]*trg.tx.get() )
+            trg.ty.set( revs[1]*trg.ty.get() )
+            trg.tz.set( revs[2]*trg.tz.get() )
+            print '%s - revs : ' % source.name(), revs
+        
+        if 'txm' in mirrorTypes:
+            trg.tx.set( -trg.tx.get() )
+        if 'tym' in mirrorTypes:
+            trg.ty.set( -trg.ty.get() )
+        if 'tzm' in mirrorTypes:
+            trg.tz.set( -trg.tz.get() )
+        if 'rxm' in mirrorTypes:
+            trg.rx.set( -trg.rx.get() )
+        if 'rym' in mirrorTypes:
+            trg.ry.set( -trg.ry.get() )
+        if 'rzm' in mirrorTypes:
+            trg.rz.set( -trg.rz.get() )
+
+        if 'matrix' in mirrorTypes:
+            srcLocalMtx = getMirrorMatrix( localMatrix )
+            dstMatrix = srcLocalMtx * getPivotMatrix( target.parent()[0] ) * listToMatrix( cmds.getAttr( target.parent()[0] + '.wm' ) )
+            
+            tr = cmds.createNode( 'transform' )
+            cmds.setAttr( tr + '.dh', 1 )
+            cmds.xform( tr, ws=1, matrix= matrixToList( dstMatrix ) )
+            
+            cmds.xform( target.name(), ws=1, t=getTranslateFromMatrix(dstMatrix) )
+            rotList = getRotateFromMatrix( dstMatrix )
+            cmds.xform( target.name(), ws=1, ro= rotList )
+
+        if 'center' in mirrorTypes:
+            if typ == 'flip':
+                setMirrorLocal( target.sgtransform )
+            elif typ == 'mirror':
+                setCenterMirrorLocal( target.sgtransform )
+        
+    
+    def isMirrorAble(self):
+        
+        if not cmds.attributeQuery( SymmetryControl.mirrorTypeAttr, node=self.__name, ex=1 ): return False
+        mirrorTypes = cmds.getAttr( self.__name + '.' + SymmetryControl.mirrorTypeAttr )
+        if not mirrorTypes: return False
+        if mirrorTypes == 'none': return False
+        return True
+    
+    
+
+    def setMirror(self, side ):
+        
+        if not self.isMirrorAble(): return None
+        
+        if side == 'LtoR':
+            if self.side() == 'left':
+                source = self
+                target = self.otherSide()
+            else:
+                source = self.otherSide()
+                target = self
+                
+        if side == 'RtoL':
+            if self.side() == 'right':
+                source = self
+                target = self.otherSide()
+            else:
+                source = self.otherSide()
+                target = self
+        
+        self.setCtlData( source, target, self.getCtlData( source ), 'mirror' )
+    
+    
+    def setFlip(self):
+
+        if not self.isMirrorAble(): return None
+
+        source = self
+        target = self.otherSide()
+        dataSource = self.getCtlData( source )
+        dataTarget = self.getCtlData( target )
+        
+        self.setCtlData( source, target, dataSource, 'flip' )
+        self.setCtlData( target, source, dataTarget, 'flip' )
+    
+
+
+    def flipH(self):
+        
+        if not self.isMirrorAble(): return None
+        
+        H = self.allChildren()
+    
+        flipedList = []
+        sourceList = []
+        targetList = []
+        sourceDataList = []
+        targetDataList = []
+        
+        for h in H:
+            
+            if h.name() in flipedList: continue
+            name = h.otherSide().name()
+            if name in flipedList: continue
+            flipedList.append( h.name() )
+            
+            print "flip target : ", h.name()
+            
+            otherSide = h.otherSide()
+            sourceList.append( h )
+            targetList.append( otherSide )
+            sourceDataList.append( self.getCtlData( h ) )
+            targetDataList.append( self.getCtlData( otherSide ) )
+        
+        for i in range( len( sourceList ) ):
+            self.setCtlData( sourceList[i], targetList[i], sourceDataList[i], 'flip' )
+            self.setCtlData( targetList[i], sourceList[i], targetDataList[i], 'flip' )
+
+
+
+    def mirrorH(self, side ):
+        
+        if not self.isMirrorAble(): return None
+        
+        if side == 'LtoR':
+            if self.side() == 'left':
+                source = self
+            else:
+                source = self.otherSide()
+                
+        if side == 'RtoL':
+            if self.side() == 'right':
+                source = self
+            else:
+                source = self.otherSide()
+        
+        H = source.allChildren()
+    
+        sourceList = []
+        targetList = []
+        sourceDatas = []
+
+        for h in H:
+            if side == 'LtoR' and h.side() == 'right': continue
+            if side == 'RtoL' and h.side() == 'left' : continue
+            
+            otherSide = h.otherSide()
+            sourceList.append( h )
+            targetList.append( otherSide )
+            sourceDatas.append( self.getCtlData( h ) )
+        
+        for i in range( len( sourceList ) ):
+            self.setCtlData( sourceList[i], targetList[i], sourceDatas[i], 'mirror' )
+        
+
+
+    def children(self):
+        
+        allAttrs = cmds.ls( '*.' + SymmetryControl.parentAttr )
+        
+        targetChildren = []
+        for attr in allAttrs:
+            if attr.find( self.__namespace ) == -1: continue
+            targetParent = cmds.getAttr( attr )
+            if self.__name == self.__namespace + targetParent:
+                targetChildren.append( SymmetryControl( attr.split( '.' )[0] ) )
+        return targetChildren
+
+
+    def allChildren(self):
+        
+        localChildren = self.children()
+        childrenH = []
+        for localChild in localChildren:
+            childrenH += localChild.allChildren()
+        localChildren += childrenH
+        childrenNames = []
+
+        localChildrenSet = []
+        for localChild in localChildren:
+            name = localChild.name()
+            if name in childrenNames: continue
+            childrenNames.append( name )
+            localChildrenSet.append( localChild )
+        
+        return localChildrenSet
+    
+    
+    def hierarchy(self):
+        
+        localChildren = [self]
+        localChildren += self.allChildren()
+        return localChildren
+    
+
+    def setDefault(self):
+
+        attrs = self.sgtransform.listAttr( k=1 )
+        for attr in attrs:
+            if attr in self.dataPtr.defaultIgnore: continue
+            try:self.sgtransform.attr(attr).setToDefault()
+            except:pass
 
 
