@@ -57,7 +57,7 @@ def getDirection( inputVector ):
     
     
 def matrixToList( matrix ):
-    if type( matrix ) == 'list':
+    if type( matrix ) == list:
         return matrix
     mtxList = range( 16 )
     for i in range( 4 ):
@@ -1225,7 +1225,6 @@ def getMirrorMatrix( mtxValue ):
 
 def getTransformFromMatrix( mtxValue ):
     
-    print "print mtx : "
     printMatrix( listToMatrix(mtxValue) )
     trMtx = OpenMaya.MTransformationMatrix( listToMatrix(mtxValue) )
     rotValue = trMtx.eulerRotation().asVector()
@@ -1294,6 +1293,43 @@ def getRotateFromMatrix( mtxValue ):
     
     return [math.degrees(rotVector.x), math.degrees(rotVector.y), math.degrees(rotVector.z)]
 
+
+
+def getMatrixFromTranslate( transValue ):
+    
+    defaultMtx = matrixToList( OpenMaya.MMatrix() )
+    defaultMtx[12] = transValue[0]
+    defaultMtx[13] = transValue[1]
+    defaultMtx[14] = transValue[2]
+    return listToMatrix( defaultMtx )
+
+
+
+def getMatrixFromRotate( rotValue ):
+    
+    trMtx = OpenMaya.MTransformationMatrix()
+    radRotValues = [ math.radians(i) for i in rotValue ]
+    trMtx.rotateTo( OpenMaya.MEulerRotation( OpenMaya.MVector( *radRotValues ) ) ) 
+    return trMtx.asMatrix()
+
+
+
+def setMatrixTranslate( mtx, *transValue ):
+    
+    mtxList = matrixToList( mtx )
+    mtxList[12] = transValue[0]
+    mtxList[13] = transValue[1]
+    mtxList[14] = transValue[2]
+    return listToMatrix( mtxList )
+
+
+def setMatrixRotate( mtx, *rotValue ):
+    
+    mtxList = matrixToList( getMatrixFromRotate( rotValue ) )
+    mtxList[12] = mtx(3,0)
+    mtxList[13] = mtx(3,1)
+    mtxList[14] = mtx(3,2)
+    return listToMatrix( mtxList )
 
 
 
@@ -2106,41 +2142,7 @@ def getMatrixFromSelection( *sels ):
 
 
 
-def getMatrixFromTranslate( transValue ):
-    
-    defaultMtx = matrixToList( OpenMaya.MMatrix() )
-    defaultMtx[12] = transValue[0]
-    defaultMtx[13] = transValue[1]
-    defaultMtx[14] = transValue[2]
-    return listToMatrix( defaultMtx )
 
-
-
-def getMatrixFromRotate( rotValue ):
-    
-    trMtx = OpenMaya.MTransformationMatrix()
-    radRotValues = [ math.radians(i) for i in rotValue ]
-    trMtx.rotateTo( OpenMaya.MEulerRotation( OpenMaya.MVector( *radRotValues ) ) ) 
-    return trMtx.asMatrix()
-
-
-
-def setMatrixTranslate( mtx, *transValue ):
-    
-    mtxList = matrixToList( mtx )
-    mtxList[12] = transValue[0]
-    mtxList[13] = transValue[1]
-    mtxList[14] = transValue[2]
-    return listToMatrix( mtxList )
-
-
-def setMatrixRotate( mtx, *rotValue ):
-    
-    mtxList = matrixToList( getMatrixFromRotate( rotValue ) )
-    mtxList[12] = mtx(3,0)
-    mtxList[13] = mtx(3,1)
-    mtxList[14] = mtx(3,2)
-    return listToMatrix( mtxList )
 
 
 
@@ -3274,26 +3276,34 @@ def setGeometryMatrixToTarget( geo, matrixTarget ):
     geoMatrix    = listToMatrix( geo.wm.get() )
     targetMatrix = listToMatrix( matrixTarget.wm.get() )
     
-    outputAttr = ''
-    inputAttr = ''
+    for shape in geoShapes:
+        if shape.attr( 'io' ).get():
+            delete( shape )
+    
+    geoShapes = geo.listRelatives( s=1 )
     
     for geoShape in geoShapes:
-        ioShape = convertSg( addIOShape( geoShape ) )
-        print "io shape : ", ioShape
-        if geoShape.nodeType() == 'mesh':
-            outputAttr = 'outMesh'
-            inputAttr = 'inMesh'
-        elif geoShape.nodeType() in ['nurbsCurve', 'nurbsSurface']:
-            outputAttr = 'local'
-            inputAttr = 'create'
+        cmds.select( geoShape.name() )
+        cmds.CreateCluster()
+        shapeHists = cmds.listHistory( geoShape.name() )
+        origShape = None
+        cluster = None
+        for hist in shapeHists:
+            if cmds.nodeType( hist ) == 'cluster':
+                cluster = hist
+            if cmds.nodeType( hist ) != 'mesh': continue
+            if not cmds.getAttr( hist + '.io' ): continue
+            origShape = convertSg( hist )
+            break
         
         trGeo = createNode( 'transformGeometry' )
-        ioShape.attr( outputAttr ) >> trGeo.inputGeometry
-        trGeo.outputGeometry >> geoShape.attr( inputAttr )
+        origShape.attr( 'outMesh' ) >> trGeo.inputGeometry
+        trGeo.outputGeometry >> geoShape.attr( 'inMesh' )
         trGeo.transform.set( matrixToList(geoMatrix * targetMatrix.inverse()), type='matrix' )
+        cmds.select( geoShape.name() )
+        cmds.DeleteHistory()
     
     geo.xform( ws=1, matrix= matrixTarget.wm.get() )
-    setPntsZero( geo )
 
 
 @convertSg_dec
@@ -5092,7 +5102,29 @@ def setMatrixToTarget( mtxValue, inputTarget ):
         target.r.set( rotValue )
     else:
         pymel.core.xform( target, ws=1, matrix= matrixToList( mtx ) )
+
+
+
+def setMatrixToGeoGroup( mtx, target ):
     
+    tr = cmds.createNode( 'transform' )
+    setMatrixToTarget( mtx, tr )
+    selChildren = cmds.listRelatives( target, c=1, f=1, type='transform' )
+    if not selChildren: selChildren = []
+    selChildren.append( target )
+    unParentList = []
+    for selChild in selChildren:
+        if cmds.listRelatives( selChild, s=1 ):
+            selP = cmds.listRelatives( selChild, p=1, f=1 )[0]
+            selChild = cmds.parent( selChild, w=1 )[0]
+            setGeometryMatrixToTarget( selChild, tr )
+            unParentList.append( [selChild,selP] )
+        else:
+            setMatrixToTarget( mtx, selChild )
+    for child, parent in unParentList:
+        cmds.parent( child, parent )
+    
+    cmds.delete( tr )
     
 
 def getAutoTwistNode( inputTarget, **options ):
@@ -5518,4 +5550,119 @@ class SymmetryControl_:
             try:self.sgtransform.attr(attr).setToDefault()
             except:pass
 
+
+
+def getMeshGroups( meshs ):
+    
+    def getCompairData( meshName ):
+        oMesh = OpenMaya.MObject()
+        selList = OpenMaya.MSelectionList()
+        selList.add( meshName )
+        selList.getDependNode( 0, oMesh )
+        fnMesh = OpenMaya.MFnMesh( oMesh )
+        numVtx = fnMesh.numVertices()
+        numEdge = fnMesh.numEdges()
+        numPoly = fnMesh.numPolygons()
+        startPoint = OpenMaya.MPoint()
+        endPoint = OpenMaya.MPoint()
+        fnMesh.getPoint(0, startPoint)
+        fnMesh.getPoint(numVtx-1, endPoint)
+        return numVtx, numEdge, numPoly, startPoint, endPoint
+    
+    compairDatas = []
+    
+    for mesh in meshs:
+        if cmds.listConnections( mesh + '.inMesh', s=1, d=0 ): continue
+        compairDatas.append( getCompairData( mesh ) )
+    
+    meshGroups = []
+    for i in range( len( compairDatas ) ):
+        compairSrc = compairDatas[i]
+        srcExists = False
+        for meshGroup in meshGroups:
+            if i in meshGroup:
+                srcExists = True
+                break
+        if srcExists: continue
+        meshGroups.append( [i] )
+        
+        for j in range( i+1, len( compairDatas ) ):
+            compairTrg = compairDatas[j]
+            if compairSrc[0] != compairTrg[0]: continue
+            if compairSrc[1] != compairTrg[1]: continue
+            if compairSrc[2] != compairTrg[2]: continue
+            if compairSrc[3].distanceTo( compairTrg[3] ) > 0.001: continue
+            if compairSrc[4].distanceTo( compairTrg[4] ) > 0.001: continue
+            
+            for meshGroup in meshGroups:
+                if i in meshGroup:
+                    meshGroup.append( j )
+                    break
+    return meshGroups
+
+
+
+def createDefaultPropRig( propGrp ):
+    
+    from sgModules import sgdata
+    from sgModules import sgcommands
+    
+    propGrp = pymel.core.ls( propGrp )[0]
+    
+    def makeParent( target ):
+        targetP = pymel.core.createNode( 'transform' )
+        pymel.core.xform( targetP, ws=1, matrix= target.wm.get() )
+        pymel.core.parent( target, targetP )
+        targetP.rename( 'P' + target.shortName() )
+        return targetP
+    
+    worldCtl = pymel.core.ls( makeController( sgdata.Controllers.circlePoints ).name() )[0]
+    moveCtl  = pymel.core.ls( makeController( sgdata.Controllers.crossPoints ).name() )[0]
+    rootCtl  = pymel.core.ls( makeController( sgdata.Controllers.circlePoints ).name() )[0]
+    
+    bb = cmds.exactWorldBoundingBox(propGrp.name())
+    bbmin = bb[:3]
+    bbmax = bb[3:]
+    
+    bbsize = max( bbmax[0] - bbmin[0], bbmax[2] - bbmin[2] )/2
+    
+    center     = ( ( bbmin[0] + bbmax[0] )/2, ( bbmin[1] + bbmax[1] )/2, ( bbmin[2] + bbmax[2] )/2 )
+    floorPoint = ( ( bbmin[0] + bbmax[0] )/2, bbmin[1], ( bbmin[2] + bbmax[2] )/2 )
+    
+    worldCtl.t.set( *floorPoint )
+    moveCtl.t.set( *floorPoint )
+    rootCtl.t.set( *center )
+    
+    rootCtl.shape_sx.set( bbsize*1.2 )
+    rootCtl.shape_sy.set( bbsize*1.2 )
+    rootCtl.shape_sz.set( bbsize*1.2 )
+
+    moveCtl.shape_sx.set( bbsize*1.3 )
+    moveCtl.shape_sy.set( bbsize*1.3 )
+    moveCtl.shape_sz.set( bbsize*1.3 )
+    
+    worldCtl.shape_sx.set( bbsize*1.5 )
+    worldCtl.shape_sy.set( bbsize*1.5 )
+    worldCtl.shape_sz.set( bbsize*1.5 )
+    
+    rootCtl.getShape().setAttr( 'overrideEnabled', 1 )
+    rootCtl.getShape().setAttr( 'overrideColor', 29 )
+    moveCtl.getShape().setAttr( 'overrideEnabled', 1 )
+    moveCtl.getShape().setAttr( 'overrideColor', 20 )
+    worldCtl.getShape().setAttr( 'overrideEnabled', 1 )
+    worldCtl.getShape().setAttr( 'overrideColor', 17 )
+    
+    rootCtl.rename( 'Ctl_%s_Root' % propGrp.name() )
+    moveCtl.rename( 'Ctl_%s_Move' % propGrp.name() )
+    worldCtl.rename( 'Ctl_%s_World' % propGrp.name() )
+    
+    pRootCtl = makeParent( rootCtl )
+    pMoveCtl = makeParent( moveCtl )
+    pWorldCtl = makeParent( worldCtl )
+    
+    pymel.core.parent( pRootCtl, moveCtl )
+    pymel.core.parent( pMoveCtl, worldCtl )
+
+    sgcommands.setMatrixToGeoGroup( rootCtl.wm.get(), propGrp.name() )
+    sgcommands.constrain_all( rootCtl, propGrp )
 

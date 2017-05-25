@@ -202,7 +202,14 @@ class Win_Cmd:
             cmds.setAttr( otherSideCtl + '.' + InfoAttrs.sidePrefixAttr, otherPrefixStr, type='string' )
             cmds.setAttr( otherSideCtl + '.' + InfoAttrs.reverseAttrs, reverseAttrsValue, type='string' )
             cmds.setAttr( otherSideCtl + '.' + InfoAttrs.outerMatrixAttr, outerMatrixAttrValue, type='string' )
-            cmds.setAttr( otherSideCtl + '.' + InfoAttrs.innerMatrixAttr, outerMatrixAttrValue, type='string' )
+            cmds.setAttr( otherSideCtl + '.' + InfoAttrs.innerMatrixAttr, innerMatrixAttrValue, type='string' )
+    
+    
+    @staticmethod
+    def testFlip( *args ):
+        target = cmds.textField( Win_Global.txf_targetCtl, q=1, tx=1 )
+        rigControl = sgHumanRigCommands.RigControllerControl( target )
+        rigControl.setFlip()
     
     
     @staticmethod
@@ -211,15 +218,32 @@ class Win_Cmd:
     
     
     @staticmethod
-    def getOuterMatrix( *args ):
-        sels = cmds.ls( sl=1 )
-        cmds.textField( Win_Global.txf_outerMatrixAttr, e=1, tx= str( cmds.getAttr( sels[0] + '.m' ) ) )
-
-
+    def getReverseMatrixStr( *args ):
+        cmds.textField( args[0], e=1, tx = str( [-1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0,0,0,1] ) )
+    
     @staticmethod
-    def getInnerMatrix( *args ):
-        sels = cmds.ls( sl=1 )
-        cmds.textField( Win_Global.txf_innerMatrixAttr, e=1, tx= str( cmds.getAttr( sels[0] + '.m' ) ) )
+    def getXRotateMatrixStr( *args ):
+        cmds.textField( args[0], e=1, tx = str( [1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0,0,0,1] ) )
+    
+    @staticmethod
+    def getYRotateMatrixStr( *args ):
+        cmds.textField( args[0], e=1, tx = str( [-1,0,0,0, 0,1,0,0, 0,0,-1,0, 0,0,0,1] ) )
+    
+    @staticmethod
+    def getZRotateMatrixStr( *args ):
+        cmds.textField( args[0], e=1, tx = str( [1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0,0,0,1] ) )
+    
+    @staticmethod
+    def getXMirrorMatrixStr( *args ):
+        cmds.textField( args[0], e=1, tx = str( [-1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1] ) )
+        
+    @staticmethod
+    def getYMirrorMatrixStr( *args ):
+        cmds.textField( args[0], e=1, tx = str( [1,0,0,0, 0,-1,0,0, 0,0,1,0, 0,0,0,1] ) )
+    
+    @staticmethod
+    def getZMirrorMatrixStr( *args ):
+        cmds.textField( args[0], e=1, tx = str( [1,0,0,0, 0,1,0,0, 0,0,-1,0, 0,0,0,1] ) )
         
 
 
@@ -343,11 +367,14 @@ class UI_Buttons:
     def create(self):
         
         form = cmds.formLayout()
-        btSet = cmds.button( l='Set', c=Win_Cmd.setMirrorType )
+        btSet  = cmds.button( l='Set', c=Win_Cmd.setMirrorType )
+        btTest = cmds.button( l='Test Flip', c=Win_Cmd.testFlip )
         cmds.setParent( '..' )
         
         cmds.formLayout( form, e=1, 
-                         af = [( btSet, 'top', 0 ), ( btSet, 'left', 0 ), ( btSet, 'right', 0 )] )
+                         af = [( btSet, 'top', 0 ), ( btSet, 'left', 0 ),
+                               ( btTest, 'top', 0 ), ( btTest, 'right', 0 )],
+                         ap = [( btSet, 'right', 2, 50 ), ( btTest, 'left', 2, 50 )] )
         
         return form
 
@@ -392,11 +419,17 @@ class Win:
         cmds.popupMenu( p=Win_Global.txf_parentAttr )
         cmds.menuItem( l='Load Parent Ctls', c= Win_Cmd.loadParentCtls )
         
-        cmds.popupMenu( p=Win_Global.txf_outerMatrixAttr )
-        cmds.menuItem( l='Get Matrix From Selection', c= Win_Cmd.getOuterMatrix )
+        from functools import partial
         
-        cmds.popupMenu( p=Win_Global.txf_innerMatrixAttr )
-        cmds.menuItem( l='Get Matrix From Selection', c= Win_Cmd.getInnerMatrix )
+        for txf in [Win_Global.txf_outerMatrixAttr,Win_Global.txf_innerMatrixAttr]:
+            cmds.popupMenu( p=txf )
+            cmds.menuItem( l='Reverse Matrix', c= partial( Win_Cmd.getReverseMatrixStr, txf ) )
+            cmds.menuItem( l='XRot Matrix', c= partial( Win_Cmd.getXRotateMatrixStr, txf ) )
+            cmds.menuItem( l='YRot Matrix', c= partial( Win_Cmd.getYRotateMatrixStr, txf ) )
+            cmds.menuItem( l='ZRot Matrix', c= partial( Win_Cmd.getZRotateMatrixStr, txf ) )
+            cmds.menuItem( l='XMirror Matrix', c= partial( Win_Cmd.getXMirrorMatrixStr, txf ) )
+            cmds.menuItem( l='YMirror Matrix', c= partial( Win_Cmd.getYMirrorMatrixStr, txf ) )
+            cmds.menuItem( l='ZMirror Matrix', c= partial( Win_Cmd.getZMirrorMatrixStr, txf ) )
         
         
         

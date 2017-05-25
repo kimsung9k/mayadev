@@ -3423,22 +3423,25 @@ class RigControllerControl:
             
 
     
-    def parent(self):
+    def parents(self):
         
-        realParent = cmds.listRelatives( self.name, p=1, f=1 )[0]
-        
+        parentObjs = []
         if not cmds.attributeQuery( self.parentAttr, node= self.name, ex=1 ): 
-            cmds.warning( "%s parent is real Parent" % self.name )
-            return RigControllerControl( realParent )
+            return None
+        if not cmds.getAttr( self.name + '.' + self.parentAttr ):
+            return None
         origName = cmds.getAttr( self.name + '.' + self.origNameAttr )
-        parentOrigName = cmds.getAttr( self.name + '.' + self.parentAttr )
+        parentOrigNames = cmds.getAttr( self.name + '.' + self.parentAttr )
         
         ns = self.name.replace( origName, '' )
-        parentName = ns + parentOrigName
-        if not cmds.objExists( parentName ): 
+        
+        for parentOrigName in parentOrigNames.split( ',' ):
+            parentName = ns + parentOrigName.strip()
+            parentObjs.append( RigControllerControl( parentName ) )
+        if not parentObjs: 
             cmds.warning( "%s parent is real Parent" % self.name )
-            return RigControllerControl( realParent )
-        return RigControllerControl( parentName )
+            return None
+        return parentObjs
     
 
 
@@ -3464,6 +3467,8 @@ class RigControllerControl:
         
         if not cmds.attributeQuery( self.sidePrefixAttr, node= self.name, ex=1 ):
             return self
+        if not cmds.getAttr( self.name + '.' + self.sidePrefixAttr ):
+            return self
         prefixValue = cmds.getAttr( self.name + '.' + self.sidePrefixAttr )
         if prefixValue in RigControllerControl.leftPrefixList:
             otherPrefixValue = RigControllerControl.rightPrefixList[ RigControllerControl.leftPrefixList.index(prefixValue) ]
@@ -3479,8 +3484,10 @@ class RigControllerControl:
 
     def getCtlData(self):
         
-        parentObj = self.parent()
-        localMatrix = self.matrix() * parentObj.matrix().inverse()
+        parentObjs = self.parents()
+        if not parentObjs:
+            return None, None, None
+        localMatrix = self.matrix() * parentObjs[0].matrix().inverse()
         
         udAttrs = cmds.listAttr( self.name, k=1, ud=1 )
         if not udAttrs: udAttrs = []
@@ -3489,6 +3496,12 @@ class RigControllerControl:
         for attr in udAttrs:
             udAttrValues.append(  cmds.getAttr( self.name + '.' + attr ) )
         
+        keyAttrs = cmds.listAttr( self.name, k=1, sn=1 )
+        for attr in ['sx', 'sy', 'sz']:
+            if attr in keyAttrs:
+                udAttrs.append( attr )
+                udAttrValues.append( cmds.getAttr( self.name + '.'+ attr ) )
+        
         return localMatrix, udAttrs, udAttrValues
     
 
@@ -3496,6 +3509,7 @@ class RigControllerControl:
     def getInnerMatrix(self):
         
         attrName = RigControllerControl.innerMatrixAttr
+        if not cmds.attributeQuery( attrName, node= self.name, ex=1 ): return None
         innerMatrixValue = cmds.getAttr( self.name + '.' + attrName )
         if not innerMatrixValue:
             return OpenMaya.MMatrix()
@@ -3503,12 +3517,13 @@ class RigControllerControl:
         mtxList = []
         exec( 'mtxList = %s' % innerMatrixValue )
         return listToMatrix( mtxList )
-    
+
 
 
     def getOuterMatrix(self):
         
         attrName = RigControllerControl.outerMatrixAttr
+        if not cmds.attributeQuery( attrName, node= self.name, ex=1 ): return None
         outerMatrixValue = cmds.getAttr( self.name + '.' + attrName )
         if not outerMatrixValue:
             return OpenMaya.MMatrix()
@@ -3521,29 +3536,32 @@ class RigControllerControl:
 
     def setCtlData(self, localMatrix, udAttrs, udAttrValues ):
         
-        printMatrix( localMatrix )
-        realParent = cmds.listRelatives( self.name, p=1, f=1 )[0]
-        
-        realParentMatrix = listToMatrix( cmds.getAttr( realParent + '.wm' ) )
-        parentMatrix     = listToMatrix( cmds.getAttr( self.parent().name + '.wm' ) )
-        realParentLocalMatrix = realParentMatrix * parentMatrix.inverse()
+        parentMatrix = listToMatrix( cmds.getAttr( self.parents()[0].name + '.wm' ) )
         
         innerMtx  = self.getInnerMatrix()
         outerMtx  = self.getOuterMatrix()
         
-        mtxResult = realParentLocalMatrix.inverse() * innerMtx * localMatrix * outerMtx
+        if not innerMtx or not outerMtx: 
+            cmds.warning( "%s is not Rig Controller" % self.name )
+            return None 
         
-        keyAttrs = cmds.listAttr( self.name, k=1, sn=1 )
+        mtxResult = innerMtx * localMatrix * outerMtx * parentMatrix
         
-        transformAttrs = ['tx', 'ty', 'tz', 'rx', 'ry', 'rz', 'sx', 'sy', 'sz']
-        transformValues = getTransformFromMatrix( mtxResult )
+        if cmds.nodeType( self.name ) == 'joint':
+            realParentMatrix = listToMatrix( cmds.getAttr( cmds.listRelatives( self.name, p=1, f=1 )[0] + '.wm' ) )
+            joMatrix = getMatrixFromRotate( cmds.getAttr( self.name + '.jo' )[0] )
+            joWorldMatrix = joMatrix * realParentMatrix
+            trValue = getTranslateFromMatrix( mtxResult )
+            cmds.move( trValue[0], trValue[1], trValue[2], self.name, ws=1 )
+            mtxResult *= joWorldMatrix.inverse()
+            rotValue = getRotateFromMatrix( mtxResult )
+            cmds.rotate( rotValue[0], rotValue[1], rotValue[2], self.name, os=1 )
+        else:
+            mtxList = matrixToList( mtxResult )
+            cmds.xform( self.name, ws=1, matrix=mtxList )
         
-        for i in range( len( transformAttrs ) ):
-            transformAttr = transformAttrs[i]
-            transformValue = transformValues[i]
-            if not transformAttr in keyAttrs: continue
-            print self.name + '.' + transformAttr, transformValue
-            cmds.setAttr( self.name + '.' + transformAttr, transformValue )
+        for i in range( len( udAttrs ) ):
+            cmds.setAttr( self.name + '.' + udAttrs[i], udAttrValues[i] )
     
 
 
@@ -3554,16 +3572,260 @@ class RigControllerControl:
         selfLocalMtx,  selfUdAttrs, selfUdAttrValues = self.getCtlData()
         otherLocalMtx, otherUdAttrs, otherUdValues  = otherSide.getCtlData()
         
-        selfMirrorMtx  = getMirrorMatrix( selfLocalMtx )
-        otherMirrorMtx = getMirrorMatrix( otherLocalMtx )
+        if not selfLocalMtx or not otherLocalMtx: 
+            cmds.warning( "%s Flip is not worked" % self.name )
+            return None
     
-        otherSide.setCtlData( selfMirrorMtx, selfUdAttrs, selfUdAttrValues )
-        self.setCtlData( otherMirrorMtx, otherUdAttrs, otherUdValues )
+        otherSide.setCtlData( selfLocalMtx, selfUdAttrs, selfUdAttrValues )
+        self.setCtlData( otherLocalMtx, otherUdAttrs, otherUdValues )
     
+    
+    
+    def children(self):
+        
+        origName = cmds.getAttr( self.name + '.' + RigControllerControl.origNameAttr )
+        ns = self.name.replace( origName, '' )
+        
+        targetNodes = []
+        for attr in cmds.ls( ns + '*.' + RigControllerControl.parentAttr ):
+            values = cmds.getAttr( attr )
+            for value in values.split( ',' ):
+                if value.strip() == origName:
+                    targetNodes.append( RigControllerControl(attr.split( '.' )[0]) )
+        return targetNodes
+
+
+    def allChildren(self):
+        
+        localChildren = self.children()
+        childrenH = []
+        for localChild in localChildren:
+            childrenH += localChild.allChildren()
+        localChildren += childrenH
+        childrenNames = []
+
+        localChildrenSet = []
+        for localChild in localChildren:
+            name = localChild.name
+            if name in childrenNames: continue
+            childrenNames.append( name )
+            localChildrenSet.append( localChild )
+        
+        return localChildrenSet
+    
+    
+    def hierarchy(self):
+        
+        localChildren = [self]
+        localChildren += self.allChildren()
+        return localChildren
+    
+    
+    def flipH(self):
+        
+        H = self.hierarchy()
+    
+        flipedList = []
+        sourceList = []
+        targetList = []
+        sourceDataList = []
+        targetDataList = []
+        
+        for h in H:
+            if h.name in flipedList: continue
+            name = h.getOtherSide().name
+            if name in flipedList: continue
+            flipedList.append( h.name )
+            
+            
+            otherSide = h.getOtherSide()
+            sourceList.append( h )
+            targetList.append( otherSide )
+            sourceDataList.append( h.getCtlData() )
+            targetDataList.append( otherSide.getCtlData() )
+        
+        for i in range( len( sourceList ) ):
+            sourceList[i].setCtlData( *targetDataList[i] )
+            targetList[i].setCtlData( *sourceDataList[i] )
+
+
+
+
+def setCharacterCurrentAsDefault():
+    
+    transforms = cmds.ls( 'Ctl_*', type='transform' )
+    
+    ctls = []
+    for transform in transforms:
+        shapes = cmds.listRelatives( transform, s=1 )
+        if not shapes: continue
+        ctls.append( transform )
+    
+    for ctl in ctls:
+        attrs  = cmds.listAttr( ctl, ud=1, k=1 )
+        if not attrs: attrs = []
+        cbAttrs = cmds.listAttr( ctl, ud=1, cb=1 )
+        if not cbAttrs: cbAttrs = []
+        attrs += cbAttrs
+        
+        for attr in attrs:
+            value = cmds.getAttr( ctl + '.' + attr )
+            cmds.addAttr( ctl + '.' + attr, e=1, dv=value )
+        
+
+
+
+class ControllerMirrorInfo:
+    
+    def __init__(self, ctlName ):
+        
+        self.ctlName = ctlName
+        addAttr( ctlName, ln= RigControllerControl.origNameAttr, dt='string' )
+        cmds.setAttr( ctlName + '.' + RigControllerControl.origNameAttr, self.ctlName, type='string' )
+        
+        targetPrefix = ''
+        for i in range( len( RigControllerControl.leftPrefixList ) ):
+            leftPrefix = RigControllerControl.leftPrefixList[i]
+            if self.ctlName.find( leftPrefix ) != -1:
+                targetPrefix = leftPrefix
+                break
+        for i in range( len( RigControllerControl.rightPrefixList ) ):
+            rightPrefix = RigControllerControl.rightPrefixList[i]
+            if self.ctlName.find( rightPrefix ) != -1:
+                targetPrefix = rightPrefix
+                break
+        
+        if targetPrefix:
+            addAttr( ctlName, ln= RigControllerControl.sidePrefixAttr, dt='string' )
+            cmds.setAttr( ctlName + '.' + RigControllerControl.sidePrefixAttr, targetPrefix, type='string' )
         
     
+    def setParentName( self, parentName ):
+        
+        self.parentName = parentName
+        addAttr( self.ctlName, ln= RigControllerControl.parentAttr, dt='string' )
+        cmds.setAttr( self.ctlName+ '.' + RigControllerControl.parentAttr, self.parentName, type='string' )
+        
+    
+    def setReverseAttrs( self, reverseAttrs ):
+        
+        self.reverseAttrs = reverseAttrs
+        addAttr( self.ctlName, ln= RigControllerControl.reverseAttrs, dt='string' )
+        cmds.setAttr( self.ctlName+ '.' + RigControllerControl.reverseAttrs, self.reverseAttrs, type='string' )
     
     
+    def setOuterMatrixAttr( self, inputMtx ):
+        
+        if type( inputMtx ) == str:
+            matrixStr = inputMtx
+        else:
+            matrixStr = str( matrixToList( inputMtx ) )
+        
+        self.outerMatrix = matrixStr
+        addAttr( self.ctlName, ln= RigControllerControl.outerMatrixAttr, dt='string' )
+        cmds.setAttr( self.ctlName+ '.' + RigControllerControl.outerMatrixAttr, self.outerMatrix, type='string' )
+    
+
+    def setInnerMatrixAttr( self, inputMtx ):
+        
+        if type( inputMtx ) == str:
+            matrixStr = inputMtx
+        else:
+            matrixStr = str( matrixToList( inputMtx ) )
+        
+        self.innerMatrix = matrixStr
+        addAttr( self.ctlName, ln= RigControllerControl.innerMatrixAttr, dt='string' )
+        cmds.setAttr( self.ctlName+ '.' + RigControllerControl.innerMatrixAttr, self.innerMatrix, type='string' )
     
     
+
+
+def setCharacterSymmetryInfo():
     
+    reverseMatrix = [-1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0,0,0,1]
+    xRotateMatrix = [1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0,0,0,1]
+    yRotateMatrix = [-1,0,0,0, 0,1,0,0, 0,0,-1,0, 0,0,0,1]
+    zRotateMatrix = [1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0,0,0,1]
+    xMirrorMatrix = [-1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]
+    yMirrorMatrix = [1,0,0,0, 0,-1,0,0, 0,0,1,0, 0,0,0,1]
+    zMirrorMatrix = [1,0,0,0, 0,1,0,0, 0,0,-1,0, 0,0,0,1]
+    
+    Ctl_World = ['Ctl_World', 'PCtl_World', '', '', '' ]
+    Ctl_Move  = ['Ctl_Move', 'Ctl_World', '', xMirrorMatrix, yRotateMatrix ]
+    Ctl_Fly   = ['Ctl_Fly', 'Ctl_Move', '', xMirrorMatrix, yRotateMatrix ]
+    Ctl_Root  = ['Ctl_Root', 'Ctl_Fly', '', xMirrorMatrix, yRotateMatrix ]
+    Ctl_PervisRotator     = ['Ctl_PervisRotator', 'Ctl_Root', '', xMirrorMatrix, yRotateMatrix ]
+    Ctl_BodyRotatorFirst  = ['Ctl_BodyRotatorFirst', 'Ctl_PervisRotator', '', xMirrorMatrix, yRotateMatrix ]
+    Ctl_BodyRotatorSecond = ['Ctl_BodyRotatorSecond', 'Ctl_BodyRotatorFirst', '', xMirrorMatrix, yRotateMatrix ]
+    Ctl_Chest  = ['Ctl_Chest', 'Ctl_BodyRotatorSecond', '', xMirrorMatrix, yRotateMatrix ]
+    Ctl_Waist  = ['Ctl_Waist', 'Ctl_BodyRotatorFirst', '', xMirrorMatrix, yRotateMatrix ]
+    Ctl_Hip    = ['Ctl_Hip', 'Ctl_Waist', '', xMirrorMatrix, yRotateMatrix ]
+    Ctl_Neck   = ['Ctl_Neck', 'Ctl_Chest', '', xMirrorMatrix, yRotateMatrix ]
+    Ctl_Head   = ['Ctl_Head', 'Ctl_Neck', '', xMirrorMatrix, yRotateMatrix ]
+    
+    Ctl_HipPos_SIDE_   = ['Ctl_HipPos_SIDE_', 'Ctl_Hip', '', xMirrorMatrix, reverseMatrix ]
+    Ctl_IkLeg_SIDE_02  = ['Ctl_IkLeg_SIDE_02', 'Ctl_HipPos_SIDE_', '', reverseMatrix, reverseMatrix ]
+    Ctl_Leg_SIDE_PoleV = ['Ctl_Leg_SIDE_PoleV', 'Ctl_IkLeg_SIDE_02', '', reverseMatrix, reverseMatrix ]
+    Ctl_FootIkFoot_SIDE_Piv = ['Ctl_FootIkFoot_SIDE_Piv', 'Ctl_IkLeg_SIDE_02', '', reverseMatrix, reverseMatrix ]
+    Ctl_FootIkToe_SIDE_End  = ['Ctl_FootIkToe_SIDE_End', 'Ctl_FootIkFoot_SIDE_Piv', '', reverseMatrix, reverseMatrix ]
+    Ctl_FootIkToe_SIDE_     = ['Ctl_FootIkToe_SIDE_', 'Ctl_FootIkToe_SIDE_End', '', reverseMatrix, reverseMatrix ]
+    
+    Ctl_FkLeg_SIDE_00 = ['Ctl_FkLeg_SIDE_00', 'Ctl_HipPos_SIDE_', '', reverseMatrix, reverseMatrix ]
+    Ctl_FkLeg_SIDE_01 = ['Ctl_FkLeg_SIDE_01', 'Ctl_FkLeg_SIDE_00', '', reverseMatrix, reverseMatrix ]
+    Ctl_FkLeg_SIDE_02 = ['Ctl_FkLeg_SIDE_02', 'Ctl_FkLeg_SIDE_01', '', reverseMatrix, reverseMatrix ]
+    Ctl_FootFkToe_SIDE_ = ['Ctl_FootFkToe_SIDE_', 'Ctl_FkLeg_SIDE_02', '', reverseMatrix, reverseMatrix ]
+    
+    Ctl_BlLeg_SIDE_02 = ['Ctl_BlLeg_SIDE_02', 'Ctl_HipPos_SIDE_', '',  '', '' ]
+
+    Ctl_clavicle_SIDE_ = ['Ctl_clavicle_SIDE_', 'Ctl_Chest', '', xMirrorMatrix, yRotateMatrix ]
+    
+    Ctl_IkArm_SIDE_02 = ['Ctl_IkArm_SIDE_02', 'Ctl_clavicle_SIDE_', '', reverseMatrix, reverseMatrix ]
+    Ctl_Arm_SIDE_PoleV = ['Ctl_Arm_SIDE_PoleV', 'Ctl_IkArm_SIDE_02', '', reverseMatrix, reverseMatrix ]
+    
+    Ctl_FkArm_SIDE_00 = ['Ctl_FkArm_SIDE_00', 'Ctl_clavicle_SIDE_', '', reverseMatrix, reverseMatrix ]
+    Ctl_FkArm_SIDE_01 = ['Ctl_FkArm_SIDE_01', 'Ctl_FkArm_SIDE_00', '',  reverseMatrix, reverseMatrix ]
+    Ctl_FkArm_SIDE_02 = ['Ctl_FkArm_SIDE_02', 'Ctl_FkArm_SIDE_01', '',  reverseMatrix, reverseMatrix ]
+    
+    Ctl_BlArm_SIDE_02 = ['Ctl_BlArm_SIDE_02', 'Ctl_clavicle_SIDE_', '',  '', '' ]
+    
+    Ctl_Finger_SIDE_ = [ 'Ctl_Finger_SIDE_', 'Ctl_FkArm_SIDE_02,Ctl_IkArm_SIDE_02', '', '', '' ]
+    
+    listCtlInfo = [Ctl_World, Ctl_Move, Ctl_Fly, Ctl_Root, Ctl_PervisRotator, Ctl_BodyRotatorFirst, Ctl_BodyRotatorSecond,
+                    Ctl_Chest, Ctl_Waist, Ctl_Hip, Ctl_Neck, Ctl_Head,
+                    Ctl_HipPos_SIDE_, Ctl_IkLeg_SIDE_02, Ctl_Leg_SIDE_PoleV,
+                    Ctl_FootIkFoot_SIDE_Piv, Ctl_FootIkToe_SIDE_End, Ctl_FootIkToe_SIDE_,
+                    Ctl_FkLeg_SIDE_00, Ctl_FkLeg_SIDE_01, Ctl_FkLeg_SIDE_02, Ctl_FootFkToe_SIDE_,
+                    Ctl_clavicle_SIDE_, Ctl_IkArm_SIDE_02, Ctl_Arm_SIDE_PoleV,
+                    Ctl_FkArm_SIDE_00, Ctl_FkArm_SIDE_01, Ctl_FkArm_SIDE_02,
+                    Ctl_Finger_SIDE_, Ctl_BlLeg_SIDE_02, Ctl_BlArm_SIDE_02 ]
+    
+    for ctlInfo in listCtlInfo:
+        sideReplaceList = [['_SIDE_','_SIDE_']]
+        if ctlInfo[0].find( '_SIDE_' ) != -1:
+            sideReplaceList = [('_SIDE_','_L_'),('_SIDE_','_R_')]
+        
+        for replaceSrc, replaceDst in sideReplaceList:
+            inst = ControllerMirrorInfo( ctlInfo[0].replace( replaceSrc, replaceDst ) )
+            inst.setParentName( ctlInfo[1].replace( replaceSrc, replaceDst ) )
+            inst.setReverseAttrs( ctlInfo[2] )
+            inst.setOuterMatrixAttr( ctlInfo[3] )
+            inst.setInnerMatrixAttr( ctlInfo[4] )
+    
+    listFingerNames = ['Ctl_Thumb_SIDE_*', 'Ctl_Index_SIDE_*', 'Ctl_Middle_SIDE_*', 'Ctl_Ring_SIDE_*', 'Ctl_Pinky_SIDE_*']
+    
+    for fingerName in listFingerNames:
+        sideReplaceList = [('_SIDE_','_L_'),('_SIDE_','_R_')]
+        for replaceSrc, replaceDst in sideReplaceList:
+            fingerCtls = cmds.ls( fingerName.replace( replaceSrc, replaceDst ), type='transform' )
+            if not fingerCtls: continue
+            beforeParent = Ctl_Finger_SIDE_[0].replace( replaceSrc, replaceDst )
+            for fingerCtl in fingerCtls:
+                if not cmds.listRelatives( fingerCtl, s=1 ): continue
+                inst = ControllerMirrorInfo( fingerCtl )
+                inst.setParentName( beforeParent )
+                inst.setReverseAttrs( '' )
+                inst.setOuterMatrixAttr( reverseMatrix )
+                inst.setInnerMatrixAttr( reverseMatrix )
+                beforeParent = fingerCtl
+
+

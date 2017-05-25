@@ -370,6 +370,8 @@ def makeController( pointList, defaultScaleMult = 1, **options ):
 def createDefaultPropRig( propGrp ):
     
     from sgModules import sgdata
+    from sgModules import sgcommands
+    
     propGrp = pymel.core.ls( propGrp )[0]
     
     def makeParent( target ):
@@ -383,8 +385,9 @@ def createDefaultPropRig( propGrp ):
     moveCtl  = makeController( sgdata.Controllers.crossPoints )
     rootCtl  = makeController( sgdata.Controllers.circlePoints )
     
-    bbmin = propGrp.boundingBoxMin.get()
-    bbmax = propGrp.boundingBoxMax.get()
+    bb = cmds.exactWorldBoundingBox(propGrp.name())
+    bbmin = bb[:3]
+    bbmax = bb[3:]
     
     bbsize = max( bbmax[0] - bbmin[0], bbmax[2] - bbmin[2] )/2
     
@@ -414,9 +417,9 @@ def createDefaultPropRig( propGrp ):
     worldCtl.getShape().setAttr( 'overrideEnabled', 1 )
     worldCtl.getShape().setAttr( 'overrideColor', 17 )
     
-    rootCtl.rename( 'Ctl_Root' )
-    moveCtl.rename( 'Ctl_Move' )
-    worldCtl.rename( 'Ctl_World' )
+    rootCtl.rename( 'Ctl_%s_Root' % propGrp.name() )
+    moveCtl.rename( 'Ctl_%s_Move' % propGrp.name() )
+    worldCtl.rename( 'Ctl_%s_World' % propGrp.name() )
     
     pRootCtl = makeParent( rootCtl )
     pMoveCtl = makeParent( moveCtl )
@@ -424,26 +427,9 @@ def createDefaultPropRig( propGrp ):
     
     pymel.core.parent( pRootCtl, moveCtl )
     pymel.core.parent( pMoveCtl, worldCtl )
-    rigGrp = pymel.core.group( pWorldCtl, n='rig' )
-    
-    pointer = pymel.core.createNode( 'transform', n='pointer_geo' )
-    pymel.core.parent( pointer, rootCtl )
-    pymel.core.xform( pointer, ws=1, matrix= propGrp.wm.get() )
 
-    mm = pymel.core.createNode( 'multMatrix' )
-    dcmp = pymel.core.createNode( 'decomposeMatrix' )
-    
-    pointer.wm >> mm.i[0]
-    propGrp.pim >> mm.i[1]
-    mm.matrixSum >> dcmp.imat
-    
-    dcmp.outputTranslate >> propGrp.t
-    dcmp.outputRotate >> propGrp.r
-    dcmp.outputScale >> propGrp.s
-    dcmp.outputShear >> propGrp.sh
-    
-    propGrp.attr( 'rotatePivot' ).set( 0,0,0 )
-    propGrp.attr( 'scalePivot' ).set( 0,0,0 )
+    sgcommands.setMatrixToGeoGroup( rootCtl.wm.get(), propGrp.name() )
+    sgcommands.constrain_all( rootCtl, propGrp )
 
 
 

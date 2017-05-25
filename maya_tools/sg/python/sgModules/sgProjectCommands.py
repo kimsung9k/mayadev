@@ -216,6 +216,32 @@ class DuplicateBlendShapeByCtl:
 
 
 
+def sortObjsByPosition( objs ):
+    def getPointFromObject( obj ):
+        point = OpenMaya.MPoint( *cmds.xform( obj, q=1, ws=1, t=1 ) )
+        return point
+    firstPoint = getPointFromObject( objs[0] )
+    secondPoint = getPointFromObject( objs[1] )
+    firstVector = secondPoint - firstPoint
+ 
+    sortedObjs = [ objs[0], objs[1] ]
+    for i in range( 2, len( objs ) ):
+        pointTarget = getPointFromObject( objs[i] )
+        inserted = False
+        for j in range( len( sortedObjs ) ):
+            pointSorted = getPointFromObject( sortedObjs[j] )
+            cuVector = pointTarget - pointSorted
+            if cuVector * firstVector > 0: continue
+            sortedObjs.insert( j, objs[i] )
+            inserted = True
+            break
+        if not inserted: 
+            sortedObjs.append( objs[i] )
+    return sortedObjs
+
+
+
+
 class FurBall_furOutJntSetting:
     
     def __init__(self):
@@ -238,9 +264,8 @@ class FurBall_furOutJntSetting:
     
     
     @staticmethod
-    def createFromEdges( edge1, edge2, edge3, baseTransform ):
+    def createFromEdges( baseTransform, edges  ):
         
-        edges = [edge1, edge2, edge3]
         loopCurves = []
         for edge in edges:
             loopCurve = FurBall_furOutJntSetting.createLoopCurve( edge )
@@ -269,7 +294,7 @@ class FurBall_furOutJntSetting:
         
         jntCenters = [ cmds.createNode( 'joint' ) for i in range( 3 ) ]
         
-        for i in range( 3 ):
+        for i in range( len(edges) ):
             constrain_point( centers[i], jntCenters[i] )
             tangentNode = cmds.tangentConstraint( curve, jntCenters[i], aim=[0,1,0], u=[1,0,0], wut='vector' )[0]
             upNode1 = pointsList[i][0]

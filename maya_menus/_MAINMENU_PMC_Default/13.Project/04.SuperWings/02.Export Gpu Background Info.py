@@ -34,7 +34,7 @@ for target in targets:
     modifiedTargetAndValues.append( [target, values] )
    
 import json
-dataPath = cmds.about( pd=1 ) + '/sg/modifiedGpuObjs.txt'
+dataPath = 'A:/@@DEV@@/maya_tools/sg/datas/modifiedGpuObjs.txt'
 
 def makeFolder( pathName ):
     

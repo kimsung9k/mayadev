@@ -7,7 +7,8 @@ def cleanMeshInScene( *args ):
         targetShapes = cmds.listRelatives( targetObj, s=1, f=1 )
         for targetShape in targetShapes:
             if not cmds.getAttr( targetShape+'.io' ): continue
-            if cmds.listConnections( targetShape, s=0, d=1 ): continue 
+            if cmds.listConnections( targetShape + '.outMesh', s=0, d=1 ): continue 
+            if cmds.listConnections( targetShape + '.worldMesh', s=0, d=1 ): continue 
             cmds.delete( targetShape )
             cmds.warning( "%s is deleted" % targetShape )
     
