@@ -14,3 +14,9 @@ for sel in sels:
     cmds.delete( tempTr )
 cmds.select( sels )
 cmds.DeleteHistory()
+
+for sel in sels:
+    selShape = cmds.listRelatives( sel, s=1, f=1 )[0]
+    engine = cmds.listConnections( selShape, type='shadingEngine' )
+    if not engine: continue
+    cmds.sets( sel, e=1, forceElement = engine[0] )

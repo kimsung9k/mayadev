@@ -5666,3 +5666,133 @@ def createDefaultPropRig( propGrp ):
     sgcommands.setMatrixToGeoGroup( rootCtl.wm.get(), propGrp.name() )
     sgcommands.constrain_all( rootCtl, propGrp )
 
+
+
+class DuplicateSourceObjectSet:
+
+    callbackId_beforeDuplicate = None
+    callbackId_afterDuplicate  = None
+
+    duplicateBeforeObjects = []
+    
+    duplicateSourceObjectGrpName = 'duplicateSourceObjects'
+    duplicateSourceNumAttrName = 'duplicateSourceNum'
+    
+    
+    @staticmethod
+    def getShapeListFromSelection():
+        
+        sels = cmds.ls( sl=1 )
+        trs = cmds.listRelatives( sels, c=1, ad=1, f=1, type='transform' )
+        if not trs: trs = []
+        trs += sels
+        
+        targetShapes = []
+        for tr in trs:
+            shapes = cmds.listRelatives( tr, s=1, f=1 )
+            if not shapes: continue
+            for shape in shapes:
+                if cmds.getAttr( shape + '.io' ): continue
+                targetShapes.append( shape )
+        return targetShapes
+    
+    
+    @staticmethod
+    def getConnectedWithDuplicateSourceObject( target ):
+        targetShapes = cmds.listRelatives( target, s=1, f=1 )
+        if not targetShapes: return None
+        for targetShape in targetShapes:
+            if cmds.getAttr( targetShape + '.io' ): continue
+            srcCon = cmds.listConnections( DuplicateSourceObjectSet.inputAttrFromShape( targetShape ), s=1, d=0, type = cmds.nodeType( targetShape ), p=1 )
+            if not srcCon: return None
+            srcObject = srcCon[0].split( '.' )[0]
+            if cmds.attributeQuery( DuplicateSourceObjectSet.duplicateSourceNumAttrName, node=srcObject, ex=1 ):
+                return srcObject
+
+
+    @staticmethod
+    def makeDuplicateSourceObject( target ):
+        
+        if not cmds.objExists( DuplicateSourceObjectSet.duplicateSourceObjectGrpName ):
+            cmds.createNode( 'transform', n=DuplicateSourceObjectSet.duplicateSourceObjectGrpName )
+            cmds.setAttr( DuplicateSourceObjectSet.duplicateSourceObjectGrpName + '.v', 0 )
+        duplicateSourceObjectGrp = DuplicateSourceObjectSet.duplicateSourceObjectGrpName
+        
+        duplicateOrigNodeAttrs = cmds.ls( '*.' + DuplicateSourceObjectSet.duplicateSourceNumAttrName )
+        if not duplicateOrigNodeAttrs: duplicateOrigNodeAttrs = []
+        maxValue = 0
+        for duplicateOrigNodeAttr in duplicateOrigNodeAttrs:
+            value = cmds.getAttr( duplicateOrigNodeAttr )
+            if maxValue < value:
+                maxValue = value
+        
+        targetChildren = cmds.listRelatives( target, c=1, ad=1, f=1, type='transform' )
+        if not targetChildren: targetChildren = []
+        targetChildren.append( target )
+        
+        for targetChild in targetChildren:
+            if not cmds.listRelatives( targetChild, s=1 ): continue
+            if DuplicateSourceObjectSet.getConnectedWithDuplicateSourceObject( targetChild ): continue
+            duChild = cmds.duplicate( targetChild )[0]
+            targetChildName = targetChild.split( '|' )[-1]
+            targetChild = cmds.rename( targetChild, 'duSource_' + targetChild.split( '|' )[-1] )
+            duChild = cmds.rename( duChild, targetChildName )
+            targetChildShape = cmds.listRelatives( targetChild, s=1, f=1 )[0]
+            if not cmds.attributeQuery( DuplicateSourceObjectSet.duplicateSourceNumAttrName, node=targetChildShape, ex=1 ):
+                cmds.addAttr( targetChildShape, ln=DuplicateSourceObjectSet.duplicateSourceNumAttrName, min=0 )
+            cmds.setAttr( targetChildShape + '.' + DuplicateSourceObjectSet.duplicateSourceNumAttrName, maxValue+1 )
+            maxValue += 1
+            duChildShape = cmds.listRelatives( duChild, s=1, f=1 )[0]
+            cmds.connectAttr( DuplicateSourceObjectSet.outputAttrFromShape(targetChildShape), DuplicateSourceObjectSet.inputAttrFromShape(duChildShape) )
+            targetChild = cmds.parent( targetChild, duplicateSourceObjectGrp)[0]
+            copyShader( targetChild, duChild )
+        
+        
+        
+    @staticmethod
+    def createEvent():
+        
+        if DuplicateSourceObjectSet.callbackId_beforeDuplicate:
+            OpenMaya.MMessage().removeCallback( DuplicateSourceObjectSet.callbackId_beforeDuplicate )
+        if DuplicateSourceObjectSet.callbackId_afterDuplicate:
+            OpenMaya.MMessage().removeCallback( DuplicateSourceObjectSet.callbackId_afterDuplicate )
+        
+        DuplicateSourceObjectSet.callbackId_beforeDuplicate = OpenMaya.MModelMessage().addBeforeDuplicateCallback( DuplicateSourceObjectSet.beforeDuplicate )
+        DuplicateSourceObjectSet.callbackId_afterDuplicate  = OpenMaya.MModelMessage().addAfterDuplicateCallback( DuplicateSourceObjectSet.afterDuplicate )
+
+
+    @staticmethod
+    def inputAttrFromShape( node ):
+        nodeType = cmds.nodeType( node )
+        if nodeType in ['nurbsCurve', 'nurbsSurface' ]:
+            return node + '.create'
+        if nodeType == 'mesh':
+            return node + '.inMesh'
+    
+    @staticmethod
+    def outputAttrFromShape( node ):
+        nodeType = cmds.nodeType( node )
+        if nodeType in ['nurbsCurve', 'nurbsSurface' ]:
+            return node + '.local'
+        if nodeType == 'mesh':
+            return node + '.outMesh'
+        
+    
+    @staticmethod
+    def beforeDuplicate( *args ):
+        print "DuplicateSourceObjectSet message : before duplicate"
+        DuplicateSourceObjectSet.duplicateBeforeObjects = DuplicateSourceObjectSet.getShapeListFromSelection()
+    
+    
+    @staticmethod
+    def afterDuplicate( *args ):
+        print "DuplicateSourceObjectSet message : after duplicate"
+        beforeObjects  = DuplicateSourceObjectSet.duplicateBeforeObjects
+        currentObjects = DuplicateSourceObjectSet.getShapeListFromSelection()
+        for i in range( len( beforeObjects ) ):
+            cons = cmds.listConnections( DuplicateSourceObjectSet.inputAttrFromShape( beforeObjects[i] ), s=1, d=0, p=1 )
+            if not cons: continue
+            if not cmds.attributeQuery( DuplicateSourceObjectSet.duplicateSourceNumAttrName, node=cons[0].split( '.' )[0], ex=1 ): continue
+            cmds.connectAttr( cons[0], DuplicateSourceObjectSet.inputAttrFromShape( currentObjects[i] ) )
+
+

@@ -486,9 +486,132 @@ class SetInfluenceOnlySelJoint:
                 cmds.setAttr( plugName, cuValue / allWeights )
         
         
-        
-    
-    
-    
 
+from sgModules import sgcommands
+
+def makeSmoothSkinedCloneMesh( src, cloneAttrName='_smooth' ):
+    
+    target = sgcommands.makeCloneObject( src, cloneAttrName = cloneAttrName, shapeOn=True )
+    cmds.polySmooth( target,  mth=0 ,sdt=2, ovb=1, ofb=3, ofc=0, ost=1, ocr=0, dv=1, bnr=1, c=1, kb=1, ksb=1, khe=0, kt=1, kmb=1, suv=1, peh=0, sl=1, dpe=1, ps=0.1, ro=1, ch=0 )
+    sgcommands.autoCopyWeight( src, target )
+    
+    srcShape = cmds.listRelatives( src, s=1, f=1 )[0]
+    targetShape = cmds.listRelatives( target, s=1, f=1 )[0]
+    srcSkinCluster = sgcommands.getNodeFromHistory( src, 'skinCluster')[0]
+    targetSkinCluster = sgcommands.getNodeFromHistory( target, 'skinCluster' )[0]
+    
+    dagPathSrc = sgcommands.getDagPath( srcShape )
+    dagPathTrg = sgcommands.getDagPath( targetShape )
+    fnMeshSrc    = OpenMaya.MFnMesh( dagPathSrc )
+    fnMeshTarget = OpenMaya.MFnMesh( dagPathTrg )
+    fnSkinClusterSrc    = OpenMaya.MFnDependencyNode( sgcommands.getMObject( srcSkinCluster ) )
+    fnSkinClusterTarget = OpenMaya.MFnDependencyNode( sgcommands.getMObject( targetSkinCluster ) )
+    
+    numVerticesSrc    = fnMeshSrc.numVertices()
+    numVerticesTarget = fnMeshTarget.numVertices()
+    
+    matrixPlugSrc    = fnSkinClusterSrc.findPlug( 'matrix' )
+    matrixPlugTarget = fnSkinClusterTarget.findPlug( 'matrix' )
+    weightListPlugSrc    = fnSkinClusterSrc.findPlug( 'weightList' )
+    weightListPlugTrg = fnSkinClusterTarget.findPlug( 'weightList' )
+    
+    dictSrcJointElementIndices = {}
+    dictTrgJointElementIndices = {}
+    srcJntList = []
+    for i in range( matrixPlugSrc.numElements() ):
+        srcJnt = cmds.listConnections( matrixPlugSrc[i].name(), s=1, d=0 )[0]
+        trgJnt = cmds.listConnections( matrixPlugTarget[i].name(), s=1, d=0 )[0]
+        srcJntList.append( srcJnt )
+        dictSrcJointElementIndices.update( {srcJnt:matrixPlugSrc[i].logicalIndex()} )
+        dictTrgJointElementIndices.update( {trgJnt:matrixPlugTarget[i].logicalIndex()} )
+    
+    srcToTrgMap = {}
+    for i in range( matrixPlugSrc.numElements() ):
+        srcIndex = dictSrcJointElementIndices[ srcJntList[i] ]
+        trgIndex = dictTrgJointElementIndices[ srcJntList[i] ]
+        srcToTrgMap.update( {srcIndex:trgIndex} )
+    
+    for i in range( weightListPlugSrc.numElements() ):
+        weightsPlugSrc = weightListPlugSrc[i].child(0)
+        weightsPlugTrg = weightListPlugTrg[i].child(0)
+        
+        for j in range( weightsPlugTrg.numElements() ):
+            cmds.removeMultiInstance( weightsPlugTrg[0].name() )
+        
+        for j in range( weightsPlugSrc.numElements() ):
+            srcMatrixIndex = weightsPlugSrc[j].logicalIndex()
+            trgMatrixIndex = srcToTrgMap[ srcMatrixIndex ]
+            value = weightsPlugSrc[j].asFloat()
+            weightsPlugTrg.elementByLogicalIndex( trgMatrixIndex ).setFloat( value )
+    
+    itMeshTrg = OpenMaya.MItMeshVertex( dagPathTrg )
+    
+    util = OpenMaya.MScriptUtil()
+    util.createFromInt( 0 )
+    prevIndex = util.asIntPtr()
+    
+    vtxnames = []
+    othreVtxNames = []
+    for i in range( numVerticesSrc, numVerticesTarget ):
+        itMeshTrg.setIndex( i, prevIndex )
+        vtxIndices = OpenMaya.MIntArray()
+        itMeshTrg.getConnectedVertices( vtxIndices )
+        targetIndices = []
+        for j in range( vtxIndices.length() ):
+            if vtxIndices[j] < numVerticesSrc:
+                targetIndices.append( vtxIndices[j] )
+        if not targetIndices:
+            vtxnames.append( target + '.vtx[%d]' % i )
+            continue
+        else:
+            othreVtxNames.append( target + '.vtx[%d]' % i )
+        
+        averageMatrixIndices = []
+        averageValues = []
+        for targetIndex in targetIndices:
+            weightsPlug = weightListPlugTrg[targetIndex].child(0)
+            for j in range( weightsPlug.numElements() ):
+                matrixIndex = weightsPlug[j].logicalIndex()
+                value = weightsPlug[j].asFloat()
+                if matrixIndex in averageMatrixIndices:
+                    index = averageMatrixIndices.index( matrixIndex )
+                    averageValues[ index ] += value
+                else:
+                    averageMatrixIndices.append( matrixIndex )
+                    averageValues.append( value )
+        
+        numInfluence = len( averageMatrixIndices )
+        for j in range( numInfluence ):
+            averageValues[j] /= len(targetIndices)
+        
+        weightsPlug = weightListPlugTrg[i].child(0)     
+        for j in range( weightsPlug.numElements() ):
+            cmds.removeMultiInstance( weightsPlug[0].name() )
+        
+        for j in range( len(averageMatrixIndices) ):
+            averageMatrixIndex = averageMatrixIndices[j]
+            averageValue = averageValues[j]
+            weightsPlug.elementByLogicalIndex( averageMatrixIndex ).setFloat( averageValue )
+        
+    cmds.select( vtxnames )
+    mel.eval( 'weightHammerVerts;' )
+    
+    for i in range( numVerticesSrc ):
+        vtxnames.append( target + '.vtx[%d]' % i )
+
+    return target, othreVtxNames
+
+
+def getWeightInfoFromVertex( skinedVtx ):
+    
+    meshName = skinedVtx.split( '.' )[0]
+    vtxId = int( skinedVtx.split( 'vtx[' )[-1].replace( ']', '' ) )
+    
+    skinNode = getNodeFromHistory( meshName, 'skinCluster' )[0]
+    fnSkinNode = OpenMaya.MFnDependencyNode( getMObject( skinNode ) )
+    
+    plugWeights = fnSkinNode.findPlug( 'weightList' )[vtxId].child(0)
+    
+    for i in range( plugWeights.numElements() ):
+        print cmds.listConnections( skinNode + '.matrix[%d]' % plugWeights[i].logicalIndex(), s=1, d=0, type='joint'), plugWeights[i].asFloat()
 
