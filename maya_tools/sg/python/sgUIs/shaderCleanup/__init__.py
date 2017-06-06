@@ -33,7 +33,8 @@ class Window_global:
         pluginList = ['redshift4maya.mll', 'Mayatomr.mll']
         for plugin in pluginList:
             if cmds.pluginInfo( plugin, q=1, l=1 ): continue
-            cmds.loadPlugin( plugin )
+            try:cmds.loadPlugin( plugin )
+            except:pass
         
     
     @staticmethod

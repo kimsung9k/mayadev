@@ -1,0 +1,2 @@
+from sgModules import sgProjectCommands
+sgProjectCommands.SetInfluenceOnlySelJoint().setWeightBySelection()

@@ -9,16 +9,15 @@ reload(mayawms)
 mayawms.UI()
 
 '''
-#2017-05-16
+#2017-06-01
 #.수정사항
-#1. 네임스페이스 수정 "파일이름"으로 고정
-
-
+#1. 쉐이딩 완료시 rigging data 정리 해주는 부분 
+#2. 모델링 완료시 해당 작업 경로에 texture 저장 해주는 부분
 
 # 작업관리스크립트를 배포할때는 pub이라는 스크립트를 사용한다.
 # pub을 통해 퍼블리시 스크립트로 만들때 아래 변수를 자동으로 고쳐준다.
 # VERSION는 버전명, DEV는 False가 된다.
-VERSION = "1.0.13"
+VERSION = "1.0.14"
 DEV = False
 
 import json, os, sys, shutil, subprocess, re, glob, uuid, time, datetime, filecmp, urllib, urllib2, ftplib, inspect, zipfile, errno, socket, httplib, json, collections
@@ -1041,7 +1040,7 @@ mayaBinPath = mel.eval('getenv MAYA_LOCATION')+'/bin/'
 # WMS_HOST의 값은 postit 스크립트에 의해서 자동 변경되므로, 들여쓰면 안된다.
 #WMS_HOST = "192.168.0.130" # Synergy
 #WMS_HOST = "175.197.68.192:7806"# 밤하늘
-WMS_HOST = "121.167.145.115:7806"# Pingo
+WMS_HOST = "121.167.145.193:7806"# Pingo
 if DEV:
     print(u'---  개발서버입니다.  ---')
     WMS_HOST = '192.168.56.138'
@@ -2192,10 +2191,10 @@ class UI:
         if not ok:
             noticeWindow(u'작업 완료가 취소되었습니다.')
             return
-
+        print ok
+        
         linkOriginalTexture(LOCAL_ROOT)
         cmds.evalDeferred(partial(linkLowTexture, LOCAL_ROOT))
-
         # 저장
         if mayascene_modified():
             save = askWindow(u'변경사항을 적용하려면 저장을 해야합니다.\n저장하시겠습니까?')
@@ -2484,6 +2483,7 @@ class UI:
                 return False
 
         if w.process == 'modeling':
+            print RENDER_DRIVE+'/texture'
             if not w.assetType:
                 # queryWorks가 등록되지 않은 셋에 타입을 보면 ''으로 변경한다. assetType을 이름 대신 아이디로 변경할지 고민 필요.
                 if askWindow(u'작업의 셋에타입이 없거나 등록되지 않은 타입입니다.\n텍스쳐를 복사하지 않고 넘어가시겠습니까?', ok=u'예', cancel=u'아니오'):
@@ -2500,8 +2500,13 @@ class UI:
                 u'2D이펙트':'03_PRP/2d_fx_source',
             }
             rtexdir = rtexroot+'/'+self.prj+'/'+assetDirName[w.assetType]+'/'+w.name
+            #2017-05-31->
+            # 로컬 복사
+            notinw = mayascene_texturesNotInside(w.dir)
+            notinw = dict((t, n) for t, n in notinw.items() if glob.glob(t)) # 없는 파일 걸러내기
+            return copytex(notinw, w.dir+'/texture')
+            #2017-05-31 <-
             return copytex(notinr, rtexdir)
-
         else:
             notinw = mayascene_texturesNotInside(w.dir)
             notinw = dict((t, n) for t, n in notinw.items() if glob.glob(t)) # 없는 파일 걸러내기
@@ -2759,13 +2764,14 @@ class UI:
         if WMS_HOST == '192.168.0.130':
             try: uploadInstalledList()
             except: pass
+
         #밤하늘
         if WMS_HOST == '175.197.68.192:7806':
             try: uploadInstalledList()
             except: pass
         '''
         #Pingo
-        if WMS_HOST == '121.167.145.115:7806':
+        if WMS_HOST == '121.167.145.193:7806':
             try: uploadInstalledList()
             except: pass
 
@@ -3812,11 +3818,13 @@ def updateShaders():
                 chk = checkVersion(aw)
                 if chk < 2 and chk != 0:
                     downloadWork(aw)
+                    downloadWork(aw)
             except:
                 #pass #2017-01-03
                 messageprint(pathForWork, u'쉐이더 다운로드 실패') #2017-01-03
             
             stripPath = pathForWork.replace('.mb', '').replace('.ma', '')
+            print stripPath
             stripName = stripPath.split('/')[-1]
             shdPath = stripPath+'_SHD.mb'
             uvPath = stripPath+'_UV.mb'
@@ -4214,9 +4222,12 @@ def cleanRig():
         except: pass
         try: cmds.setAttr(tr+'.scaleZ', lock=False)
         except: pass
-
     mel.eval('DeleteAllConstraints;')
-
+    #2015-06-01->
+    try: cmds.delete('Rig_Box')
+    except: pass
+    #2015-06-01<-
+    
 try: uvSnapshotDict
 except NameError: uvSnapshotDict = {}
 

@@ -100,6 +100,16 @@ def worldPointToViewPoint( worldPoint ):
 
 
 
+
+def printMatrix( mtxValue ):
+    
+    for i in range( 4 ):
+        print "%5.3f, %5.3f, %5.3f, %5.3f" %( mtxValue(i,0), mtxValue(i,1), mtxValue(i,2), mtxValue(i,3) )
+    print
+    
+
+
+
 class Functions:
     
     @staticmethod
@@ -126,7 +136,9 @@ class Functions:
         if intersectPoints.length() == 1:
             return intersectPoints[0] * meshMatrix
         elif intersectPoints.length() > 1:
-            pointCenter = (OpenMaya.MVector(intersectPoints[0]) + OpenMaya.MVector(intersectPoints[1]))/2.0
+            pointCenter = OpenMaya.MPoint( ( intersectPoints[0].x + intersectPoints[1].x )/2.0, 
+                                           ( intersectPoints[0].y + intersectPoints[1].y )/2.0,
+                                           ( intersectPoints[0].z + intersectPoints[1].z )/2.0 ) 
             return pointCenter * meshMatrix
     
     

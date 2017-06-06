@@ -615,3 +615,15 @@ def getWeightInfoFromVertex( skinedVtx ):
     for i in range( plugWeights.numElements() ):
         print cmds.listConnections( skinNode + '.matrix[%d]' % plugWeights[i].logicalIndex(), s=1, d=0, type='joint'), plugWeights[i].asFloat()
 
+
+
+
+
+
+            
+                
+                
+                
+            
+            
+

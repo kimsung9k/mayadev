@@ -1,0 +1,15 @@
+import maya.cmds as cmds
+
+sels = cmds.ls( sl=1 )
+selChildren = cmds.listRelatives( sels, c=1, ad=1, type='shape', f=1 )
+
+children = []
+for child in selChildren:
+    childP = cmds.listRelatives( child, p=1, f=1 )[0]
+    if cmds.nodeType( child ) == 'gpuCache':
+    	cmds.showHidden( childP, a=1 )
+    else:
+    	try:cmds.setAttr( childP + '.v', 0 )
+    	except:pass
+
+cmds.select( children )

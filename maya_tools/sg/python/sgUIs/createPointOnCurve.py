@@ -130,7 +130,22 @@ class Functions:
     
     
     @staticmethod
+    def setAngleEnabled( evt=0 ):
+        
+        if Window_global.checkBox.isChecked():
+            Window_global.leVx.setEnabled( True )
+            Window_global.leVy.setEnabled( True )
+            Window_global.leVz.setEnabled( True )
+        else:
+            Window_global.leVx.setEnabled( False )
+            Window_global.leVy.setEnabled( False )
+            Window_global.leVz.setEnabled( False )
+    
+    
+    @staticmethod
     def createPointOnCurve( evt=0 ):
+        
+        import pymel.core
         
         sliderValue = Window_global.slider.value()
         
@@ -164,12 +179,36 @@ class Functions:
                 cmds.addAttr( trNode, ln='param', min=0, max=100, dv=(eachParamValue * i + addParamValue)*100 )
                 cmds.setAttr( trNode + '.param', e=1, k=1 )
                 cmds.setAttr( trNode + '.dh', 1 )
-                cmds.connectAttr( curveInfo + '.position', trNode + '.t' )
-                cmds.setAttr( trNode + '.inheritsTransform', 0 )
+                compose = cmds.createNode( 'composeMatrix' )
+                multMtx = cmds.createNode( 'multMatrix' )
+                dcmp = cmds.createNode( 'decomposeMatrix' )
+                cmds.connectAttr( curveInfo + '.position', compose + '.it' )
+                cmds.connectAttr( compose + '.outputMatrix', multMtx + '.i[0]' )
+                cmds.connectAttr( trNode + '.pim', multMtx + '.i[1]' )
+                cmds.connectAttr( multMtx + '.o', dcmp + '.imat' )
+                cmds.connectAttr( dcmp + '.ot', trNode + '.t' )
                 multDouble = cmds.createNode( 'multDoubleLinear' )
                 cmds.setAttr( multDouble + '.input2', 0.01 )
                 cmds.connectAttr( trNode + '.param', multDouble + '.input1' )
                 cmds.connectAttr( multDouble + '.output', curveInfo + '.parameter' )
+                
+                if not Window_global.checkBox.isChecked(): continue
+                curveInfo = pymel.core.ls( curveInfo )[0]
+                angleNode = pymel.core.createNode( 'angleBetween' )
+                vectorNode = pymel.core.createNode( 'vectorProduct' )
+                trNode = pymel.core.ls( trNode )[0]
+                vectorNode.operation.set(3)
+                valueX = float( Window_global.leVx.text() )
+                valueY = float( Window_global.leVy.text() )
+                valueZ = float( Window_global.leVz.text() )
+                angleNode.vector1X.set( valueX )
+                angleNode.vector1Y.set( valueY )
+                angleNode.vector1Z.set( valueZ )
+                curveInfo.tangent >> vectorNode.input1
+                trNode.pim >> vectorNode.matrix
+                vectorNode.output >> angleNode.vector2
+                angleNode.euler >> trNode.r
+                
         cmds.undoInfo( cck=1 )
     
         
@@ -204,21 +243,37 @@ class Window( QtGui.QMainWindow ):
         slider.setMaximum( self.maximum )
         layoutSlider.addWidget( lineEdit )
         layoutSlider.addWidget( slider )
+        layoutAngle = QtGui.QVBoxLayout()
+        checkBox = QtGui.QCheckBox( 'Connect Angle By Tangent' )
+        layoutVector = QtGui.QHBoxLayout()
+        leVx = QtGui.QLineEdit(); leVx.setText( str( 1.000 ) ); leVx.setEnabled( False )
+        leVx.setValidator( QtGui.QDoubleValidator( -100, 100, 5, self ) )
+        leVy = QtGui.QLineEdit(); leVy.setText( str( 0.000 ) ); leVy.setEnabled( False )
+        leVy.setValidator( QtGui.QDoubleValidator( -100, 100, 5, self ) )
+        leVz = QtGui.QLineEdit(); leVz.setText( str( 0.000 ) ); leVz.setEnabled( False )
+        leVz.setValidator( QtGui.QDoubleValidator( -100, 100, 5, self ) )
+        layoutAngle.addWidget( checkBox )
+        layoutAngle.addLayout( layoutVector )
+        layoutVector.addWidget( leVx ); layoutVector.addWidget( leVy ); layoutVector.addWidget( leVz )
         button       = QtGui.QPushButton( 'Create' )
         
         layoutVertical.addLayout( layoutSlider )
+        layoutVertical.addLayout( layoutAngle )
         layoutVertical.addWidget( button )
         
         QtCore.QObject.connect( slider, QtCore.SIGNAL('valueChanged(int)'),   self.sliderValueChanged )
         QtCore.QObject.connect( lineEdit, QtCore.SIGNAL('textEdited(QString)'), self.lineEditValueChanged )
         QtCore.QObject.connect( button, QtCore.SIGNAL('clicked()'), Functions.createPointOnCurve )
+        QtCore.QObject.connect( checkBox, QtCore.SIGNAL( 'clicked()'), Functions.setAngleEnabled )
         self.slider = slider
         self.lineEdit = lineEdit
         
         Window_global.slider = slider
         Window_global.button = button
-        
-        Functions.setButtonEnabled()
+        Window_global.checkBox = checkBox
+        Window_global.leVx = leVx
+        Window_global.leVy = leVy
+        Window_global.leVz = leVz
         
     
     def sliderValueChanged( self, value, evt=0 ):
@@ -237,6 +292,7 @@ class Window( QtGui.QMainWindow ):
         event = args[1]
         if event.type() in [QtCore.QEvent.LayoutRequest,QtCore.QEvent.Move,QtCore.QEvent.Resize] :
             Window_global.saveInfo()
+
 
 
 

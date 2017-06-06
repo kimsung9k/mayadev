@@ -2300,7 +2300,12 @@ def createPointOnCurve( inputCurve, **options ):
     curve = pymel.core.ls( inputCurve )[0]
     curveShape = curve.getShape()
     pointInfoNode = pymel.core.createNode( 'pointOnCurveInfo' )
-    trNode = pymel.core.createNode( 'transform' )
+    
+    transformType = 'transform'
+    if options.has_key( 'nodeType' ):
+        transformType = options['nodeType']
+    
+    trNode = pymel.core.createNode( transformType )
     trNode.dh.set( 1 )
     
     
@@ -3291,14 +3296,24 @@ def setGeometryMatrixToTarget( geo, matrixTarget ):
         for hist in shapeHists:
             if cmds.nodeType( hist ) == 'cluster':
                 cluster = hist
-            if cmds.nodeType( hist ) != 'mesh': continue
+            if not cmds.nodeType( hist ) in ['mesh','nurbsCurve', 'nurbsSurface']: continue
             if not cmds.getAttr( hist + '.io' ): continue
             origShape = convertSg( hist )
             break
         
+        outputAttr = None
+        inputAttr = None
+        
+        if origShape.nodeType() == 'mesh':
+            outputAttr = 'outMesh'
+            inputAttr = 'inMesh'
+        elif origShape.nodeType() == 'nurbsCurve':
+            outputAttr = 'local'
+            inputAttr = 'create'
+        
         trGeo = createNode( 'transformGeometry' )
-        origShape.attr( 'outMesh' ) >> trGeo.inputGeometry
-        trGeo.outputGeometry >> geoShape.attr( 'inMesh' )
+        origShape.attr( outputAttr ) >> trGeo.inputGeometry
+        trGeo.outputGeometry >> geoShape.attr( inputAttr )
         trGeo.transform.set( matrixToList(geoMatrix * targetMatrix.inverse()), type='matrix' )
         cmds.select( geoShape.name() )
         cmds.DeleteHistory()
@@ -5794,5 +5809,29 @@ class DuplicateSourceObjectSet:
             if not cons: continue
             if not cmds.attributeQuery( DuplicateSourceObjectSet.duplicateSourceNumAttrName, node=cons[0].split( '.' )[0], ex=1 ): continue
             cmds.connectAttr( cons[0], DuplicateSourceObjectSet.inputAttrFromShape( currentObjects[i] ) )
+
+
+
+
+def getParentNameOf( target, searchName ):
+    
+    longNameTarget = cmds.ls( target, l=1 )[0]
+    
+    splits = longNameTarget.split( '|' )
+    
+    targetIndex = -1
+    for i in range( len( splits ) ):
+        if splits[i].find( searchName ) == -1: continue
+        targetIndex = i
+    if targetIndex == -1: return None
+    
+    return '|'.join( splits[:targetIndex+1] ) 
+    
+    
+    
+    
+    
+    
+    
 
 

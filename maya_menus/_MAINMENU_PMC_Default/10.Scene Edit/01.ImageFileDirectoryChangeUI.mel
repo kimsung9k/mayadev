@@ -1,0 +1,47 @@
+global proc ImageFileDirectoryChangeUI()
+{
+	string $IFD_win="ImageFileDirectoryChange",$IFD_form;
+	if(!`optionVar -ex "JW_ImageFileDirectory"`)optionVar -sv "JW_ImageFileDirectory" (`internalVar -uwd`);
+    if(`window -ex $IFD_win`) deleteUI $IFD_win;
+    window -width 450 -height 80 -title "Image File Directory Change" $IFD_win;
+    $IFD_form=`formLayout -nd 100`;
+    iconTextButton -w 20 -h 20 -c "JW_IDF_SetDir" -st "iconOnly" -i1 "SP_DriveNetIcon.png" -ann "Set Directory" IFD_DirBttn;
+    textField -w 400 -text (`optionVar -q "JW_ImageFileDirectory"`) IFD_TxtField;
+    button -l "EXECUTE" -w 125 -h 30 -c "JW_SetFileDir" IFD_Bttn;    
+    formLayout -edit 
+    -af IFD_DirBttn "top" 10    -af IFD_DirBttn "left" 12
+    -af IFD_TxtField "top" 9    -af IFD_TxtField "left" 35   
+    -af IFD_Bttn "top" 40    -af IFD_Bttn "left" 152   
+    $IFD_form;
+    if(`windowPref -ex $IFD_win`)windowPref -r $IFD_win;
+    showWindow $IFD_win;
+}ImageFileDirectoryChangeUI;
+
+global proc JW_IDF_SetDir() 
+{
+    string $dirLs[],$wkSpc=`workspace -fn`,$getDir=`setWorkingDirectory $wkSpc "Best Guess" "scene"`;
+    $dirLs=`fileDialog2 -ds 2 -cap "Set Directory" -dir $getDir -fm 2 -okc "Set Directory" -cc "Cancel" -rf 1`;
+    optionVar -sv "JW_ImageFileDirectory" ($dirLs[0]+"/");
+    textField -e -tx (`optionVar -q "JW_ImageFileDirectory"`) IFD_TxtField;
+}
+global proc JW_SetFileDir()
+{
+    string $lsFile[]=`ls -type "file"`,$lf,$imgNm,$dvNm[],$newDir=`textField -q -tx IFD_TxtField`,
+           $setDir;
+           print $newDir;
+    int $dvNmSz,$cfmDir;
+    for($lf in $lsFile)
+    {
+        $imgNm=`getAttr ($lf+".fileTextureName")`;
+        $dvNm=stringToStringArray($imgNm,"/");
+        $dvNmSz=size($dvNm);
+        $setDir=$newDir+$dvNm[$dvNmSz-1];
+        $cfmDir=`filetest -e $setDir`;
+        if($cfmDir!=1)
+        {
+            warning ($lf+"의 "+$setDir+"파일은 존재하지않습니다.");
+            continue;
+        }
+        setAttr -type "string" ($lf+".fileTextureName")  $setDir;
+    }   
+}
