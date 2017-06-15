@@ -227,14 +227,20 @@ def separateParentConnection( node, attrName ):
     if parentAttr:
         cons = cmds.listConnections( node+'.'+parentAttr[0], s=1, d=0, p=1, c=1 )
         if cons:
-            cmds.disconnectAttr( cons[1], cons[0] )
             srcAttr = cons[1]
             srcNode, srcParentAttr = srcAttr.split( '.' )
-            srcAttrs = cmds.attributeQuery( srcParentAttr, node=srcNode, listChildren=1 )
+            if cmds.nodeType( srcNode ) == 'unitConversion':
+                origCons = cmds.listConnections( srcNode + '.input', s=1, d=0, p=1, c=1 )
+                origSrcNode, origSrcParentAttr = origCons[1].split( '.' )
+                srcAttrs = cmds.attributeQuery( origSrcParentAttr, node=origSrcNode, listChildren=1 )
+                srcNode = origSrcNode
+            else:
+                srcAttrs = cmds.attributeQuery( srcParentAttr, node=srcNode, listChildren=1 )
             dstAttrs = cmds.attributeQuery( parentAttr[0], node=node,    listChildren=1 )
             for i in range( len( srcAttrs ) ):
                 if cmds.connectAttr( srcNode+'.'+srcAttrs[i], node+'.'+dstAttrs[i] ): continue
                 cmds.connectAttr( srcNode+'.'+srcAttrs[i], node+'.'+dstAttrs[i], f=1 )
+            cmds.disconnectAttr( cons[1], cons[0] )
 
 
     
@@ -436,6 +442,9 @@ def createPointOnCurve( inputCurve, numPoints, **options ):
 
 
 def getOrderedEdgeRings( targetEdge ):
+    
+    targetEdge = pymel.core.ls( targetEdge )[0].name()
+    
     cmds.select( targetEdge )
     cmds.SelectEdgeRingSp()
     ringEdges = cmds.ls( sl=1, fl=1 )
@@ -506,6 +515,7 @@ def getNumVertices( inputNode ):
         nodeShape = node.getShape()
     else:
         nodeShape = node
+    if not nodeShape: return 0
     dagPath = getDagPath( nodeShape )
     fnMesh = OpenMaya.MFnMesh( dagPath )
     return fnMesh.numVertices()
@@ -584,7 +594,7 @@ def blendTwoMatrixConnect( inputFirst, inputSecond, inputThird, **options ):
     if options.has_key( 'ct' ):
         connectTrans = options['ct']
     if options.has_key( 'cr' ):
-        connectTrans = options['cr']
+        connectRotate = options['cr']
     
     first  = pymel.core.ls( inputFirst )[0]
     second = pymel.core.ls( inputSecond )[0]
@@ -662,3 +672,971 @@ def addMiddleJoint( inputJnt, **options ):
     
     cmds.setAttr( middleTransJnt + '.radius', cmds.getAttr( jnt + '.radius' ) * 1.5 )
     return pymel.core.ls( middleTransJnt )[0]
+
+
+
+
+def getConstrainMatrix( inputFirst, inputTarget ):
+    first = pymel.core.ls( inputFirst )[0]
+    target = pymel.core.ls( inputTarget )[0]
+    mm = pymel.core.createNode( 'multMatrix' )
+    first.wm >> mm.i[0]
+    target.pim >> mm.i[1]
+    return mm
+
+
+
+def constrain_point( first, target ):
+    
+    mm = getConstrainMatrix( first, target )
+    dcmp = getDecomposeMatrix( mm.matrixSum )
+    cmds.connectAttr( dcmp + '.ot', target + '.t', f=1 )
+
+
+
+def constrain_rotate( first, target ):
+    
+    mm = getConstrainMatrix( first, target )
+    dcmp = getDecomposeMatrix( mm.matrixSum )
+    cmds.connectAttr( dcmp + '.or', target + '.r', f=1 )
+
+
+
+def constrain_scale( first, target ):
+    
+    mm = getConstrainMatrix( first, target )
+    dcmp = getDecomposeMatrix( mm )
+    cmds.connectAttr( dcmp + '.os', target + '.s', f=1 )
+
+
+
+
+def constrain_parent( first, target ):
+    
+    mm = getConstrainMatrix( first, target )
+    dcmp = getDecomposeMatrix( mm.matrixSum )
+    cmds.connectAttr( dcmp + '.ot',  target + '.t', f=1 )
+    cmds.connectAttr( dcmp + '.or',  target + '.r', f=1 )
+
+
+def constrain_all( first, target ):
+    
+    mm = getConstrainMatrix( first, target )
+    dcmp = getDecomposeMatrix( mm.matrixSum )
+    cmds.connectAttr( dcmp + '.ot',  target + '.t', f=1 )
+    cmds.connectAttr( dcmp + '.or',  target + '.r', f=1 )
+    cmds.connectAttr( dcmp + '.os',  target + '.s', f=1 )
+    cmds.connectAttr( dcmp + '.osh',  target + '.sh', f=1 )
+
+
+
+def makeParent( inputSel, **options ):
+    
+    sel = pymel.core.ls( inputSel )[0]
+    if not options.has_key( 'n' ) and not options.has_key( 'name' ):
+        options.update( {'n':'P'+ sel.shortName()} )
+    selP = sel.getParent()
+    transform = pymel.core.createNode( 'transform', **options )
+    if selP: pymel.core.parent( transform, selP )
+    pymel.core.xform( transform, ws=1, matrix= sel.wm.get() )
+    pymel.core.parent( sel, transform )
+    pymel.core.xform( sel, os=1, matrix= getDefaultMatrix() )
+    return transform
+
+
+
+
+def addMultDoubleLinearConnection( inputAttr ):
+    
+    fullAttr = pymel.core.ls( inputAttr )[0]
+    newAttrName = 'mult_' + fullAttr.attrName()
+    
+    node = pymel.core.ls( fullAttr.node() )[0]
+    separateParentConnection( node, fullAttr.attrName() )
+    
+    addAttr( node, ln=newAttrName, cb=1, dv=1 )
+    multDouble = pymel.core.createNode( 'multDoubleLinear' )
+    
+    cons = cmds.listConnections( node + '.' + fullAttr.attrName(), s=1, d=0, p=1, c=1 )
+    if not cons: return None
+    cmds.connectAttr( cons[1], multDouble+'.input1' )
+    cmds.connectAttr( node+'.'+newAttrName, multDouble + '.input2' )
+    cmds.connectAttr( multDouble + '.output', node+'.'+fullAttr.attrName(), f=1 )
+    return pymel.core.ls( node.attr( newAttrName ) )[0]
+
+
+
+def addAnimCurveConnection( inputAttr ):
+    
+    fullAttr = pymel.core.ls( inputAttr )[0]
+    node = fullAttr.node()
+    attr = fullAttr.attrName()
+    separateParentConnection( node, attr )
+          
+    cons = cmds.listConnections( node+'.'+attr, s=1, d=0, p=1, c=1 )
+    if not cons: return None
+    if cmds.nodeType( cons[1].split( '.' )[0] ) == 'unitConversion':
+        srcCon = cmds.listConnections( cons[1].split( '.' )[0], s=1, d=0, p=1 )
+        if srcCon:
+            cons[1] = srcCon[0]
+    
+    attrType = cmds.attributeQuery( attr, node= node, attributeType=1 )
+    
+    if attrType == 'doubleLinear':
+        animCurveType= 'animCurveUL'
+    elif attrType == 'doubleAngle':
+        animCurveType = 'animCurveUA'
+    else:
+        animCurveType = 'animCurveUU'
+    
+    animCurve = pymel.core.createNode( animCurveType )
+    cmds.connectAttr( cons[1], animCurve+'.input' )
+    cmds.connectAttr( animCurve+'.output', cons[0], f=1 )
+    
+    cmds.setKeyframe( animCurve, f= -1, v= -1 )
+    cmds.setKeyframe( animCurve, f=  0, v=  0 )
+    cmds.setKeyframe( animCurve, f=  1, v=  1 )
+    
+    cmds.setAttr( animCurve + ".postInfinity", 1 )
+    cmds.setAttr( animCurve + ".preInfinity", 1 )
+    
+    pymel.core.selectKey( animCurve )
+    cmds.keyTangent( itt='spline', ott='spline' )
+    return animCurve
+
+
+
+def copyShapeToTransform( inputShape, inputTransform ):
+    
+    shape = pymel.core.ls( inputShape )[0]
+    transform = pymel.core.ls( inputTransform )[0]
+    
+    oTarget = getMObject( transform )
+    if shape.type() == 'mesh':
+        oMesh = getMObject( shape )
+        fnMesh = OpenMaya.MFnMesh( oMesh )
+        fnMesh.copy( oMesh, oTarget )
+    elif shape.type() == 'nurbsCurve':
+        oCurve = getMObject( shape )
+        fnCurve = OpenMaya.MFnNurbsCurve( oCurve )
+        fnCurve.copy( oCurve, oTarget )
+    elif shape.type() == 'nurbsSurface':
+        oSurface = getMObject( shape )
+        fnSurface = OpenMaya.MFnNurbsSurface( oSurface )
+        fnSurface.copy( oSurface, oTarget )
+
+
+
+def addIOShape( inputShape ):
+    
+    shape = pymel.core.ls( inputShape )[0]
+    
+    if shape.type() == 'transform':
+        targetShape = shape.getShape()
+    else:
+        targetShape = shape
+    
+    targetTr    = targetShape.getParent()
+    newShapeTr = pymel.core.createNode( 'transform' )
+    copyShapeToTransform( targetShape, newShapeTr )
+    ioShape = newShapeTr.getShape()
+    ioShape.attr( 'io' ).set( 1 )
+    pymel.core.parent( ioShape, targetTr, add=1, shape=1 )
+    pymel.core.delete( newShapeTr )
+    return targetTr.listRelatives( s=1 )[-1]
+
+
+
+def makeController( pointList, defaultScaleMult = 1, **options ):
+    
+    newPointList = copy.deepcopy( pointList )
+    
+    options.update( {'p':newPointList, 'd':1} )
+    
+    typ = 'transform'
+    if options.has_key( 'typ' ):
+        typ = options.pop( 'typ' )
+    
+    mp = False
+    if options.has_key( 'makeParent' ):
+        mp = options.pop('makeParent')
+    
+    colorIndex = -1
+    if options.has_key( 'colorIndex' ):
+        colorIndex = options.pop('colorIndex')
+    
+    crv = pymel.core.curve( **options )
+    crvShape = crv.getShape()
+    
+    if options.has_key( 'n' ):
+        name = options['n']
+    elif options.has_key( 'name' ):
+        name = options['name']
+    else:
+        name = None
+    
+    jnt = pymel.core.ls( cmds.createNode( typ ) )[0]
+    pJnt = None
+    
+    if mp:
+        pJnt = pymel.core.ls( makeParent( jnt ) )[0]
+    
+    if name:
+        jnt.rename( name )
+        if pJnt:
+            pJnt.rename( 'P' + name )
+
+    pymel.core.parent( crvShape, jnt, add=1, shape=1 )
+    pymel.core.delete( crv )
+    crvShape = jnt.getShape()
+    
+    ioShape = addIOShape( jnt )
+    ioShape = pymel.core.ls( ioShape )[0]
+    
+    jnt.addAttr( 'shape_tx', dv=0 ); jnt.shape_tx.set( e=1, cb=1 )
+    jnt.addAttr( 'shape_ty', dv=0); jnt.shape_ty.set( e=1, cb=1 )
+    jnt.addAttr( 'shape_tz', dv=0); jnt.shape_tz.set( e=1, cb=1 )
+    jnt.addAttr( 'shape_rx', dv=0, at='doubleAngle' ); jnt.shape_rx.set( e=1, cb=1 )
+    jnt.addAttr( 'shape_ry', dv=0, at='doubleAngle' ); jnt.shape_ry.set( e=1, cb=1 )
+    jnt.addAttr( 'shape_rz', dv=0, at='doubleAngle' ); jnt.shape_rz.set( e=1, cb=1 )
+    jnt.addAttr( 'shape_sx', dv=1 ); jnt.shape_sx.set( e=1, cb=1 )
+    jnt.addAttr( 'shape_sy', dv=1 ); jnt.shape_sy.set( e=1, cb=1 )
+    jnt.addAttr( 'shape_sz', dv=1 ); jnt.shape_sz.set( e=1, cb=1 )
+    jnt.addAttr( 'scaleMult', dv=defaultScaleMult, min=0 ); jnt.scaleMult.set( e=1, cb=1 )
+    composeMatrix = pymel.core.createNode( 'composeMatrix' )
+    composeMatrix2 = pymel.core.createNode( 'composeMatrix' )
+    multMatrix = pymel.core.createNode( 'multMatrix' )
+    composeMatrix.outputMatrix >> multMatrix.i[0]
+    composeMatrix2.outputMatrix >> multMatrix.i[1]
+    jnt.shape_tx >> composeMatrix.inputTranslateX
+    jnt.shape_ty >> composeMatrix.inputTranslateY
+    jnt.shape_tz >> composeMatrix.inputTranslateZ
+    jnt.shape_rx >> composeMatrix.inputRotateX
+    jnt.shape_ry >> composeMatrix.inputRotateY
+    jnt.shape_rz >> composeMatrix.inputRotateZ
+    jnt.shape_sx >> composeMatrix.inputScaleX
+    jnt.shape_sy >> composeMatrix.inputScaleY
+    jnt.shape_sz >> composeMatrix.inputScaleZ
+    jnt.scaleMult >> composeMatrix2.inputScaleX
+    jnt.scaleMult >> composeMatrix2.inputScaleY
+    jnt.scaleMult >> composeMatrix2.inputScaleZ
+    trGeo = pymel.core.createNode( 'transformGeometry' )
+    try:jnt.attr( 'radius' ).set( 0 )
+    except:pass
+    
+    ioShape.local >> trGeo.inputGeometry
+    multMatrix.matrixSum >> trGeo.transform
+    
+    trGeo.outputGeometry >> crvShape.create
+    
+    if colorIndex != -1:
+        shape = jnt.getShape().name()
+        cmds.setAttr( shape + '.overrideEnabled', 1 )
+        cmds.setAttr( shape + '.overrideColor', colorIndex )
+
+    return jnt
+
+
+def getNodeFromHistory( target, nodeType ):
+    
+    pmTarget = pymel.core.ls( target )[0]
+    hists = pmTarget.history( pdo=1 )
+    targetNodes = []
+    for hist in hists:
+        if hist.type() == nodeType:
+            targetNodes.append( hist )
+    return targetNodes
+
+
+
+def setGeometryMatrixToTarget( inputGeo, inputMatrixTarget ):
+    
+    geo = pymel.core.ls( inputGeo )[0]
+    matrixTarget = pymel.core.ls( inputMatrixTarget )[0]
+    geoShapes = geo.listRelatives( s=1 )
+    
+    geoMatrix    = listToMatrix( pymel.core.xform( geo, q=1, ws=1, matrix=1 ) )
+    targetMatrix = listToMatrix( pymel.core.xform( matrixTarget, q=1, ws=1, matrix=1 ) )
+    
+    for shape in geoShapes:
+        if shape.attr( 'io' ).get():
+            pymel.core.delete( shape )
+    
+    geoShapes = geo.listRelatives( s=1 )
+    
+    for geoShape in geoShapes:
+        cmds.select( geoShape.name() )
+        cmds.CreateCluster()
+        shapeHists = cmds.listHistory( geoShape.name() )
+        origShape = None
+        cluster = None
+        for hist in shapeHists:
+            if cmds.nodeType( hist ) == 'cluster':
+                cluster = hist
+            if not cmds.nodeType( hist ) in ['mesh','nurbsCurve', 'nurbsSurface']: continue
+            if not cmds.getAttr( hist + '.io' ): continue
+            origShape = pymel.core.ls( hist )[0]
+            break
+        
+        outputAttr = None
+        inputAttr = None
+        
+        if origShape.type() == 'mesh':
+            outputAttr = 'outMesh'
+            inputAttr = 'inMesh'
+        elif origShape.type() == 'nurbsCurve':
+            outputAttr = 'local'
+            inputAttr = 'create'
+        
+        trGeo = pymel.core.createNode( 'transformGeometry' )
+        origShape.attr( outputAttr ) >> trGeo.inputGeometry
+        trGeo.outputGeometry >> geoShape.attr( inputAttr )
+        trGeo.transform.set( matrixToList(geoMatrix * targetMatrix.inverse()), type='matrix' )
+        cmds.select( geoShape.name() )
+        cmds.DeleteHistory()
+    
+    pymel.core.xform( geo, ws=1, matrix= matrixTarget.wm.get() )
+
+
+
+def setMeshPoints( srcShape, dstShape ):
+    
+    fnSrc = OpenMaya.MFnMesh( getDagPath( srcShape ) )
+    fnDst = OpenMaya.MFnMesh( getDagPath( dstShape ) )
+    
+    srcPoints = OpenMaya.MPointArray()
+    fnSrc.getPoints( srcPoints )
+    fnDst.setPoints( srcPoints )
+    
+
+
+
+def autoCopyWeight( *args ):
+    
+    first = pymel.core.ls( args[0] )[0].name()
+    second = pymel.core.ls( args[1] )[0].name()
+    
+    hists = cmds.listHistory( first, pdo=1 )
+    
+    skinNode = None
+    for hist in hists:
+        if cmds.nodeType( hist ) == 'skinCluster':
+            skinNode = hist
+    
+    if not skinNode: return None
+    
+    targetSkinNode = None
+    targetHists = cmds.listHistory( second, pdo=1 )
+    if targetHists:
+        for hist in targetHists:
+            if cmds.nodeType( hist ) == 'skinCluster':
+                targetSkinNode = hist
+
+    if not targetSkinNode:
+        bindObjs = cmds.listConnections( skinNode+'.matrix', s=1, d=0, type='joint' )
+        bindObjs.append( second )
+        cmds.skinCluster( bindObjs, tsb=1 )
+    
+    cmds.copySkinWeights( first, second, noMirror=True, surfaceAssociation='closestPoint', influenceAssociation ='oneToOne' )
+
+    
+
+
+def copyWeightToSpecifyObjects( inputSrcMesh, inputDstMesh, inputSrcJnt, inputDstJnt ):
+    
+    srcJnt = pymel.core.ls( inputSrcJnt )[0]
+    dstJnt = pymel.core.ls( inputDstJnt )[0]
+    
+    srcMesh = pymel.core.ls( inputSrcMesh )[0]
+    trgMesh = pymel.core.ls( inputDstMesh )[0]
+    
+    srcSkin = getNodeFromHistory( srcMesh, 'skinCluster' )[0]
+    dstSkin = getNodeFromHistory( trgMesh, 'skinCluster' )[0]
+    
+    srcMtxIndex = None
+    for con in srcJnt.listConnections( type='skinCluster', p=1 ):
+        if con.node().name() != srcSkin.name(): continue
+        if con.longName().find( 'matrix' ) == -1: continue
+        srcMtxIndex = con.index()
+    if not srcMtxIndex: return None
+    
+    dstMtxIndex = None
+    for con in dstJnt.listConnections( type='skinCluster', p=1 ):
+        if con.node().name() != dstSkin.name(): continue
+        if con.longName().find( 'matrix' ) == -1: continue
+        dstMtxIndex = con.index()
+    
+    if not dstMtxIndex: return None
+    
+    vtxWeightsMap = {}
+    for i in range( srcSkin.weightList.numElements() ):
+        weightsPlug = srcSkin.weightList[i].getChildren()[0]
+        for j in range( weightsPlug.numElements() ):
+            if weightsPlug[j].logicalIndex() != srcMtxIndex: continue
+            weightValue = weightsPlug[j].get()
+            if not weightValue: continue
+            vtxWeightsMap.update( { i: weightValue } )
+    
+    for i, value in vtxWeightsMap.items():
+        weightsPlug = dstSkin.weightList[i].getChildren()[0]
+        multValue = 1.0-value
+        origValue = 0
+        for element in weightsPlug.elements():
+            origValue += cmds.getAttr( dstSkin + '.' + element )
+            cmds.setAttr( dstSkin + '.' + element, cmds.getAttr( dstSkin + '.' + element ) * multValue )
+
+        weightsPlug[dstMtxIndex].set( weightsPlug[dstMtxIndex].get() + value )
+
+
+
+def copyWeightToSmoothedMesh( inputSrcMesh, inputSmoothedMesh ):
+
+    from maya import mel
+
+    srcMesh      = pymel.core.ls( inputSrcMesh )[0]    
+    smoothedMesh = pymel.core.ls( inputSmoothedMesh )[0]
+    
+    autoCopyWeight( srcMesh, smoothedMesh )
+    
+    srcShape = cmds.listRelatives( srcMesh.name(), s=1, f=1 )[0]
+    targetShape = cmds.listRelatives( smoothedMesh.name(), s=1, f=1 )[0]
+    srcSkinCluster = getNodeFromHistory( srcMesh, 'skinCluster')[0]
+    targetSkinCluster = getNodeFromHistory( smoothedMesh, 'skinCluster' )[0]
+    
+    dagPathSrc = getDagPath( srcShape )
+    dagPathTrg = getDagPath( targetShape )
+    fnMeshSrc    = OpenMaya.MFnMesh( dagPathSrc )
+    fnMeshTarget = OpenMaya.MFnMesh( dagPathTrg )
+    fnSkinClusterSrc    = OpenMaya.MFnDependencyNode( getMObject( srcSkinCluster ) )
+    fnSkinClusterTarget = OpenMaya.MFnDependencyNode( getMObject( targetSkinCluster ) )
+    
+    numVerticesSrc    = fnMeshSrc.numVertices()
+    numVerticesTarget = fnMeshTarget.numVertices()
+    
+    matrixPlugSrc    = fnSkinClusterSrc.findPlug( 'matrix' )
+    matrixPlugTarget = fnSkinClusterTarget.findPlug( 'matrix' )
+    weightListPlugSrc    = fnSkinClusterSrc.findPlug( 'weightList' )
+    weightListPlugTrg = fnSkinClusterTarget.findPlug( 'weightList' )
+    
+    dictSrcJointElementIndices = {}
+    dictTrgJointElementIndices = {}
+    srcJntList = []
+    trgJntList = []
+    for i in range( matrixPlugSrc.numElements() ):
+        srcJnt = cmds.listConnections( matrixPlugSrc[i].name(), s=1, d=0 )[0]
+        trgJnt = cmds.listConnections( matrixPlugTarget[i].name(), s=1, d=0 )[0]
+        srcJntList.append( srcJnt )
+        trgJntList.append( trgJnt )
+        dictSrcJointElementIndices.update( {srcJnt:matrixPlugSrc[i].logicalIndex()} )
+        dictTrgJointElementIndices.update( {trgJnt:matrixPlugTarget[i].logicalIndex()} )
+    
+    srcToTrgMap = {}
+    for i in range( matrixPlugSrc.numElements() ):
+        srcIndex = dictSrcJointElementIndices[ srcJntList[i] ]
+        trgIndex = dictTrgJointElementIndices[ trgJntList[i] ]
+        srcToTrgMap.update( {srcIndex:trgIndex} )
+    
+    for i in range( weightListPlugSrc.numElements() ):
+        weightsPlugSrc = weightListPlugSrc[i].child(0)
+        weightsPlugTrg = weightListPlugTrg[i].child(0)
+        
+        for j in range( weightsPlugTrg.numElements() ):
+            cmds.removeMultiInstance( weightsPlugTrg[0].name() )
+        
+        for j in range( weightsPlugSrc.numElements() ):
+            srcMatrixIndex = weightsPlugSrc[j].logicalIndex()
+            trgMatrixIndex = srcToTrgMap[ srcMatrixIndex ]
+            value = weightsPlugSrc[j].asFloat()
+            weightsPlugTrg.elementByLogicalIndex( trgMatrixIndex ).setFloat( value )
+    
+    itMeshTrg = OpenMaya.MItMeshVertex( dagPathTrg )
+    
+    util = OpenMaya.MScriptUtil()
+    util.createFromInt( 0 )
+    prevIndex = util.asIntPtr()
+    
+    vtxnames = []
+    othreVtxNames = []
+    for i in range( numVerticesSrc, numVerticesTarget ):
+        itMeshTrg.setIndex( i, prevIndex )
+        vtxIndices = OpenMaya.MIntArray()
+        itMeshTrg.getConnectedVertices( vtxIndices )
+        targetIndices = []
+        for j in range( vtxIndices.length() ):
+            if vtxIndices[j] < numVerticesSrc:
+                targetIndices.append( vtxIndices[j] )
+        if not targetIndices:
+            vtxnames.append( smoothedMesh + '.vtx[%d]' % i )
+            continue
+        else:
+            othreVtxNames.append( smoothedMesh + '.vtx[%d]' % i )
+        
+        averageMatrixIndices = []
+        averageValues = []
+        for targetIndex in targetIndices:
+            weightsPlug = weightListPlugTrg[targetIndex].child(0)
+            for j in range( weightsPlug.numElements() ):
+                matrixIndex = weightsPlug[j].logicalIndex()
+                value = weightsPlug[j].asFloat()
+                if matrixIndex in averageMatrixIndices:
+                    index = averageMatrixIndices.index( matrixIndex )
+                    averageValues[ index ] += value
+                else:
+                    averageMatrixIndices.append( matrixIndex )
+                    averageValues.append( value )
+        
+        numInfluence = len( averageMatrixIndices )
+        for j in range( numInfluence ):
+            averageValues[j] /= len(targetIndices)
+        
+        weightsPlug = weightListPlugTrg[i].child(0)     
+        for j in range( weightsPlug.numElements() ):
+            cmds.removeMultiInstance( weightsPlug[0].name() )
+        
+        for j in range( len(averageMatrixIndices) ):
+            averageMatrixIndex = averageMatrixIndices[j]
+            averageValue = averageValues[j]
+            weightsPlug.elementByLogicalIndex( averageMatrixIndex ).setFloat( averageValue )
+        
+    cmds.select( vtxnames )
+    mel.eval( 'weightHammerVerts;' )
+    
+    for i in range( numVerticesSrc ):
+        vtxnames.append( smoothedMesh + '.vtx[%d]' % i )
+
+    return smoothedMesh, othreVtxNames
+    
+        
+
+
+def createFourByFourMatrixCube( inputTarget ):
+    
+    target = pymel.core.ls( inputTarget )[0]
+    
+    curvePoses = [ [1,0,0], [0,1,0], [0,0,1], [0,0,0] ]
+    newCurve = pymel.core.curve( p=curvePoses, d=1 )
+    ioShape = addIOShape( newCurve )
+    
+    compose = pymel.core.createNode( 'composeMatrix' )
+    trGeo = pymel.core.createNode( 'transformGeometry' )
+    compose.outputMatrix >> trGeo.transform
+    ioShape.local >> trGeo.inputGeometry
+    addAttr( newCurve, ln='size', min=0, dv=1, cb=1 )
+    newCurve.size >> compose.isx
+    newCurve.size >> compose.isy
+    newCurve.size >> compose.isz
+    trGeo.outputGeometry >> newCurve.getShape().create
+    curveWorldGeo = pymel.core.createNode( 'transformGeometry' )
+    newCurve.getShape().local >> curveWorldGeo.inputGeometry
+    newCurve.m >> curveWorldGeo.transform
+    
+    newTrs = []
+    for i in range( 4 ):
+        curveInfo = pymel.core.createNode( 'pointOnCurveInfo' )
+        curveWorldGeo.outputGeometry >> curveInfo.inputCurve
+        curveInfo.parameter.set( i )
+        newTr = pymel.core.createNode( 'transform' )
+        curveInfo.position >> newTr.t
+        newTrs.append( newTr )
+    
+    newCurve.size >> newTrs[-1].sx
+    newCurve.size >> newTrs[-1].sy
+    newCurve.size >> newTrs[-1].sz
+    
+    dcmpX = getLocalDecomposeMatrix( newTrs[0].wm, newTrs[-1].wim )
+    dcmpY = getLocalDecomposeMatrix( newTrs[1].wm, newTrs[-1].wim )
+    dcmpZ = getLocalDecomposeMatrix( newTrs[2].wm, newTrs[-1].wim )
+    
+    fbf = pymel.core.createNode( 'fourByFourMatrix' )
+    mm  = pymel.core.createNode( 'multMatrix' )
+    fbfDcmp = pymel.core.createNode( 'decomposeMatrix' )
+    dcmpX.otx >> fbf.in00
+    dcmpX.oty >> fbf.in01
+    dcmpX.otz >> fbf.in02
+    dcmpY.otx >> fbf.in10
+    dcmpY.oty >> fbf.in11
+    dcmpY.otz >> fbf.in12
+    dcmpZ.otx >> fbf.in20
+    dcmpZ.oty >> fbf.in21
+    dcmpZ.otz >> fbf.in22
+    newTrs[-1].tx >> fbf.in30
+    newTrs[-1].ty >> fbf.in31
+    newTrs[-1].tz >> fbf.in32
+    fbf.output >> mm.i[0]
+    mm.matrixSum >> fbfDcmp.imat
+    
+    newGrp = pymel.core.group( em=1 )
+    pymel.core.parent( newCurve, newTrs, newGrp )
+    
+    newGrp.wm >> mm.i[1]
+    
+    resultTr = pymel.core.createNode( 'transform', n= 'Result' )
+    resultTr.dh.set( 1 )
+    resultTr.pim >> mm.i[2]
+    
+    fbfDcmp.outputTranslate >> resultTr.t
+    fbfDcmp.outputRotate >> resultTr.r
+    fbfDcmp.outputScale >> resultTr.s
+    fbfDcmp.outputShear >> resultTr.sh
+    
+    pymel.core.xform( newGrp, ws=1, matrix= target.wm.get() )
+    
+    return resultTr, newGrp
+
+
+
+
+def getDirectionIndex( inputVector ):
+    
+    import math
+    
+    if type( inputVector ) in [ list, tuple ]:
+        normalInput = OpenMaya.MVector(*inputVector).normal()
+    else:
+        normalInput = OpenMaya.MVector(inputVector).normal()
+    
+    xVector = OpenMaya.MVector( 1,0,0 )
+    yVector = OpenMaya.MVector( 0,1,0 )
+    zVector = OpenMaya.MVector( 0,0,1 )
+    
+    xdot = xVector * normalInput
+    ydot = yVector * normalInput
+    zdot = zVector * normalInput
+    
+    xabs = math.fabs( xdot )
+    yabs = math.fabs( ydot )
+    zabs = math.fabs( zdot )
+    
+    dotList = [xdot, ydot, zdot]
+    
+    dotIndex = 0
+    if xabs < yabs:
+        dotIndex = 1
+        if yabs < zabs:
+            dotIndex = 2
+    elif xabs < zabs:
+        dotIndex = 2
+        
+    if dotList[ dotIndex ] < 0:
+        dotIndex += 3
+    
+    return dotIndex
+
+
+
+
+def getCurveInfo( inputCurveAttr ):
+        
+    curveAttr = pymel.core.ls( inputCurveAttr )[0]
+    consCurveInfo = curveAttr.listConnections( s=0, d=1, type='curveInfo' )
+    if consCurveInfo:
+        curveInfo = consCurveInfo[0]
+    else:
+        curveInfo = pymel.core.createNode( 'curveInfo' )
+        curveAttr >> curveInfo.inputCurve
+    return curveInfo
+
+
+    
+
+def connectCurveScale( inputCurveOrigAttr, inputCurveCurrentAttr, inputTargetJnt ):
+
+    curveOrigAttr = pymel.core.ls( inputCurveOrigAttr )[0]
+    curveCurrentAttr = pymel.core.ls( inputCurveCurrentAttr )[0]
+    targetJnt = pymel.core.ls( inputTargetJnt )[0]
+
+    curveOrigInfo    = getCurveInfo( curveOrigAttr )
+    curveCurrentInfo = getCurveInfo( curveCurrentAttr )
+    def getCurveDistanceNode( curveOrigInfo, curveCurrentInfo ):
+        divNode = curveOrigInfo.arcLength.listConnections( type='multiplyDivide' )
+        if divNode:
+            if pymel.core.isConnected( curveCurrentInfo.arcLength, divNode[0].input1X ):
+                return divNode[0]
+        divNode = pymel.core.createNode( 'multiplyDivide' )
+        curveCurrentInfo.arcLength >> divNode.input1X
+        curveOrigInfo.arcLength >> divNode.input2X
+        divNode.op.set( 2 )
+        return divNode
+    divNode = getCurveDistanceNode( curveOrigInfo, curveCurrentInfo )
+    
+    curveDagPath = getDagPath( inputCurveCurrentAttr.node().name() )
+    fnCurve = OpenMaya.MFnNurbsCurve( curveDagPath )
+    
+    targetWorldPoint = OpenMaya.MPoint( *pymel.core.xform( targetJnt, q=1, ws=1, t=1 ) )
+    targetLocalPoint = targetWorldPoint * curveDagPath.inclusiveMatrixInverse()
+    
+    util = OpenMaya.MScriptUtil()
+    util.createFromDouble( 0.0 )
+    ptrDouble = util.asDoublePtr()
+    fnCurve.getParamAtPoint( targetLocalPoint, ptrDouble, 10000.0 )
+    tangent = fnCurve.tangent( util.getDouble(ptrDouble) )
+    
+    axisName = ['X','Y','Z'][(getDirectionIndex( tangent )+3)%3]
+    
+    divNode.outputX >> targetJnt.attr( 'scale%s' % axisName )
+    
+        
+    
+
+def duplicateBlendShapeByCtl(ctls, inputSrcMesh ):
+    
+    srcMesh = pymel.core.ls( inputSrcMesh )[0]
+    
+    def getBlendShapeDestConnections( attr ):
+        destAttrs = attr.listConnections( s=0, d=1, p=1 )
+        compairAttrs = []
+        for destAttr in destAttrs:
+            if cmds.attributeQuery( 'wm', node=destAttr.node().name(), ex=1 ): continue
+            compairAttrs.append( destAttr )
+        
+        blendConnections = []
+        for compairAttr in compairAttrs:
+            if compairAttr.node().type() == 'blendShape':
+                blendConnections.append( [attr,compairAttr] )
+            else:
+                outputAttrs = compairAttr.node().listAttr( o=1 )
+                for outputAttr in outputAttrs:
+                    try:blendConnections += getBlendShapeDestConnections( outputAttr )
+                    except:pass
+        return blendConnections
+    
+    def addBlendShape( mesh, targetMesh ):
+        hists = targetMesh.history( pdo=1 )
+        blendShapeNode = None
+        for hist in hists:
+            if hist.type() == 'blendShape':
+                blendShapeNode = hist
+        if not blendShapeNode:
+            blendShapeNode = pymel.core.blendShape( mesh, targetMesh )[0]
+            return blendShapeNode.weight[0]
+        else:
+            currentIndex = blendShapeNode.weight.numElements()
+            pymel.core.blendShape( blendShapeNode, e=1, t=[blendShapeNode.getBaseObjects()[0], currentIndex, mesh, 1] )
+            return blendShapeNode.weight[currentIndex]  
+    
+    
+    duMeshs = []
+    for inputCtl in ctls:
+        ctl = pymel.core.ls( inputCtl )[0]
+        attrs = ctl.listAttr( k=1 )
+        for attr in attrs:
+            if attr.isLocked(): continue
+            blendCons = getBlendShapeDestConnections( attr )
+            srcAttrNames = []
+            for srcAttr, dstAttr in blendCons:
+                attrName = cmds.ls( dstAttr.name() )[0].split( '.' )[-1]
+                if srcAttr.name() in srcAttrNames: continue
+                srcAttrNames.append( srcAttr.name() )
+                dstAttr.set( 1 )
+                duMesh = pymel.core.duplicate( srcMesh, n= srcMesh.name() + '_' + attrName )[0]
+                duMeshs.append( duMesh )
+                duMesh.setParent( w=1 )
+                dstAttr.set( 0 )
+
+
+
+def getMDagPathAndComponent():
+    
+    mSelList = OpenMaya.MSelectionList()
+    OpenMaya.MGlobal.getActiveSelectionList( mSelList )
+    
+    returnTargets = []
+    for i in range( mSelList.length() ):
+        mDagPath = OpenMaya.MDagPath()
+        mObject  = OpenMaya.MObject()
+        
+        mSelList.getDagPath( i, mDagPath, mObject )
+        
+        mIntArrU = OpenMaya.MIntArray()
+        mIntArrV = OpenMaya.MIntArray()
+        mIntArrW = OpenMaya.MIntArray()
+        
+        if not mObject.isNull():
+            if mDagPath.apiType() == OpenMaya.MFn.kNurbsCurve:
+                component = OpenMaya.MFnSingleIndexedComponent( mObject )
+                component.getElements( mIntArrU )
+            elif mDagPath.apiType() == OpenMaya.MFn.kNurbsSurface:
+                component = OpenMaya.MFnDoubleIndexedComponent( mObject )
+                component.getElements( mIntArrU, mIntArrV )
+            elif mDagPath.apiType() == OpenMaya.MFn.kLattice:
+                component = OpenMaya.MFnTripleIndexedComponent( mObject )
+                component.getElements( mIntArrU, mIntArrV, mIntArrW )
+            elif mObject.apiType() == OpenMaya.MFn.kMeshVertComponent:
+                component = OpenMaya.MFnSingleIndexedComponent( mObject )
+                component.getElements( mIntArrU )
+            elif mObject.apiType() == OpenMaya.MFn.kMeshEdgeComponent:
+                mfnMesh = OpenMaya.MFnMesh( mDagPath )
+                component = OpenMaya.MFnSingleIndexedComponent( mObject )
+                mIntArr = OpenMaya.MIntArray()
+                component.getElements( mIntArr )
+                mIntArrU.setLength( mIntArr.length() * 2 )
+                util = OpenMaya.MScriptUtil()
+                util.createFromList([0,0],2)
+                ptrEdgeToVtxIndex = util.asInt2Ptr()
+                for i in range( mIntArr.length() ):
+                    mfnMesh.getEdgeVertices( mIntArr[i], ptrEdgeToVtxIndex )
+                    index1 = util.getInt2ArrayItem( ptrEdgeToVtxIndex, 0, 0 )
+                    index2 = util.getInt2ArrayItem( ptrEdgeToVtxIndex, 0, 1 )
+                    mIntArrU[i*2  ] = index1
+                    mIntArrU[i*2+1] = index2 
+            elif mObject.apiType() == OpenMaya.MFn.kMeshPolygonComponent:
+                mfnMesh = OpenMaya.MFnMesh( mDagPath )
+                component = OpenMaya.MFnSingleIndexedComponent( mObject )
+                mIntArr = OpenMaya.MIntArray()
+                component.getElements( mIntArr )
+                mIntArrEach = OpenMaya.MIntArray()
+                for i in range( mIntArr.length() ):
+                    mfnMesh.getPolygonVertices( mIntArr[i], mIntArrEach )
+                    for i in range( mIntArrEach.length() ):
+                        mIntArrU.append( mIntArrEach[i] )
+        
+        returnTargets.append( [mDagPath, mIntArrU, mIntArrV, mIntArrW] )
+    
+    return returnTargets
+
+
+
+
+def setInfluenceOnlySelJoint():
+        
+    targets = getMDagPathAndComponent()
+    
+    jnts = []
+    mesh = None
+
+    fnMesh = OpenMaya.MFnMesh()        
+    faceCompIndices = OpenMaya.MIntArray()
+    for dagPath, compU, compV, compW in targets:
+        nodeName = OpenMaya.MFnDagNode( dagPath ).partialPathName()
+        if compU:
+            mesh = pymel.core.ls( nodeName )[0]
+            faceCompIndices = compU
+            fnMesh.setObject( dagPath )
+        else:
+            jnts.append( pymel.core.ls( nodeName )[0] )
+
+    skinNode = None
+    for hist in mesh.history( pdo=1 ):
+        if hist.type() == 'skinCluster':
+            skinNode = hist
+            break
+    if not skinNode: return None
+
+    influenceIndices = []
+    for jnt in jnts:
+        cons = jnt.wm.listConnections( type='skinCluster', p=1 )
+        for con in cons:
+            if skinNode.name() != con.node().name(): continue
+            influenceIndices.append( con.index() )
+
+    allVertices = []
+    for i in range( faceCompIndices.length() ):
+        allVertices.append( faceCompIndices[i] )
+        
+    allVertices = list( set( allVertices ) )
+    
+    fnSkinNode = OpenMaya.MFnDependencyNode( getMObject( skinNode.name() ) )
+    plugWeightList = fnSkinNode.findPlug( 'weightList' )
+    
+    for vtxIndex in allVertices:
+        plugWeights = plugWeightList[ vtxIndex ].child( 0 )
+        
+        allWeights = 0
+        removeTargets = []
+        for i in range( plugWeights.numElements() ):
+            if plugWeights[i].logicalIndex() in influenceIndices:
+                allWeights += plugWeights[i].asFloat()
+            else:
+                removeTargets.append( plugWeights[i].name() )
+        
+        for removeTarget in removeTargets:
+            cmds.removeMultiInstance( removeTarget )
+
+        for i in range( plugWeights.numElements() ):
+            plugName = plugWeights[i].name()
+            cuValue = plugWeights[i].asFloat()
+            cmds.setAttr( plugName, cuValue / allWeights )
+
+
+
+
+
+def getClosestVertexIndex( position, mesh ):
+    
+    if type( position ) in [tuple, list]:
+        pos = OpenMaya.MPoint( *position )
+    else:
+        pos = OpenMaya.MPoint( position )
+    
+    if cmds.nodeType( mesh ) == 'transform':
+        meshShape = cmds.listRelatives( mesh, s=1, f=1 )[0]
+    else:
+        meshShape = mesh
+    
+    dagPathMesh = getDagPath( meshShape )
+    intersector = OpenMaya.MMeshIntersector()
+    intersector.create( dagPathMesh.node() )
+    
+    meshMatrix = dagPathMesh.inclusiveMatrix()
+    localPos = pos * meshMatrix.inverse()
+    
+    pointOnMesh = OpenMaya.MPointOnMesh()
+    intersector.getClosestPoint( localPos, pointOnMesh )
+    
+    faceIndex = pointOnMesh.faceIndex()
+    fnMesh = OpenMaya.MFnMesh( dagPathMesh )
+    vtxIndices = OpenMaya.MIntArray()
+    fnMesh.getPolygonVertices( faceIndex, vtxIndices )
+
+    points = OpenMaya.MPointArray()
+    fnMesh.getPoints( points )
+    minDist = 10000000.0
+    minDistIndex = vtxIndices[0]
+    for i in range( vtxIndices.length() ):
+        vtxIndex = vtxIndices[i]
+        point = points[ vtxIndex ]
+        dist = point.distanceTo( localPos )
+        if dist < minDist:
+            minDist = dist
+            minDistIndex = vtxIndex
+    return minDistIndex
+
+
+
+
+
+def addInfluenceOnlyOneCloseVertex( inputJnt, inputMesh ):
+    
+    jnt = pymel.core.ls( inputJnt )[0]
+    mesh = pymel.core.ls( inputMesh )[0]
+    
+    mesh = pymel.core.ls( mesh )[0]
+    if mesh.type() == 'mesh':
+        meshShape = mesh
+    else:
+        meshShape = mesh.getShape()
+    
+    hists = meshShape.history( pdo=1 )
+    targetSkinNode = None
+    for hist in hists:
+        if hist.type() == 'skinCluster':
+            targetSkinNode = hist
+            break
+    if not targetSkinNode: return None
+    
+    try:cmds.skinCluster( targetSkinNode.name(), e=1, ug=1, dr=4, ps=0, ns=10, lw=True, wt=0, ai=jnt )
+    except:pass
+    closeIndex = getClosestVertexIndex( pymel.core.xform( jnt, q=1, ws=1, t=1 )[:3], mesh.name() )
+    
+    fnNode = OpenMaya.MFnDependencyNode( getMObject( targetSkinNode.name() ) )
+    wlPlug = fnNode.findPlug( 'weightList' )[ closeIndex ].child(0)
+    
+    for i in range( wlPlug.numElements() ):
+        cmds.removeMultiInstance( wlPlug[0].name() )
+    
+    skinCons = jnt.wm.listConnections( type='skinCluster', p=1 )
+    for skinCon in skinCons:
+        node = skinCon.node()
+        jntIndex = skinCon.index()
+        if node.name() != targetSkinNode.name(): continue
+        cmds.setAttr( wlPlug.name() + '[%d]' % jntIndex, 1 )

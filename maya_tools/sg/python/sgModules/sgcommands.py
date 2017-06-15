@@ -5124,14 +5124,15 @@ def setMatrixToGeoGroup( mtx, target ):
     
     tr = cmds.createNode( 'transform' )
     setMatrixToTarget( mtx, tr )
-    selChildren = cmds.listRelatives( target, c=1, f=1, type='transform' )
+    selChildren = cmds.listRelatives( target, c=1, f=1, ad=1, type='transform' )
     if not selChildren: selChildren = []
     selChildren.append( target )
     unParentList = []
     for selChild in selChildren:
-        if cmds.listRelatives( selChild, s=1 ):
+        if cmds.listRelatives( selChild, s=1, f=1 ):
             selP = cmds.listRelatives( selChild, p=1, f=1 )[0]
             selChild = cmds.parent( selChild, w=1 )[0]
+            print "set geo : ", selChild
             setGeometryMatrixToTarget( selChild, tr )
             unParentList.append( [selChild,selP] )
         else:

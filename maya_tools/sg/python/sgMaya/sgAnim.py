@@ -262,3 +262,45 @@ def makeUdAttrGlobal( inputTargets, inputCtl ):
             if not pymel.core.attributeQuery( circleAttr.longName(), node=target, ex=1 ): continue
             circleAttr >> target.attr( circleAttr.longName() )
 
+
+
+def buildJointLineByVtxNum( mesh, vtxList, numJoints ):
+    
+    points = OpenMaya.MPointArray()
+    
+    for vtxIndex in vtxList:
+        vtxPos = OpenMaya.MPoint( *cmds.xform( mesh + '.vtx[%d]' % vtxIndex, q=1, ws=1, t=1 )[:3] )
+        points.append( vtxPos )
+        #print "vtx pos[%d] : %5.3f, %5.3f, %5.3f " %( vtxIndex, vtxPos.x, vtxPos.y, vtxPos.z )
+    
+    curveData = OpenMaya.MFnNurbsCurveData()
+    oData = curveData.create()
+    fnCurve = OpenMaya.MFnNurbsCurve()
+    
+    fnCurve.createWithEditPoints( points, 3, fnCurve.kOpen, False, True, True, oData )
+    
+    newFnCurve = OpenMaya.MFnNurbsCurve( oData )
+    
+    eachLength = newFnCurve.length()/numJoints
+    parentObj = None
+    joints = []
+    for i in range( numJoints+1 ):
+        paramValue = newFnCurve.findParamFromLength( eachLength * i )
+        point = OpenMaya.MPoint()
+        newFnCurve.getPointAtParam( paramValue, point )
+        
+        if not parentObj:
+            pymel.core.select( d=1 )
+        else:
+            pymel.core.select( parentObj )
+
+        joint = pymel.core.joint()
+        joints.append( joint )
+        pymel.core.move( point.x, point.y, point.z, joint, ws=1 )
+        parentObj = joint
+    return joints[0]
+        
+        
+
+
+

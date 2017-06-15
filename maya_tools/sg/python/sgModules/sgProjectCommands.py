@@ -158,7 +158,10 @@ class AddInfluenceOnlyOneCloseVertex:
     
 class DuplicateBlendShapeByCtl:
     
-    def __init__(self, ctls, srcMesh, dstMesh ):
+    def __init__(self, ctls, inputSrcMesh, inputDstMesh ):
+        
+        srcMesh = pymel.core.ls( inputSrcMesh )[0]
+        dstMesh = pymel.core.ls( inputDstMesh )[0]
         
         def getBlendShapeDestConnections( attr ):
             destAttrs = attr.listConnections( s=0, d=1, p=1 )
@@ -193,7 +196,8 @@ class DuplicateBlendShapeByCtl:
                 return blendShapeNode.weight[currentIndex]  
         
         
-        for ctl in ctls:
+        for inputCtl in ctls:
+            ctl = pymel.core.ls( inputCtl )[0]
             attrs = ctl.listAttr( k=1 )
             for attr in attrs:
                 if attr.isLocked(): continue
@@ -267,12 +271,14 @@ class FurBall_furOutJntSetting:
     def createFromEdges( baseTransform, edges  ):
         
         loopCurves = []
+        
         for edge in edges:
             loopCurve = FurBall_furOutJntSetting.createLoopCurve( edge )
             loopCurves.append(loopCurve )
             FurBall_furOutJntSetting.setWorldGeometryToLocalGeometry( loopCurve, baseTransform )
         
         pointsList = []
+        print "loopCurves :", len( loopCurves )
         for loopCurve in loopCurves:
             points = FurBall_furOutJntSetting.createFourPoints( loopCurve )
             pointsList.append( points )
@@ -292,7 +298,7 @@ class FurBall_furOutJntSetting:
         cmds.connectAttr( curve + '.' + currentAttrName, scaleNode + '.input1X' )
         cmds.connectAttr( curve + '.' + origAttrName, scaleNode + '.input2X' )
         
-        jntCenters = [ cmds.createNode( 'joint' ) for i in range( 3 ) ]
+        jntCenters = [ cmds.createNode( 'joint' ) for i in range( len(centers) ) ]
         
         for i in range( len(edges) ):
             constrain_point( centers[i], jntCenters[i] )
@@ -323,7 +329,11 @@ class FurBall_furOutJntSetting:
             cmds.connectAttr( scaleXNode + '.outputX', jntCenters[i] + '.sx' )
             cmds.connectAttr( scaleZNode + '.outputX', jntCenters[i] + '.sz' )
         
-        cmds.parent( loopCurves , centers, jntCenters, curve, pointsList[0], pointsList[1], pointsList[2], baseTransform )
+        allPoints = []
+        for points in pointsList:
+            allPoints += points
+        
+        cmds.parent( loopCurves , centers, jntCenters, curve, allPoints, baseTransform )
     
     
     @staticmethod
@@ -396,24 +406,9 @@ class FurBall_furOutJntSetting:
 
 
     @staticmethod
-    def createCenterLineCurve( node1, node2, node3 ):
+    def createCenterLineCurve( *centers ):
         
-        point1 = OpenMaya.MVector( *cmds.xform( node1, q=1, ws=1, t=1 ) )
-        point2 = OpenMaya.MVector( *cmds.xform( node2, q=1, ws=1, t=1 ) )
-        point3 = OpenMaya.MVector( *cmds.xform( node3, q=1, ws=1, t=1 ) )
-        v1 = point2 - point1
-        v2 = point3 - point2
-        
-        sortedNodes = []
-        if v1 * v2 > 0:
-            sortedNodes = [ node1, node2, node3 ]
-        else:
-            if v1.length() < v2.length():
-                sortedNodes = [ node3, node1, node2 ]
-            else:
-                sortedNodes = [ node1, node3, node2 ]
-        
-        return makeCurveFromSelection( sortedNodes, d=2 )
+        return makeCurveFromSelection( centers, d=2 )
         
         
         
@@ -491,7 +486,7 @@ from sgModules import sgcommands
 
 def makeSmoothSkinedCloneMesh( src, cloneAttrName='_smooth' ):
     
-    target = sgcommands.makeCloneObject( src, cloneAttrName = cloneAttrName, shapeOn=True )
+    target = sgcommands.makeCloneObject( src, cloneAttrName = 'cloneAttrName', shapeOn=True )
     cmds.polySmooth( target,  mth=0 ,sdt=2, ovb=1, ofb=3, ofc=0, ost=1, ocr=0, dv=1, bnr=1, c=1, kb=1, ksb=1, khe=0, kt=1, kmb=1, suv=1, peh=0, sl=1, dpe=1, ps=0.1, ro=1, ch=0 )
     sgcommands.autoCopyWeight( src, target )
     
