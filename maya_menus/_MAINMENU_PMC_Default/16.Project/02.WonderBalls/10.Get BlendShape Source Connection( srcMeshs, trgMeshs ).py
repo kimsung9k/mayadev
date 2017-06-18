@@ -1,9 +1,19 @@
 import pymel.core
+from sgMaya import sgCmds
+reload( sgCmds )
 
 sels = pymel.core.ls( sl=1 )
 
-srcBlends = sels[:-1]
-targetBlend = sels[-1]
+srcMeshs = sels[:-1]
+targetMesh = sels[-1]
+
+srcBlends = []
+targetBlend = None
+
+for srcMesh in srcMeshs:
+    srcBlends += sgCmds.getNodeFromHistory( srcMesh, 'blendShape' )
+
+targetBlend = sgCmds.getNodeFromHistory( targetMesh, 'blendShape' )[0]
 
 targetBlendAttrs = targetBlend.weight
 

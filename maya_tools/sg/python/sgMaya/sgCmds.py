@@ -447,7 +447,7 @@ def getOrderedEdgeRings( targetEdge ):
     
     cmds.select( targetEdge )
     cmds.SelectEdgeRingSp()
-    ringEdges = cmds.ls( sl=1, fl=1 )
+    ringEdges = [ edge.name() for edge in pymel.core.ls( sl=1, fl=1 ) ]
     oppasitEdges = []
     
     meshName = targetEdge.split( '.' )[0]
@@ -486,24 +486,24 @@ def getOrderedEdgeRings( targetEdge ):
     for i in range( len( ringEdges ) ):
         if len( oppasitEdges[i] ) == 1:
             break
-    
-    nextIndex = ringEdges.index( oppasitEdges[i][0] )
-    orderedEdges = [ ringEdges[i], ringEdges[ nextIndex ] ]
-    
-    startNum = 0
-    while len( oppasitEdges[ nextIndex ]  )== 2:
-        edges = oppasitEdges[ nextIndex ]
-        exists = False
-        for edge in edges:
-            if not edge in orderedEdges:
-                orderedEdges.append( edge )
-                exists = True
-                break
-        if not exists: break
-        nextIndex = ringEdges.index( edge )
-        startNum += 1
-    
+        nextIndex = ringEdges.index( oppasitEdges[i][0] )
+        orderedEdges = [ ringEdges[i], ringEdges[ nextIndex ] ]
+        
+        startNum = 0
+        while len( oppasitEdges[ nextIndex ]  )== 2:
+            edges = oppasitEdges[ nextIndex ]
+            exists = False
+            for edge in edges:
+                if not edge in orderedEdges:
+                    orderedEdges.append( edge )
+                    exists = True
+                    break
+            if not exists: break
+            nextIndex = ringEdges.index( edge )
+            startNum += 1
+
     return orderedEdges
+
 
 
 
@@ -940,7 +940,7 @@ def makeController( pointList, defaultScaleMult = 1, **options ):
 def getNodeFromHistory( target, nodeType ):
     
     pmTarget = pymel.core.ls( target )[0]
-    hists = pmTarget.history( pdo=1 )
+    hists = pmTarget.history()
     targetNodes = []
     for hist in hists:
         if hist.type() == nodeType:
@@ -1610,6 +1610,9 @@ def addInfluenceOnlyOneCloseVertex( inputJnt, inputMesh ):
     jnt = pymel.core.ls( inputJnt )[0]
     mesh = pymel.core.ls( inputMesh )[0]
     
+    try:pymel.core.skinCluster( getNodeFromHistory( mesh, 'skinCluster' )[0], e=1, dr=10, lw=True, wt=0, ai=jnt )
+    except:pass
+    
     mesh = pymel.core.ls( mesh )[0]
     if mesh.type() == 'mesh':
         meshShape = mesh
@@ -1640,3 +1643,276 @@ def addInfluenceOnlyOneCloseVertex( inputJnt, inputMesh ):
         jntIndex = skinCon.index()
         if node.name() != targetSkinNode.name(): continue
         cmds.setAttr( wlPlug.name() + '[%d]' % jntIndex, 1 )
+    
+
+
+
+def createLoopCurve( edge1 ):
+        
+    cmds.select( edge1 )
+    cmds.SelectEdgeLoopSp()
+    curve1 = cmds.polyToCurve( form=2, degree=3 )[0]
+    return curve1
+
+
+
+
+def setWorldGeometryToLocalGeometry( geo, mtxTarget ):
+        
+    shapes = cmds.listRelatives( geo, c=1, ad=1, type='shape', f=1 )
+    
+    trs = []
+    for shape in shapes:
+        transform = cmds.listRelatives( shape, p=1, f=1 )[0]
+        trs.append( transform )
+    
+    trs = list( set( trs ) )
+    
+    for tr in trs:
+        shape = cmds.listRelatives( tr, s=1, f=1 )[0]
+        trGeo = cmds.createNode( 'transformGeometry' )
+        
+        if cmds.nodeType( shape ) == 'nurbsCurve':
+            cons = cmds.listConnections( shape + '.create', s=1, d=0, p=1, c=1 )
+            if not cons: continue
+            cmds.connectAttr( cons[1], trGeo + '.inputGeometry' )
+            cmds.connectAttr( trGeo + '.outputGeometry', shape + '.create', f=1 )
+            cmds.connectAttr( mtxTarget + '.wim', trGeo + '.transform' )
+
+
+
+
+def createPointsFromCurve( curve1, numPoints ):
+        
+    curveShape = cmds.listRelatives( curve1, s=1, f=1 )[0]        
+    fourPoints = []
+    for i in range( numPoints ):
+        trNode = cmds.createNode( 'transform' )
+        cmds.setAttr( trNode + '.dh', 1 )
+        curveInfo = cmds.createNode( 'pointOnCurveInfo' )
+        cmds.connectAttr( curveShape + '.local', curveInfo + '.inputCurve' )
+        cmds.setAttr( curveInfo + '.top', 1 )
+        cmds.setAttr( curveInfo + '.parameter', i / float( numPoints ) )
+        cmds.connectAttr( curveInfo + '.position', trNode + '.t' )
+        fourPoints.append( trNode )
+    return fourPoints
+
+
+
+
+def getDistanceNodeFromTwoObjs( target1, target2 ):
+    
+        pmTarget1 = pymel.core.ls( target1 )[0]
+        pmTarget2 = pymel.core.ls( target2 )[0]
+        
+        distNode = pymel.core.createNode( 'distanceBetween' )
+        pmTarget1.t >> distNode.point1
+        pmTarget2.t >> distNode.point2
+        
+        distNode.addAttr( 'origDist', dv= distNode.distance.get() )
+        
+        return distNode.name(), 'origDist'
+
+
+
+def addCurveDistanceInfo( inputCurve ):
+    
+    NAME_origLength = 'origLength'
+    NAME_currentLength = 'currentLength'
+    
+    curve = pymel.core.ls( inputCurve )[0]
+    if curve.type() == 'nurbsCurve':
+        curveShape = curve
+    else:
+        curveShape = curve.getShape()
+    
+    curve = curveShape.getParent()
+    if not pymel.core.attributeQuery( NAME_origLength, node=curve, ex=1 ):curve.addAttr( NAME_origLength )
+    pymel.core.setAttr( curve.attr(NAME_origLength), e=1, cb=1 )
+    if not pymel.core.attributeQuery( NAME_currentLength, node=curve, ex=1 ):curve.addAttr( NAME_currentLength )
+    pymel.core.setAttr( curve.attr(NAME_currentLength), e=1, cb=1 )
+    
+    curveInfos = curve.attr(NAME_currentLength).listConnections( s=1, d=0, type='curveInfo' )
+    if not curve.currentLength.listConnections( s=1, d=0, type='curveInfo' ):
+        info = pymel.core.createNode( 'curveInfo' )
+        curveShape.local >> info.inputCurve
+        info.arcLength >> curve.currentLength
+    else:
+        info = curveInfos[0]
+    
+    curve.origLength.set( info.arcLength.get() )
+    return NAME_origLength, NAME_currentLength
+
+
+
+def makeCurveFromSelection( *inputSels, **options ):
+    
+    poses = []
+    sels = []
+    for inputSel in inputSels:
+        sels.append( pymel.core.ls( inputSel )[0] )
+    for sel in sels:
+        pose = pymel.core.xform( sel, q=1, ws=1, t=1 )[:3]
+        poses.append( pose )
+    curve = pymel.core.curve( p=poses, **options )
+    curveShape = curve.getShape()
+    
+    for i in range( len( sels ) ):
+        dcmp = pymel.core.createNode( 'decomposeMatrix' )
+        vp   = pymel.core.createNode( 'vectorProduct' )
+        vp.setAttr( 'op', 4 )
+        sels[i].wm >> dcmp.imat
+        dcmp.ot >> vp.input1
+        curve.wim >> vp.matrix
+        vp.output >> curveShape.attr( 'controlPoints' )[i]
+    
+    return curve.name()
+
+
+
+
+def getSortedEdgesInSameRing( inputEdges ):
+    
+    edges = [ pymel.core.ls( inputEdge )[0].name() for inputEdge in inputEdges ]
+    edgeRings = getOrderedEdgeRings( edges[0] )
+    
+    orderedEdges = {}
+    for edge in edges:
+        if edge in edgeRings:
+            orderedEdges.update( { edgeRings.index(edge):edge } )
+    
+    def sortCmp( input1, input2 ):
+        return cmp( input1[0], input2[0] )
+    
+    items = orderedEdges.items()
+    items.sort( sortCmp )
+    return [ value for index, value in items ]
+
+
+
+def rigWithEdgeRing( inputEdges, inputBaseTransform ):
+    
+    edges = getSortedEdgesInSameRing( inputEdges )
+    baseTransform = pymel.core.ls( inputBaseTransform )[0].name()
+    
+    def createCenterPoint( trObjects ):
+        
+        averageNode = cmds.createNode( 'plusMinusAverage' )
+        cmds.setAttr( averageNode + '.op', 3 )
+        
+        centerNode = cmds.createNode( 'transform' )
+        cmds.setAttr( centerNode + '.dh', 1 )
+        for i in range( len( trObjects ) ):
+            cmds.connectAttr( trObjects[i] + '.t', averageNode + '.input3D[%d]' % i )
+        cmds.connectAttr( averageNode + '.output3D', centerNode + '.t' )
+        return centerNode
+    
+    loopCurves = []
+        
+    for edge in edges:
+        loopCurve = createLoopCurve( edge )
+        loopCurves.append(loopCurve )
+        setWorldGeometryToLocalGeometry( loopCurve, baseTransform )
+    
+    pointsList = []
+    print "loopCurves :", len( loopCurves )
+    for loopCurve in loopCurves:
+        points = createPointsFromCurve( loopCurve, 4 )
+        pointsList.append( points )
+    centers = []
+    for points in pointsList:
+        center = createCenterPoint( points )
+        centers.append( center )
+    
+    curve = makeCurveFromSelection( *centers, d=2 )
+    origAttrName, currentAttrName = addCurveDistanceInfo(curve)
+    scaleNode = cmds.createNode( 'multiplyDivide' )
+    cmds.setAttr( scaleNode + '.op', 2 )
+    
+    print curve + '.' + currentAttrName
+    #print cmds.ls( curve + '.' + currentAttrName )
+    
+    cmds.connectAttr( curve + '.' + currentAttrName, scaleNode + '.input1X' )
+    cmds.connectAttr( curve + '.' + origAttrName, scaleNode + '.input2X' )
+    
+    jntCenters = [ cmds.createNode( 'joint' ) for i in range( len(centers) ) ]
+    
+    for i in range( len(edges) ):
+        constrain_point( centers[i], jntCenters[i] )
+        tangentNode = cmds.tangentConstraint( curve, jntCenters[i], aim=[0,1,0], u=[1,0,0], wut='vector' )[0]
+        upNode1 = pointsList[i][0]
+        upNode2 = pointsList[i][2]
+        dcmp1 = getDecomposeMatrix( upNode1 + '.wm' )
+        dcmp2 = getDecomposeMatrix( upNode2 + '.wm' )
+        upVectorNode = cmds.createNode( 'plusMinusAverage' )
+        cmds.setAttr( upVectorNode + '.operation', 2 )
+        cmds.connectAttr( dcmp1 + '.ot', upVectorNode+'.input3D[0]' )
+        cmds.connectAttr( dcmp2 + '.ot', upVectorNode+'.input3D[1]' )
+        cmds.connectAttr( upVectorNode + '.output3D', tangentNode + '.worldUpVector' )
+        cmds.connectAttr( scaleNode + '.outputX', jntCenters[i] + '.sy' )
+        
+        distNode1, origAttrName1 = getDistanceNodeFromTwoObjs( pointsList[i][0], pointsList[i][2] )
+        distNode2, origAttrName2 = getDistanceNodeFromTwoObjs( pointsList[i][1], pointsList[i][3] )
+    
+        scaleXNode = cmds.createNode( 'multiplyDivide' )
+        scaleZNode = cmds.createNode( 'multiplyDivide' )
+        cmds.setAttr( scaleXNode + '.op', 2 )
+        cmds.setAttr( scaleZNode + '.op', 2 )
+        cmds.connectAttr( distNode1 + '.distance', scaleXNode + '.input1X' )
+        cmds.connectAttr( distNode1 + '.' + origAttrName1, scaleXNode + '.input2X' )
+        cmds.connectAttr( distNode2 + '.distance', scaleZNode + '.input1X' )
+        cmds.connectAttr( distNode2 + '.' + origAttrName2, scaleZNode + '.input2X' )
+        
+        cmds.connectAttr( scaleXNode + '.outputX', jntCenters[i] + '.sx' )
+        cmds.connectAttr( scaleZNode + '.outputX', jntCenters[i] + '.sz' )
+    
+    allPoints = []
+    for points in pointsList:
+        allPoints += points
+    
+    cmds.parent( loopCurves , centers, jntCenters, curve, allPoints, baseTransform )
+
+
+
+
+def getWeightInfoFromVertex( skinedVtx ):
+    
+    meshName = skinedVtx.split( '.' )[0]
+    vtxId = int( skinedVtx.split( 'vtx[' )[-1].replace( ']', '' ) )
+    
+    skinNode = getNodeFromHistory( meshName, 'skinCluster' )[0]
+    fnSkinNode = OpenMaya.MFnDependencyNode( getMObject( skinNode ) )
+    
+    plugWeights = fnSkinNode.findPlug( 'weightList' )[vtxId].child(0)
+    
+    
+    weightInfos = []
+    for i in range( plugWeights.numElements() ):
+        cons = cmds.listConnections( skinNode + '.matrix[%d]' % plugWeights[i].logicalIndex(), s=1, d=0, type='joint')
+        weight = plugWeights[i].asFloat()
+        if not cons: continue
+        weightInfos.append( [cons[0], weight] )
+    return weightInfos
+
+
+
+def removeSkinWeight( skinedVtx, maxWeight ):
+    
+    meshName = skinedVtx.split( '.' )[0]
+    vtxId = int( skinedVtx.split( 'vtx[' )[-1].replace( ']', '' ) )
+    
+    skinNode = getNodeFromHistory( meshName, 'skinCluster' )[0]
+    fnSkinNode = OpenMaya.MFnDependencyNode( getMObject( skinNode ) )
+    
+    plugWeights = fnSkinNode.findPlug( 'weightList' )[vtxId].child(0)
+    
+    for i in range( plugWeights.numElements() ):
+        weight = plugWeights[i].asFloat()
+        if weight < maxWeight:
+            cmds.setAttr( plugWeights[i].name(), 0 )
+
+
+
+
+
+
