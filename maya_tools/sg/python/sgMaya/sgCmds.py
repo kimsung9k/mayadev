@@ -4,6 +4,7 @@ import pymel.core
 import math, copy
 import os
 import math
+from sgModules.sgcommands import replaceConnection
 
 
 def getIntPtr( intValue = 0 ):
@@ -51,30 +52,18 @@ def getFloat2Ptr():
 
 
 def getMObject( inputTarget ):
-    
-    if type( inputTarget ) in [str, unicode]:
-        target = inputTarget
-    else:
-        target = inputTarget.name()
-    
     mObject = OpenMaya.MObject()
     selList = OpenMaya.MSelectionList()
-    selList.add( target )
+    selList.add( pymel.core.ls( inputTarget )[0].name() )
     selList.getDependNode( 0, mObject )
     return mObject
 
 
 
 def getDagPath( inputTarget ):
-    
-    if type( inputTarget ) in [str, unicode]:
-        target = inputTarget
-    else:
-        target = inputTarget.name()
-    
     dagPath = OpenMaya.MDagPath()
     selList = OpenMaya.MSelectionList()
-    selList.add( target )
+    selList.add( pymel.core.ls( inputTarget )[0].name() )
     try:
         selList.getDagPath( 0, dagPath )
         return dagPath
@@ -937,6 +926,7 @@ def makeController( pointList, defaultScaleMult = 1, **options ):
     return jnt
 
 
+
 def getNodeFromHistory( target, nodeType ):
     
     pmTarget = pymel.core.ls( target )[0]
@@ -946,6 +936,7 @@ def getNodeFromHistory( target, nodeType ):
         if hist.type() == nodeType:
             targetNodes.append( hist )
     return targetNodes
+
 
 
 
@@ -996,6 +987,7 @@ def setGeometryMatrixToTarget( inputGeo, inputMatrixTarget ):
         cmds.DeleteHistory()
     
     pymel.core.xform( geo, ws=1, matrix= matrixTarget.wm.get() )
+
 
 
 
@@ -1150,61 +1142,61 @@ def copyWeightToSmoothedMesh( inputSrcMesh, inputSmoothedMesh ):
             weightsPlugTrg.elementByLogicalIndex( trgMatrixIndex ).setFloat( value )
     
     itMeshTrg = OpenMaya.MItMeshVertex( dagPathTrg )
+    fnMesh    = OpenMaya.MFnMesh( dagPathTrg )
+    meshName = fnMesh.name()
+    skinCluster = getNodeFromHistory( meshName, 'skinCluster' )[0]
+    fnSkinNode = OpenMaya.MFnDependencyNode( getMObject( skinCluster ) )
+    weightListPlug = fnSkinNode.findPlug( 'weightList' )
     
     util = OpenMaya.MScriptUtil()
     util.createFromInt( 0 )
     prevIndex = util.asIntPtr()
     
-    vtxnames = []
-    othreVtxNames = []
+    twoVtxlist = []
+    fourVtxList = []
     for i in range( numVerticesSrc, numVerticesTarget ):
         itMeshTrg.setIndex( i, prevIndex )
-        vtxIndices = OpenMaya.MIntArray()
-        itMeshTrg.getConnectedVertices( vtxIndices )
-        targetIndices = []
-        for j in range( vtxIndices.length() ):
-            if vtxIndices[j] < numVerticesSrc:
-                targetIndices.append( vtxIndices[j] )
-        if not targetIndices:
-            vtxnames.append( smoothedMesh + '.vtx[%d]' % i )
-            continue
-        else:
-            othreVtxNames.append( smoothedMesh + '.vtx[%d]' % i )
+        faceIndicesConnected = OpenMaya.MIntArray()
+        itMeshTrg.getConnectedFaces( faceIndicesConnected )
+        srcVtxIndices = []
+        for j in range( faceIndicesConnected.length() ):
+            vtxIndices = OpenMaya.MIntArray()
+            fnMesh.getPolygonVertices( faceIndicesConnected[j], vtxIndices )
+            for k in range( vtxIndices.length() ):
+                if vtxIndices[k] >= numVerticesSrc: continue
+                if vtxIndices[k] in srcVtxIndices: continue
+                srcVtxIndices.append( vtxIndices[k] )    
         
-        averageMatrixIndices = []
-        averageValues = []
-        for targetIndex in targetIndices:
-            weightsPlug = weightListPlugTrg[targetIndex].child(0)
-            for j in range( weightsPlug.numElements() ):
-                matrixIndex = weightsPlug[j].logicalIndex()
-                value = weightsPlug[j].asFloat()
-                if matrixIndex in averageMatrixIndices:
-                    index = averageMatrixIndices.index( matrixIndex )
-                    averageValues[ index ] += value
-                else:
-                    averageMatrixIndices.append( matrixIndex )
-                    averageValues.append( value )
-        
-        numInfluence = len( averageMatrixIndices )
-        for j in range( numInfluence ):
-            averageValues[j] /= len(targetIndices)
-        
-        weightsPlug = weightListPlugTrg[i].child(0)     
+        weightsPlug = weightListPlug[i].child(0)
         for j in range( weightsPlug.numElements() ):
             cmds.removeMultiInstance( weightsPlug[0].name() )
         
-        for j in range( len(averageMatrixIndices) ):
-            averageMatrixIndex = averageMatrixIndices[j]
-            averageValue = averageValues[j]
-            weightsPlug.elementByLogicalIndex( averageMatrixIndex ).setFloat( averageValue )
+        logicalMap = {}
+        numSample = len( srcVtxIndices )
         
-    cmds.select( vtxnames )
-    mel.eval( 'weightHammerVerts;' )
-    
-    for i in range( numVerticesSrc ):
-        vtxnames.append( smoothedMesh + '.vtx[%d]' % i )
+        if numSample == 2:
+            twoVtxlist.append( meshName + '.vtx[%d]' % i )
+        if numSample == 4:
+            fourVtxList.append( meshName + '.vtx[%d]' % i )
+        
+        for srcVtxIndex in srcVtxIndices:
+            srcWeightsPlug = weightListPlug[srcVtxIndex].child(0)
+            for j in range( srcWeightsPlug.numElements() ):
+                logicalIndex = srcWeightsPlug[j].logicalIndex()
+                value = srcWeightsPlug[j].asFloat() 
+                if not logicalMap.has_key( logicalIndex ):
+                    logicalMap.update( {logicalIndex:0})
+                logicalMap[logicalIndex] += value/numSample
 
-    return smoothedMesh, othreVtxNames
+        for key, value in logicalMap.items():
+            weightPlug = weightsPlug.elementByLogicalIndex( key )
+            cmds.setAttr( weightPlug.name(), value )
+    
+    oneVtxList = []
+    for i in range( numVerticesSrc ):
+        oneVtxList.append( meshName + '.vtx[%d]' % i )
+    
+    return oneVtxList, twoVtxlist, fourVtxList
     
         
 
@@ -1490,7 +1482,7 @@ def getMDagPathAndComponent():
                     for i in range( mIntArrEach.length() ):
                         mIntArrU.append( mIntArrEach[i] )
         
-        returnTargets.append( [mDagPath, mIntArrU, mIntArrV, mIntArrW] )
+        returnTargets.append( [mDagPath, list( set( mIntArrU ) ), list( set( mIntArrV ) ), list( set( mIntArrW ) )] )
     
     return returnTargets
 
@@ -1875,24 +1867,21 @@ def rigWithEdgeRing( inputEdges, inputBaseTransform ):
 
 
 
-def getWeightInfoFromVertex( skinedVtx ):
+def getWeightPlugFromSkinedVertex( skinedVtx ):
     
-    meshName = skinedVtx.split( '.' )[0]
-    vtxId = int( skinedVtx.split( 'vtx[' )[-1].replace( ']', '' ) )
+    mesh = skinedVtx.split( '.' )[0]
+    vtxId = skinedVtx.split( '[' )
     
-    skinNode = getNodeFromHistory( meshName, 'skinCluster' )[0]
+    skinNode = getNodeFromHistory( mesh, 'skinCluster' )[0]
     fnSkinNode = OpenMaya.MFnDependencyNode( getMObject( skinNode ) )
     
     plugWeights = fnSkinNode.findPlug( 'weightList' )[vtxId].child(0)
     
-    
     weightInfos = []
     for i in range( plugWeights.numElements() ):
-        cons = cmds.listConnections( skinNode + '.matrix[%d]' % plugWeights[i].logicalIndex(), s=1, d=0, type='joint')
-        weight = plugWeights[i].asFloat()
-        if not cons: continue
-        weightInfos.append( [cons[0], weight] )
+        weightInfos.append( pymel.core.ls( plugWeights[i].name() )[0] )
     return weightInfos
+
 
 
 
@@ -1905,7 +1894,6 @@ def removeSkinWeight( skinedVtx, maxWeight ):
     fnSkinNode = OpenMaya.MFnDependencyNode( getMObject( skinNode ) )
     
     plugWeights = fnSkinNode.findPlug( 'weightList' )[vtxId].child(0)
-    
     for i in range( plugWeights.numElements() ):
         weight = plugWeights[i].asFloat()
         if weight < maxWeight:
@@ -1914,5 +1902,84 @@ def removeSkinWeight( skinedVtx, maxWeight ):
 
 
 
+def replaceDestinationConnection( *args ):
+    
+    first = pymel.core.ls( args[0] )[0] 
+    second = pymel.core.ls( args[1] )[0] 
+    target = pymel.core.ls( args[2] )[0]
+    
+    cons = target.listConnections( s=1, d=0, p=1, c=1 )
+    for dest, src in cons:
+        splits = src.split( '.' )
+        node = splits[0]
+        attr = '.'.join( splits[1:] )
+        
+        if src.node() != first: continue
+        if not pymel.core.attributeQuery( attr, node=second, ex=1 ): continue
+        try:
+            cmds.connectAttr( second + '.' + attr, dest.name(), f=1 )
+        except:
+            pass
 
+
+
+
+def getOrderedEdgeLoopIndices( targetEdge ):
+    
+    pymel.core.select( targetEdge )
+    cmds.SelectEdgeLoop()
+    
+    edges = pymel.core.ls( sl=1, fl=1 )
+    edgeIndices = [ edge.index() for edge in edges ]
+    
+    meshName = targetEdge.split( '.' )[0]
+    itEdge = OpenMaya.MItMeshEdge( getDagPath( meshName ) )
+    
+    def getConnectedEdge( itEdge, edgeIndex, edgeIndices ):
+        util = OpenMaya.MScriptUtil()
+        util.createFromInt( 0 )
+        prevIndex = util.asIntPtr()
+        itEdge.setIndex( edgeIndex, prevIndex )
+        conEdges = OpenMaya.MIntArray()
+        itEdge.getConnectedEdges( conEdges )
+        return [ conEdges[i] for i in range( conEdges.length() ) if conEdges[i] in edgeIndices ]
+    
+    currentIndex = copy.copy( edgeIndices[0] )
+    
+    orderedList = []
+    orderedList.append( currentIndex )
+    
+    firstConnectedEdges = getConnectedEdge( itEdge, currentIndex, edgeIndices )
+    currentIndex = copy.copy( firstConnectedEdges[0] )
+    orderedList.append( currentIndex )
+    
+    while( True ):
+        connectedEdges = getConnectedEdge( itEdge, currentIndex, edgeIndices )
+        targetEdges = [ connectedEdge for connectedEdge in connectedEdges if not connectedEdge in orderedList ]
+        if not targetEdges: break
+        orderedList += targetEdges
+        currentIndex = copy.copy( targetEdges[0] )
+    
+    if len( firstConnectedEdges ) >=2:
+        currentIndex = copy.copy( firstConnectedEdges[1] )
+        orderedList.insert( 0, currentIndex )
+        while( True ):
+            connectedEdges = getConnectedEdge( itEdge, currentIndex, edgeIndices )
+            targetEdges = [ connectedEdge for connectedEdge in connectedEdges if not connectedEdge in orderedList ]
+            if not targetEdges: break
+            orderedList  = targetEdges + orderedList
+            currentIndex = copy.copy( targetEdges[0] )
+            
+    return orderedList
+
+
+
+def connectReverseScaleFromParent( inputTarget ):
+    target = pymel.core.ls( inputTarget )[0]
+    pTarget = target.getParent()
+    multNode = pymel.core.createNode( 'multiplyDivide' )
+    multNode.op.set( 2 )
+    multNode.input1.set( 1,1,1 )
+    pTarget.scale >> multNode.input2
+    multNode.output >> target.scale
 

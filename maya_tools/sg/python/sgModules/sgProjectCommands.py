@@ -597,6 +597,7 @@ def makeSmoothSkinedCloneMesh( src, cloneAttrName='_smooth' ):
     return target, othreVtxNames
 
 
+
 def getWeightInfoFromVertex( skinedVtx ):
     
     meshName = skinedVtx.split( '.' )[0]
