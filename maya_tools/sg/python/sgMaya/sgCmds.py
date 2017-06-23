@@ -430,9 +430,9 @@ def createPointOnCurve( inputCurve, numPoints, **options ):
 
 
 
-def getOrderedEdgeRings( targetEdge ):
+def getOrderedEdgeRings( inputTargetEdge ):
     
-    targetEdge = pymel.core.ls( targetEdge )[0].name()
+    targetEdge = pymel.core.ls( inputTargetEdge )[0].name()
     
     cmds.select( targetEdge )
     cmds.SelectEdgeRingSp()
@@ -448,18 +448,19 @@ def getOrderedEdgeRings( targetEdge ):
     util.createFromInt( 0 )
     prevIndex = util.asIntPtr()
     
+    startEdgeIndex = None
     for edge in ringEdges:
         edgeIndex = int( edge.split( '[' )[-1].replace( ']', '' ) )
         itEdgeMesh.setIndex( edgeIndex, prevIndex )
-        faces = OpenMaya.MIntArray()
+        connectedFaces = OpenMaya.MIntArray()
         connectedEdges = OpenMaya.MIntArray()
-        itEdgeMesh.getConnectedFaces( faces )
+        itEdgeMesh.getConnectedFaces( connectedFaces )
         itEdgeMesh.getConnectedEdges( connectedEdges )
         
-        resultEdges = []
-        for i in range( faces.length() ):
+        resultEdgeIndices = []
+        for i in range( connectedFaces.length() ):
             edgesFromFace = OpenMaya.MIntArray()
-            itPolygon.setIndex( faces[i], prevIndex )
+            itPolygon.setIndex( connectedFaces[i], prevIndex )
             itPolygon.getEdges( edgesFromFace )
             for j in range( edgesFromFace.length() ):
                 if edgesFromFace[j] == edgeIndex: continue
@@ -469,29 +470,51 @@ def getOrderedEdgeRings( targetEdge ):
                         exists=True
                         break
                 if exists: continue
-                resultEdges.append( meshName + '.e[%d]' % edgesFromFace[j] )
-        oppasitEdges.append( resultEdges )
-
-    for i in range( len( ringEdges ) ):
-        if len( oppasitEdges[i] ) == 1:
+                resultEdgeIndices.append( edgesFromFace[j] )
+        if len( resultEdgeIndices ) == 1:
+            startEdgeIndex = edgeIndex
             break
-        nextIndex = ringEdges.index( oppasitEdges[i][0] )
-        orderedEdges = [ ringEdges[i], ringEdges[ nextIndex ] ]
-        
-        startNum = 0
-        while len( oppasitEdges[ nextIndex ]  )== 2:
-            edges = oppasitEdges[ nextIndex ]
-            exists = False
-            for edge in edges:
-                if not edge in orderedEdges:
-                    orderedEdges.append( edge )
-                    exists = True
-                    break
-            if not exists: break
-            nextIndex = ringEdges.index( edge )
-            startNum += 1
 
-    return orderedEdges
+    maxLoopNum = 1000
+    loopIndex = 0
+    
+    orderedEdgeIndices = [ startEdgeIndex ]
+    currentIndex = startEdgeIndex
+    while True:
+        itEdgeMesh.setIndex( currentIndex, prevIndex )
+        connectedFaces = OpenMaya.MIntArray()
+        connectedEdges = OpenMaya.MIntArray()
+        itEdgeMesh.getConnectedFaces( connectedFaces )
+        itEdgeMesh.getConnectedEdges( connectedEdges )
+        
+        resultEdgeIndices = []
+        for i in range( connectedFaces.length() ):
+            edgesFromFace = OpenMaya.MIntArray()
+            itPolygon.setIndex( connectedFaces[i], prevIndex )
+            itPolygon.getEdges( edgesFromFace )
+            for j in range( edgesFromFace.length() ):
+                if edgesFromFace[j] == edgeIndex: continue
+                exists = False
+                for k in range( connectedEdges.length() ):
+                    if edgesFromFace[j] == connectedEdges[k]: 
+                        exists=True
+                        break
+                if exists: continue
+                resultEdgeIndices.append( edgesFromFace[j] )
+                
+        nextEdgeIndex = None
+        for resultEdgeIndex in resultEdgeIndices:
+            if resultEdgeIndex in orderedEdgeIndices: continue
+            nextEdgeIndex = resultEdgeIndex
+            break
+        if not nextEdgeIndex: break
+        currentIndex = nextEdgeIndex
+        orderedEdgeIndices.append( nextEdgeIndex )
+        
+        loopIndex+=1
+        if loopIndex > maxLoopNum: break
+
+    return [ meshName + '.e[%d]' % i for i in orderedEdgeIndices ]
 
 
 
@@ -1143,17 +1166,15 @@ def copyWeightToSmoothedMesh( inputSrcMesh, inputSmoothedMesh ):
     
     itMeshTrg = OpenMaya.MItMeshVertex( dagPathTrg )
     fnMesh    = OpenMaya.MFnMesh( dagPathTrg )
-    meshName = fnMesh.name()
-    skinCluster = getNodeFromHistory( meshName, 'skinCluster' )[0]
-    fnSkinNode = OpenMaya.MFnDependencyNode( getMObject( skinCluster ) )
-    weightListPlug = fnSkinNode.findPlug( 'weightList' )
+    weightListPlug = fnSkinClusterTarget.findPlug( 'weightList' )
     
     util = OpenMaya.MScriptUtil()
     util.createFromInt( 0 )
     prevIndex = util.asIntPtr()
     
-    twoVtxlist = []
-    fourVtxList = []
+    twoVtxIndices = []
+    fourVtxIndices = []
+    
     for i in range( numVerticesSrc, numVerticesTarget ):
         itMeshTrg.setIndex( i, prevIndex )
         faceIndicesConnected = OpenMaya.MIntArray()
@@ -1175,9 +1196,9 @@ def copyWeightToSmoothedMesh( inputSrcMesh, inputSmoothedMesh ):
         numSample = len( srcVtxIndices )
         
         if numSample == 2:
-            twoVtxlist.append( meshName + '.vtx[%d]' % i )
+            twoVtxIndices.append( i )
         if numSample == 4:
-            fourVtxList.append( meshName + '.vtx[%d]' % i )
+            fourVtxIndices.append( i )
         
         for srcVtxIndex in srcVtxIndices:
             srcWeightsPlug = weightListPlug[srcVtxIndex].child(0)
@@ -1190,13 +1211,51 @@ def copyWeightToSmoothedMesh( inputSrcMesh, inputSmoothedMesh ):
 
         for key, value in logicalMap.items():
             weightPlug = weightsPlug.elementByLogicalIndex( key )
-            cmds.setAttr( weightPlug.name(), value )
+            weightPlug.setFloat( value )
     
-    oneVtxList = []
+    weightsMapList = []
     for i in range( numVerticesSrc ):
-        oneVtxList.append( meshName + '.vtx[%d]' % i )
+        itMeshTrg.setIndex( i, prevIndex )
+        vtxIndicesConnected = OpenMaya.MIntArray()
+        itMeshTrg.getConnectedVertices(vtxIndicesConnected)
+        weightsPlug = weightListPlug[i].child(0)
+        weightsMap = {}
+        for j in range( weightsPlug.numElements() ):
+            weightsMap.update( {weightsPlug[j].logicalIndex():weightsPlug[j].asFloat()*0.125} )
+        
+        multValue = 0.875/vtxIndicesConnected.length()
+        for j in range( vtxIndicesConnected.length() ):
+            connectedWeightsPlug = weightListPlug[vtxIndicesConnected[j]].child(0)
+            for k in range( connectedWeightsPlug.numElements() ):
+                logicalIndex = connectedWeightsPlug[k].logicalIndex()
+                value = connectedWeightsPlug[k].asFloat()
+                if not weightsMap.has_key( logicalIndex ):
+                    weightsMap.update( {logicalIndex:0})
+                weightsMap[logicalIndex] += (value *multValue)
+        for key, value in weightsMap.items():
+            weightsPlug.elementByLogicalIndex( key ).setFloat( value )
     
-    return oneVtxList, twoVtxlist, fourVtxList
+    for i in twoVtxIndices:
+        itMeshTrg.setIndex( i, prevIndex )
+        vtxIndicesConnected = OpenMaya.MIntArray()
+        itMeshTrg.getConnectedVertices(vtxIndicesConnected)
+        weightsPlug = weightListPlug[i].child(0)
+        weightsMap = {}
+        for j in range( weightsPlug.numElements() ):
+            weightsMap.update( {weightsPlug[j].logicalIndex():weightsPlug[j].asFloat()*0.5} )
+        
+        multValue = 0.5/vtxIndicesConnected.length()
+        for j in range( vtxIndicesConnected.length() ):
+            connectedWeightsPlug = weightListPlug[vtxIndicesConnected[j]].child(0)
+            for k in range( connectedWeightsPlug.numElements() ):
+                logicalIndex = connectedWeightsPlug[k].logicalIndex()
+                value = connectedWeightsPlug[k].asFloat()
+                if not weightsMap.has_key( logicalIndex ):
+                    weightsMap.update( {logicalIndex:0})
+                weightsMap[logicalIndex] += (value *multValue)
+        for key, value in weightsMap.items():
+            weightsPlug.elementByLogicalIndex( key ).setFloat( value )
+    
     
         
 
@@ -1412,6 +1471,7 @@ def duplicateBlendShapeByCtl(ctls, inputSrcMesh ):
         ctl = pymel.core.ls( inputCtl )[0]
         attrs = ctl.listAttr( k=1 )
         for attr in attrs:
+            #print "attr : ", attr
             if attr.isLocked(): continue
             blendCons = getBlendShapeDestConnections( attr )
             srcAttrNames = []
@@ -1682,9 +1742,19 @@ def createPointsFromCurve( curve1, numPoints ):
         trNode = cmds.createNode( 'transform' )
         cmds.setAttr( trNode + '.dh', 1 )
         curveInfo = cmds.createNode( 'pointOnCurveInfo' )
+        animCurve = cmds.createNode( 'animCurveUU' )
+        cmds.setKeyframe( animCurve, f=0, v=0 )
+        cmds.setKeyframe( animCurve, f=1, v=1 )
+        cmds.selectKey( animCurve, add=1, k=1, f=(0.0, 1.0) )
+        cmds.keyTangent( animCurve, itt='linear', ott='linear' )
+        cmds.setAttr( animCurve + '.preInfinity', 3 )
+        cmds.setAttr( animCurve + '.postInfinity', 3 )
         cmds.connectAttr( curveShape + '.local', curveInfo + '.inputCurve' )
         cmds.setAttr( curveInfo + '.top', 1 )
-        cmds.setAttr( curveInfo + '.parameter', i / float( numPoints ) )
+        cmds.addAttr( trNode, ln='parameter', dv=i / float( numPoints ) )
+        cmds.setAttr( trNode + '.parameter', e=1, k=1 )
+        cmds.connectAttr( trNode + '.parameter', animCurve + '.input' )
+        cmds.connectAttr( animCurve + '.output', curveInfo + '.parameter' )
         cmds.connectAttr( curveInfo + '.position', trNode + '.t' )
         fourPoints.append( trNode )
     return fourPoints
@@ -1782,7 +1852,7 @@ def getSortedEdgesInSameRing( inputEdges ):
 
 
 
-def rigWithEdgeRing( inputEdges, inputBaseTransform ):
+def rigWithEdgeRing( inputEdges, inputBaseTransform, degree=2 ):
     
     edges = getSortedEdgesInSameRing( inputEdges )
     baseTransform = pymel.core.ls( inputBaseTransform )[0].name()
@@ -1807,7 +1877,7 @@ def rigWithEdgeRing( inputEdges, inputBaseTransform ):
         setWorldGeometryToLocalGeometry( loopCurve, baseTransform )
     
     pointsList = []
-    print "loopCurves :", len( loopCurves )
+    #print "loopCurves :", len( loopCurves )
     for loopCurve in loopCurves:
         points = createPointsFromCurve( loopCurve, 4 )
         pointsList.append( points )
@@ -1816,18 +1886,19 @@ def rigWithEdgeRing( inputEdges, inputBaseTransform ):
         center = createCenterPoint( points )
         centers.append( center )
     
-    curve = makeCurveFromSelection( *centers, d=2 )
+    curve = makeCurveFromSelection( *centers, d=degree )
     origAttrName, currentAttrName = addCurveDistanceInfo(curve)
     scaleNode = cmds.createNode( 'multiplyDivide' )
     cmds.setAttr( scaleNode + '.op', 2 )
-    
-    print curve + '.' + currentAttrName
+    #print curve + '.' + currentAttrName
     #print cmds.ls( curve + '.' + currentAttrName )
-    
     cmds.connectAttr( curve + '.' + currentAttrName, scaleNode + '.input1X' )
     cmds.connectAttr( curve + '.' + origAttrName, scaleNode + '.input2X' )
     
-    jntCenters = [ cmds.createNode( 'joint' ) for i in range( len(centers) ) ]
+    jntCenters = []
+    for i in range( len( centers ) ):
+        pymel.core.select( baseTransform )
+        jntCenters.append( cmds.joint() )
     
     for i in range( len(edges) ):
         constrain_point( centers[i], jntCenters[i] )
@@ -1862,7 +1933,26 @@ def rigWithEdgeRing( inputEdges, inputBaseTransform ):
     for points in pointsList:
         allPoints += points
     
-    cmds.parent( loopCurves , centers, jntCenters, curve, allPoints, baseTransform )
+    cmds.parent( loopCurves, centers, jntCenters, curve, allPoints, baseTransform )
+    
+    def setTransformDefault( target ):
+        attrs = ['tx','ty','tz','rx','ry','rz','sx','sy','sz']
+        values = [0,0,0,0,0,0,1,1,1]
+        for i in range( len( attrs ) ):
+            try:cmds.setAttr( target + '.' + attrs[i], values[i] )
+            except:pass
+    
+    setTransformDefault( curve )
+    for target in loopCurves:
+        setTransformDefault( target )
+    for target in centers:
+        setTransformDefault( target )
+    for target in jntCenters:
+        setTransformDefault( target )
+    for target in allPoints:
+        setTransformDefault( target )
+
+    return jntCenters
 
 
 
@@ -1870,7 +1960,7 @@ def rigWithEdgeRing( inputEdges, inputBaseTransform ):
 def getWeightPlugFromSkinedVertex( skinedVtx ):
     
     mesh = skinedVtx.split( '.' )[0]
-    vtxId = skinedVtx.split( '[' )
+    vtxId = int( skinedVtx.split( '[' )[-1].replace( ']', '' ) )
     
     skinNode = getNodeFromHistory( mesh, 'skinCluster' )[0]
     fnSkinNode = OpenMaya.MFnDependencyNode( getMObject( skinNode ) )
@@ -1982,4 +2072,5 @@ def connectReverseScaleFromParent( inputTarget ):
     multNode.input1.set( 1,1,1 )
     pTarget.scale >> multNode.input2
     multNode.output >> target.scale
+
 
