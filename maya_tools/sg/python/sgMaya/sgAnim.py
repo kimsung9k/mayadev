@@ -64,7 +64,7 @@ def makeWaveJoint( inputTopJoint ):
         children = children[0].listRelatives( c=1, type='joint' )
     
     methodList = ['Sine', 'Rand', 'RandBig']
-    axisList   = ['Y', 'Z']
+    axisList   = ['X', 'Y', 'Z']
     
     firstJnt = joints[0]
     sgCmds.addOptionAttribute( firstJnt, 'All' )
@@ -100,6 +100,11 @@ def makeWaveJoint( inputTopJoint ):
             
     
     for axis in axisList:  
+        randValues = []
+        for j in range( 100 ):
+            randValue = random.uniform( -1, 1 )
+            randValues.append( randValue )
+        
         for i in range( 1, len(joints)-1 ):
             methodAdd = pymel.core.createNode( 'plusMinusAverage' )
             globalAllMult = pymel.core.createNode( 'multDoubleLinear' )
@@ -108,6 +113,7 @@ def makeWaveJoint( inputTopJoint ):
             
             joint = joints[i]
             methodIndex = 0
+            
             for method in methodList:
                 globalAllSpeedMult = pymel.core.createNode( 'multDoubleLinear' )
                 firstJnt.attr( 'allSpeed' ) >> globalAllSpeedMult.input1
@@ -119,8 +125,8 @@ def makeWaveJoint( inputTopJoint ):
                 animCurve.preInfinity.set( 3 )
                 animCurve.postInfinity.set( 3 )
                 if method in ['Rand','RandBig']:
-                    for j in range( 100 ):
-                        randValue = random.uniform( -1, 1 )
+                    for j in range( len( randValues ) ):
+                        randValue = randValues[j]
                         if j == 0 or j == 99:
                             pymel.core.setKeyframe( animCurve, f=j*10, v=0 )
                         else:

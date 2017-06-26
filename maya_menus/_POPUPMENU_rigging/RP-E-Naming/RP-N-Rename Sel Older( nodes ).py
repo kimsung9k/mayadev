@@ -1,12 +1,8 @@
-from sgModules import sgcommands
+import pymel.core
 
-sels = sgcommands.listNodes( sl=1 )
+sels = pymel.core.ls( sl=1 )
 
-if isinstance( sels[0], sgcommands.SGDagNode ):
-    firstName = sels[0].name()
-else:
-    firstName = sels[0].localName()
-
+firstName = sels[0].name()
 firstLocalName = firstName.split( '|' )[-1]
 
 digitIndices = []

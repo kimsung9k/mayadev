@@ -535,24 +535,27 @@ def getNumVertices( inputNode ):
 
 
 
-def copyShader( first, second ):
+def copyShader( inputFirst, inputSecond ):
     
-    if not cmds.objExists( first ): return None
-    if not cmds.objExists( second ): return None
+    first = pymel.core.ls( inputFirst )[0]
+    second = pymel.core.ls( inputSecond )[0]
     
-    firstShape = cmds.listRelatives( first, s=1, f=1 )[0]
-    secondShape = cmds.listRelatives( second, s=1, f=1 )[0]
-    engines = cmds.listConnections( firstShape, type='shadingEngine' )
+    if not pymel.core.objExists( first ): return None
+    if not pymel.core.objExists( second ): return None
+    
+    firstShape = first.getShape()
+    secondShape = second.getShape()
+    engines = firstShape.listConnections( type='shadingEngine' )
     if not engines: return None
     
     engines = list( set( engines ) )
     
     for engine in engines:
-        shaders = cmds.listConnections( engine+'.surfaceShader', s=1, d=0 )
+        shaders = engine.surfaceShader.listConnections( s=1, d=0 )
         if not shaders: continue
         shader = shaders[0]
-        cmds.hyperShade( objects = shader )
-        selObjs = cmds.ls( sl=1, l=1 )
+        pymel.core.hyperShade( objects = shader )
+        selObjs = pymel.core.ls( sl=1 )
         
         targetObjs = []
         for selObj in selObjs:
@@ -560,13 +563,14 @@ def copyShader( first, second ):
                 trNode, components = selObj.split( '.' )
                 if trNode == first:
                     targetObjs.append( second+'.'+components )
-            elif selObj == firstShape:
+            elif selObj.name() == firstShape.name():
                 targetObjs.append( secondShape )
         
         if not targetObjs: continue
         
         for targetObj in targetObjs:
-            cmds.sets( targetObj, e=1, forceElement=engine )
+            print "target obj : ", targetObj, engine
+            cmds.sets( targetObj.name(), e=1, forceElement=engine.name() )
     
 
 
@@ -1104,7 +1108,7 @@ def copyWeightToSpecifyObjects( inputSrcMesh, inputDstMesh, inputSrcJnt, inputDs
 
 
 
-def copyWeightToSmoothedMesh( inputSrcMesh, inputSmoothedMesh ):
+def copyWeightToSmoothedMesh( inputSrcMesh, inputSmoothedMesh, keepSrcVtx=False ):
 
     from maya import mel
 
@@ -1213,27 +1217,27 @@ def copyWeightToSmoothedMesh( inputSrcMesh, inputSmoothedMesh ):
             weightPlug = weightsPlug.elementByLogicalIndex( key )
             weightPlug.setFloat( value )
     
-    weightsMapList = []
-    for i in range( numVerticesSrc ):
-        itMeshTrg.setIndex( i, prevIndex )
-        vtxIndicesConnected = OpenMaya.MIntArray()
-        itMeshTrg.getConnectedVertices(vtxIndicesConnected)
-        weightsPlug = weightListPlug[i].child(0)
-        weightsMap = {}
-        for j in range( weightsPlug.numElements() ):
-            weightsMap.update( {weightsPlug[j].logicalIndex():weightsPlug[j].asFloat()*0.125} )
-        
-        multValue = 0.875/vtxIndicesConnected.length()
-        for j in range( vtxIndicesConnected.length() ):
-            connectedWeightsPlug = weightListPlug[vtxIndicesConnected[j]].child(0)
-            for k in range( connectedWeightsPlug.numElements() ):
-                logicalIndex = connectedWeightsPlug[k].logicalIndex()
-                value = connectedWeightsPlug[k].asFloat()
-                if not weightsMap.has_key( logicalIndex ):
-                    weightsMap.update( {logicalIndex:0})
-                weightsMap[logicalIndex] += (value *multValue)
-        for key, value in weightsMap.items():
-            weightsPlug.elementByLogicalIndex( key ).setFloat( value )
+    if not keepSrcVtx:
+        for i in range( numVerticesSrc ):
+            itMeshTrg.setIndex( i, prevIndex )
+            vtxIndicesConnected = OpenMaya.MIntArray()
+            itMeshTrg.getConnectedVertices(vtxIndicesConnected)
+            weightsPlug = weightListPlug[i].child(0)
+            weightsMap = {}
+            for j in range( weightsPlug.numElements() ):
+                weightsMap.update( {weightsPlug[j].logicalIndex():weightsPlug[j].asFloat()*0.125} )
+            
+            multValue = 0.875/vtxIndicesConnected.length()
+            for j in range( vtxIndicesConnected.length() ):
+                connectedWeightsPlug = weightListPlug[vtxIndicesConnected[j]].child(0)
+                for k in range( connectedWeightsPlug.numElements() ):
+                    logicalIndex = connectedWeightsPlug[k].logicalIndex()
+                    value = connectedWeightsPlug[k].asFloat()
+                    if not weightsMap.has_key( logicalIndex ):
+                        weightsMap.update( {logicalIndex:0})
+                    weightsMap[logicalIndex] += (value *multValue)
+            for key, value in weightsMap.items():
+                weightsPlug.elementByLogicalIndex( key ).setFloat( value )
     
     for i in twoVtxIndices:
         itMeshTrg.setIndex( i, prevIndex )
