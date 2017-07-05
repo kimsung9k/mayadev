@@ -39,6 +39,7 @@ def makeFile( filePath ):
     
 
 
+
 class Window_global:
     
     mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QtGui.QWidget )
@@ -106,6 +107,26 @@ class UI_attrlist( QtGui.QWidget ):
 
 
 
+class UI_options( QtGui.QWidget ):
+    
+    def __init__( self, *args, **kwargs ):
+        QtGui.QWidget.__init__( self, *args, **kwargs )
+        self.installEventFilter( self )
+        
+        self.layout = QtGui.QVBoxLayout( self )
+        self.layout.setContentsMargins( 0,0,0,0 )
+        
+        self.checkBox = QtGui.QCheckBox( "To Parent" )
+        self.layout.addWidget( self.checkBox )        
+        
+    def eventFilter( self, *args, **kwargs ):
+        event = args[1]
+        if event.type() == QtCore.QEvent.LayoutRequest or event.type() == QtCore.QEvent.Move :
+            pass
+        
+
+
+
 class UI_buttons( QtGui.QWidget ):
     
     def __init__(self, *args, **kwargs):
@@ -136,7 +157,7 @@ class Window( QtGui.QMainWindow ):
         QtGui.QMainWindow.__init__( self, *args, **kwargs )
         self.installEventFilter( self )
         self.setWindowFlags(QtCore.Qt.Drawer)
-    
+
         self.layoutWidget = QtGui.QWidget()
         self.setCentralWidget( self.layoutWidget )
         
@@ -145,9 +166,11 @@ class Window( QtGui.QMainWindow ):
         
         self.ui_labels     = UI_labels()
         self.ui_driverAttr = UI_attrlist()
+        self.ui_options    = UI_options()
         self.ui_buttons    = UI_buttons()
         self.layout.addWidget( self.ui_labels )
         self.layout.addWidget( self.ui_driverAttr )
+        self.layout.addWidget( self.ui_options )
         self.layout.addWidget( self.ui_buttons )
         
         
@@ -155,7 +178,7 @@ class Window( QtGui.QMainWindow ):
             
             numItems = self.layout.count()
             attrlist = UI_attrlist()
-            self.layout.insertWidget( numItems-1, attrlist )
+            self.layout.insertWidget( numItems-2, attrlist )
         
         
         def connectCommand():
@@ -164,7 +187,9 @@ class Window( QtGui.QMainWindow ):
             sels = cmds.ls( sl=1 )
             numItems = self.layout.count()
             
-            for i in range( 1, numItems-1 ):
+            optionWidget = self.layout.itemAt( numItems-2 ).widget()
+            
+            for i in range( 1, numItems-2 ):
                 targetWidget = self.layout.itemAt( i ).widget()
                 
                 srcAttr = targetWidget.lineEdit_srcAttr.text()
@@ -174,7 +199,12 @@ class Window( QtGui.QMainWindow ):
                 
                 try: 
                     for sel in sels[1:]:
-                        cmds.connectAttr( sels[0] + '.' + srcAttr, sel + '.' + dstAttr )
+                        target = sel
+                        if optionWidget.checkBox.isChecked():
+                            selParents = cmds.listRelatives( sel, p=1, f=1 )
+                            if selParents:
+                                target = selParents[0]
+                        cmds.connectAttr( sels[0] + '.' + srcAttr, target + '.' + dstAttr )
                 except: pass
             cmds.undoInfo( cck=1 )
             
@@ -199,6 +229,10 @@ def show( evt=0 ):
     
     Window_global.mainGui = Window(Window_global.mayaWin)
     Window_global.mainGui.setObjectName( Window_global.objectName )
+    
+    pos = Window_global.mainGui.mapFromGlobal( QtGui.QCursor.pos() )
+    
+    Window_global.mainGui.move( pos.x()-25, pos.y()-63 )
     Window_global.mainGui.resize( Window_global.width, Window_global.height )
     
     Window_global.mainGui.show()

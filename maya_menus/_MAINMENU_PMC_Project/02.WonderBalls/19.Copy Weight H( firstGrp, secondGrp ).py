@@ -1,4 +1,5 @@
 from sgMaya import sgCmds
+import pymel.core
 sels = pymel.core.ls( sl=1 )
 
 firstGrp = sels[0]
@@ -9,5 +10,5 @@ secondChildren = secondGrp.listRelatives( c=1, ad=1, type='transform' )
 
 for i in range( len( firstChildren ) ):
     if not firstChildren[i].getShape(): continue
-    try:sgCmds.copyWeightToSmoothedMesh( firstChildren[i], secondChildren[i] )
+    try:sgCmds.autoCopyWeight( firstChildren[i], secondChildren[i] )
     except:pass

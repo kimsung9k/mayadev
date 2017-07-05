@@ -176,7 +176,7 @@ class Functions:
                 cmds.connectAttr( curveShape + '.worldSpace', curveInfo+'.inputCurve' )
                 cmds.setAttr( curveInfo + '.top', 1 )
                 trNode = cmds.createNode( 'transform' )
-                cmds.addAttr( trNode, ln='param', min=0, max=100, dv=(eachParamValue * i + addParamValue)*100 )
+                cmds.addAttr( trNode, ln='param', dv=(eachParamValue * i + addParamValue)*10 )
                 cmds.setAttr( trNode + '.param', e=1, k=1 )
                 cmds.setAttr( trNode + '.dh', 1 )
                 compose = cmds.createNode( 'composeMatrix' )
@@ -187,10 +187,14 @@ class Functions:
                 cmds.connectAttr( trNode + '.pim', multMtx + '.i[1]' )
                 cmds.connectAttr( multMtx + '.o', dcmp + '.imat' )
                 cmds.connectAttr( dcmp + '.ot', trNode + '.t' )
-                multDouble = cmds.createNode( 'multDoubleLinear' )
-                cmds.setAttr( multDouble + '.input2', 0.01 )
-                cmds.connectAttr( trNode + '.param', multDouble + '.input1' )
-                cmds.connectAttr( multDouble + '.output', curveInfo + '.parameter' )
+                animCurve = cmds.createNode( 'animCurveUU' )
+                cmds.setKeyframe( animCurve, f= 0, v=0 )
+                cmds.setKeyframe( animCurve, f=10, v=1 )
+                cmds.setAttr( animCurve + '.preInfinity', 3 )
+                cmds.setAttr( animCurve + '.postInfinity', 3 )
+                cmds.keyTangent( animCurve, itt='linear', ott='linear' )
+                cmds.connectAttr( trNode + '.param', animCurve + '.input' )
+                cmds.connectAttr( animCurve + '.output', curveInfo + '.parameter' )
                 
                 if not Window_global.checkBox.isChecked(): continue
                 curveInfo = pymel.core.ls( curveInfo )[0]

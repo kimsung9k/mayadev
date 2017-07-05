@@ -459,3 +459,23 @@ class Controller:
             [0.000000, 1.000000, 0.000000],
             [0.986157, -0.003968, 0.000000],
             [0.479576, -0.003968, 0.000000]]
+
+
+
+
+class AttrInfo:
+    
+    def __init__(self):
+        
+        self.shortName = None
+        self.longName = None
+        self.type = 'double'
+        self.range = [None,None]
+        self.keyable = False
+        self.channelBox = False
+        self.lock = False
+        self.enums = {}
+        self.defaultValue = None
+
+
+

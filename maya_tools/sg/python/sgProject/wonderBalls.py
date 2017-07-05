@@ -49,90 +49,13 @@ def getListFromInt2Ptr( ptr ):
 
 
 
-
-def edgeStartAndEndWeightHammer( inputEdges ):
-    
-    inputEdgeIndices = [ pymel.core.ls( inputEdge )[0].index() for inputEdge in inputEdges ]
-    orderedIndices = sgCmds.getOrderedEdgeLoopIndices( inputEdges[0] )
-    
-    orderedInputIndices = []
-    for orderedIndex in orderedIndices:
-        if not orderedIndex in inputEdgeIndices: continue
-        orderedInputIndices.append( orderedIndex )
-    
-    mesh = pymel.core.ls( inputEdges[0] )[0].node()
-    srcMeshs = sgCmds.getNodeFromHistory( mesh, 'mesh' )
-    
-    origMesh = copy.copy( mesh )
-    for srcMesh in srcMeshs:
-        if mesh.name() == srcMesh.name(): continue
-        if mesh.numVertices() != srcMesh.numVertices(): continue
-        origMesh = srcMesh
-    
-    orderedVtxIndices = []
-    dagPath = sgCmds.getDagPath( origMesh )
-    fnMesh = OpenMaya.MFnMesh( dagPath )
-    
-    for orderedIndex in orderedInputIndices:
-        util = OpenMaya.MScriptUtil()
-        util.createFromList([0,0],2)
-        int2Ptr = util.asInt2Ptr()
-        
-        fnMesh.getEdgeVertices( orderedIndex, int2Ptr )
-        appendTargets = []
-        for vtxIndex in [util.getInt2ArrayItem( int2Ptr, 0, i ) for i in range(2) ]:
-            appendTargets.append( vtxIndex )
-        if len( orderedVtxIndices ) == 2:
-            if orderedVtxIndices[0] in appendTargets:
-                orderedVtxIndices.reverse()
-        for appendTarget in appendTargets:
-            if appendTarget in orderedVtxIndices: continue
-            orderedVtxIndices.append( appendTarget )
-    
-    distList = []
-    allDist = 0
-    for i in range( len( orderedVtxIndices ) -1 ):
-        firstPoint =  OpenMaya.MPoint( *pymel.core.xform( origMesh + '.vtx[%d]' % orderedVtxIndices[i], q=1, ws=1, t=1 )[:3] )
-        secondPoint = OpenMaya.MPoint( *pymel.core.xform( origMesh + '.vtx[%d]' % orderedVtxIndices[i+1], q=1, ws=1, t=1 )[:3] )
-        dist = firstPoint.distanceTo( secondPoint )
-        distList.append( dist )
-        allDist += dist
-    
-    startVtx = mesh + '.vtx[%d]' % orderedVtxIndices[0]
-    endVtx   = mesh + '.vtx[%d]' % orderedVtxIndices[-1]
-    
-    startPlugs = sgCmds.getWeightPlugFromSkinedVertex(startVtx)
-    endPlugs   = sgCmds.getWeightPlugFromSkinedVertex(endVtx)
-    
-    for i in range( 1, len( orderedVtxIndices )-1 ):
-        currentDist = reduce( lambda x, y : x+y, distList[:i] )
-        targetVtx = mesh + '.vtx[%d]' % orderedVtxIndices[i]
-        targetPlugs = sgCmds.getWeightPlugFromSkinedVertex(targetVtx)
-        weightValue = currentDist/allDist
-        revValue    = 1.0 - weightValue
-        
-        targetPlugArray = targetPlugs[0].array()
-        for targetPlug in targetPlugs:
-            pymel.core.removeMultiInstance( targetPlug )
-        
-        for startPlug in startPlugs:
-            startIndex = startPlug.index()
-            targetPlugArray[startIndex].set( revValue )
-        
-        for endPlug in endPlugs:
-            endIndex = endPlug.index()
-            targetPlugArray[endIndex].set( weightValue )
-
-
-
-def edgeLoopVerticalStartAndEndHammer( inputEdges ):
+def edgeLoopVerticalStartAndEndHammer( inputEdges, percent=1.0 ):
     
     meshName = inputEdges[0].split( '.' )[0]
     inputEdgeIndices = [ pymel.core.ls( inputEdge )[0].index() for inputEdge in inputEdges ]
     
     dagPath = sgCmds.getDagPath( meshName )
     fnMesh = OpenMaya.MFnMesh( dagPath )
-    itVertex = OpenMaya.MItMeshVertex( dagPath )
     
     existsVertices = [ False for i in range( fnMesh.numVertices() ) ]
     for i in inputEdgeIndices:
@@ -145,11 +68,14 @@ def edgeLoopVerticalStartAndEndHammer( inputEdges ):
         existsVertices[ index1 ] = True
         existsVertices[ index2 ] = True
     
-    for i in range( len(existsVertices) ):
+    for i in range( fnMesh.numVertices() ):
         if not existsVertices[i]: continue
+        
+        itVertex = OpenMaya.MItMeshVertex( dagPath )
         util = OpenMaya.MScriptUtil()
         util.createFromInt(0)
         prevIndex = util.asIntPtr()
+        
         itVertex.setIndex( i, prevIndex )
         edgeIndices = OpenMaya.MIntArray()
         itVertex.getConnectedEdges( edgeIndices )
@@ -158,7 +84,7 @@ def edgeLoopVerticalStartAndEndHammer( inputEdges ):
         for j in range( edgeIndices.length() ):
             if edgeIndices[j] in inputEdgeIndices: continue
             targetEdges.append( meshName + '.e[%d]' % edgeIndices[j] )
-        edgeStartAndEndWeightHammer( targetEdges )
+        sgCmds.edgeStartAndEndWeightHammer( targetEdges, percent )
         cmds.select( targetEdges )
     
 

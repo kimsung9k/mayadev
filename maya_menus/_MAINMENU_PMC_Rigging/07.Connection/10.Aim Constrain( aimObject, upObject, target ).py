@@ -5,9 +5,8 @@ sels = cmds.ls( sl=1 )
 from sgModules import sgcommands
 
 first = sels[0]
-second = sels[1]
-
-upObj = cmds.listRelatives( cmds.listRelatives( first, p=1, f=1 )[0], p=1, f=1 )[0]
+upObj = sels[1]
+second = sels[2]
 
 pos = OpenMaya.MPoint( *cmds.xform( first, q=1, ws=1, t=1 )[:3] )
 upObjMtx = sgcommands.listToMatrix( cmds.getAttr( upObj + '.wm' ) )
