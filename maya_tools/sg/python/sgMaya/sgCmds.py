@@ -266,8 +266,6 @@ def editShapeByMatrix( inputShapeNode, inputMatrix ):
 
 
 
-
-
 def separateParentConnection( node, attrName ):
     
     if not type( node ) in [ str, unicode ]:
@@ -293,7 +291,8 @@ def separateParentConnection( node, attrName ):
             cmds.disconnectAttr( cons[1], cons[0] )
 
 
-    
+
+
 def convertMultDoubleConnection( inputAttr ):
     
     attr = pymel.core.ls( inputAttr )[0]
@@ -597,10 +596,8 @@ def getNumVertices( inputNode ):
 
 
 def copyShader( inputFirst, inputSecond ):
-    
     first = pymel.core.ls( inputFirst )[0]
     second = pymel.core.ls( inputSecond )[0]
-    
     if not pymel.core.objExists( first ): return None
     if not pymel.core.objExists( second ): return None
     
@@ -611,6 +608,7 @@ def copyShader( inputFirst, inputSecond ):
     
     engines = list( set( engines ) )
     
+    copyObjAndEngines = []
     for engine in engines:
         shaders = engine.surfaceShader.listConnections( s=1, d=0 )
         if not shaders: continue
@@ -621,17 +619,16 @@ def copyShader( inputFirst, inputSecond ):
         targetObjs = []
         for selObj in selObjs:
             if selObj.find( '.' ) != -1:
-                trNode, components = selObj.split( '.' )
-                if trNode == first:
-                    targetObjs.append( second+'.'+components )
+                if selObj.node() == first.getShape():
+                    targetObjs.append( second+'.'+ selObj.split( '.' )[-1] )
             elif selObj.name() == firstShape.name():
-                targetObjs.append( secondShape )
-        
+                targetObjs.append( secondShape.name() )
+
         if not targetObjs: continue
-        
         for targetObj in targetObjs:
-            print "target obj : ", targetObj, engine
-            cmds.sets( targetObj.name(), e=1, forceElement=engine.name() )
+            cmds.sets( targetObj, e=1, forceElement=engine.name() )
+            copyObjAndEngines.append( [targetObj, engine.name()] )
+    return copyObjAndEngines
     
 
 
@@ -2015,6 +2012,16 @@ def getSortedEdgesInSameRing( inputEdges ):
 
 
 
+def setTransformDefault( inputTarget ):
+    target = pymel.core.ls( inputTarget )[0]
+    attrs = ['tx','ty','tz','rx','ry','rz','sx','sy','sz']
+    values = [0,0,0,0,0,0,1,1,1]
+    for i in range( len( attrs ) ):
+        try:cmds.setAttr( target + '.' + attrs[i], values[i] )
+        except:pass
+
+
+
 def rigWithEdgeRing( inputEdges, inputBaseTransform, degree=2 ):
     
     edges = getSortedEdgesInSameRing( inputEdges )
@@ -2097,13 +2104,6 @@ def rigWithEdgeRing( inputEdges, inputBaseTransform, degree=2 ):
         allPoints += points
     
     cmds.parent( loopCurves, centers, jntCenters, curve, allPoints, baseTransform )
-    
-    def setTransformDefault( target ):
-        attrs = ['tx','ty','tz','rx','ry','rz','sx','sy','sz']
-        values = [0,0,0,0,0,0,1,1,1]
-        for i in range( len( attrs ) ):
-            try:cmds.setAttr( target + '.' + attrs[i], values[i] )
-            except:pass
     
     setTransformDefault( curve )
     for target in loopCurves:
@@ -2307,11 +2307,10 @@ def makeCloneObject( inputTarget, **options  ):
             if op_shapeOn:
                 cuTargetShape = cuTarget.getShape()
                 if cuTargetShape:
-                    duObj = pymel.core.duplicate( cuTarget, n=targetClone+'_du' )[0]
-                    duShape = duObj.getShape()
-                    pymel.core.parent( duShape, targetClone, add=1, shape=1 )[0]
-                    duShape.rename( targetClone+'Shape' )
-                    pymel.core.delete( duObj )
+                    oCuShape = getMObject( cuTargetShape )
+                    oTargetClone = getMObject( targetClone )
+                    OpenMaya.MFnMesh().copy( oCuShape, oTargetClone )
+                    
             if op_connectionOn:
                 getSourceConnection( cuTarget, targetClone )
                 cuTargetShape    = cuTarget.getShape()
