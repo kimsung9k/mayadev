@@ -595,14 +595,37 @@ def getNumVertices( inputNode ):
 
 
 
+def getCurrentVisibleShapes( inputTarget ):
+    
+    target = pymel.core.ls( inputTarget )[0]
+    shapes = target.listRelatives( s=1 )
+    return [ shape for shape in shapes if not shape.io.get() ]
+
+
+
+
+def getShadingEngines( inputTarget ):
+    
+    target = pymel.core.ls( inputTarget )[0]
+    if target.nodeType() == 'transform':
+        shape = getCurrentVisibleShapes( inputTarget )[0]
+    else:
+        shape = target
+    return shape.listConnections( s=0, d=1, type='shadingEngine' )
+
+
+
+
 def copyShader( inputFirst, inputSecond ):
     first = pymel.core.ls( inputFirst )[0]
     second = pymel.core.ls( inputSecond )[0]
     if not pymel.core.objExists( first ): return None
     if not pymel.core.objExists( second ): return None
     
-    firstShape = first.getShape()
-    secondShape = second.getShape()
+    try:firstShape = first.getShape()
+    except:firstShape = first
+    try:secondShape = second.getShape()
+    except:secondShape = second
     engines = firstShape.listConnections( type='shadingEngine' )
     if not engines: return None
     
@@ -619,7 +642,7 @@ def copyShader( inputFirst, inputSecond ):
         targetObjs = []
         for selObj in selObjs:
             if selObj.find( '.' ) != -1:
-                if selObj.node() == first.getShape():
+                if selObj.node() == firstShape:
                     targetObjs.append( second+'.'+ selObj.split( '.' )[-1] )
             elif selObj.name() == firstShape.name():
                 targetObjs.append( secondShape.name() )
@@ -2503,4 +2526,137 @@ def makeSubCtl( inputCtl, inputBase ):
 
 
 
+def addShapeToTarget( inputShapeNode, inputTransform ):
+    
+    shapeNode = pymel.core.ls( inputShapeNode )[0]
+    transform = pymel.core.ls( inputTransform )[0]
+    
+    oTransform = getMObject( transform.name() )
+    oShape = getMObject( shapeNode.name() )
+    
+    if shapeNode.nodeType() == 'mesh':
+        oShape = OpenMaya.MFnMesh().copy( oShape, oTransform )
+        fnMesh = OpenMaya.MFnMesh( oShape )
+        srcAttr = shapeNode.outMesh
+        dstAttr = pymel.core.ls( fnMesh.name() + '.inMesh' )[0]
+    elif shapeNode.nodeType() == 'nurbsCurve':
+        oShape = OpenMaya.MFnNurbsCurve().copy( oShape, oTransform )
+        fnCurve = OpenMaya.MFnNurbsCurve( oShape )
+        srcAttr = shapeNode.outMesh
+        dstAttr = pymel.core.ls( fnCurve.name() + '.create' )[0]
+    elif shapeNode.nodeType() == 'nurbsSurface':
+        oShape = OpenMaya.MFnNurbsCurve().copy( oShape, oTransform )
+        fnSurface = OpenMaya.MFnNurbsSurface( oShape )
+        srcAttr = shapeNode.outMesh
+        dstAttr = pymel.core.ls( fnSurface.name() + '.create' )[0]
+    
+    trGeo = pymel.core.createNode( 'transformGeometry' )
+    srcAttr >> trGeo.inputGeometry
+    shapeNode.wm >> trGeo.transform
+    trGeo.outputGeometry >> dstAttr
+    return dstAttr.node()
+    
+    
 
+
+
+def combineMultiShapes( inputTargetGrps ):
+    
+    targetShapes = pymel.core.listRelatives( inputTargetGrps, c=1, ad=1, type='shape' )
+    
+    newTransform = pymel.core.createNode( 'transform' )
+    for targetShape in targetShapes:
+        addedShape = addShapeToTarget( targetShape, newTransform )
+        print targetShape, addedShape
+        copyShader( targetShape, addedShape )
+    
+    try:return pymel.core.polyUnite( newTransform, ch=0, mergeUVSets=1 )[0]
+    except: return newTransform
+
+
+
+
+
+def surfaceColorAtPoint( inputSurfaceNode, position ):
+    
+    surfaceNode = pymel.core.ls( inputSurfaceNode )[0]
+    
+    def getCloseNode( surfaceNode ):
+        if surfaceNode.nodeType() == 'nurbsSurface':
+            closeNode = cmds.listConnections( surfaceNode+'.worldSpace', type='closestPointOnSurface' )
+            if closeNode: return pymel.core.ls( closeNode )[0]
+            closeNode = cmds.createNode( 'closestPointOnSurface' )
+            cmds.connectAttr( surfaceNode+'.worldSpace', closeNode+'.inputSurface' )
+            return pymel.core.ls( closeNode )[0]
+        elif surfaceNode.nodeType() == 'mesh':
+            closeNode = surfaceNode.outMesh.listConnections( type='closestPointOnMesh' )
+            if closeNode: return closeNode[0]
+            closeNode = pymel.core.createNode( 'closestPointOnMesh' )
+            surfaceNode.outMesh >> closeNode.inputMesh
+            surfaceNode.worldMatrix >> closeNode.inputMatrix
+            return closeNode
+    
+    closeNode = getCloseNode( surfaceNode )
+    closeNode.inPosition.set( position )
+    
+    shadingEngines = getShadingEngines( surfaceNode )
+    if not shadingEngines: return None
+    
+    shader = shadingEngines[0].surfaceShader.listConnections( s=1, d=0 )
+    texture = shader[0].color.listConnections( s=1, d=0 )
+    
+    if not texture:
+        try:return shader.color.get()
+        except: return None
+    
+    uValue = cmds.getAttr( closeNode+'.parameterU' )
+    vValue = cmds.getAttr( closeNode+'.parameterV' )
+    
+    return pymel.core.colorAtPoint( texture[0], u=uValue, v=vValue )
+    
+
+
+def getAverageColorFromSurface( inputSurface ):
+    
+    surfaceNode = pymel.core.ls( inputSurface )[0]
+    
+    if surfaceNode.nodeType() == 'transform':
+        surfaceNode = getCurrentVisibleShapes( surfaceNode )[0]
+    
+    if surfaceNode.nodeType() == 'mesh':
+        components = pymel.core.ls( surfaceNode + '.vtx[*]', fl=1 )
+    elif surfaceNode.nodeType() == 'nurbsSurface':
+        components = pymel.core.ls( surfaceNode + '.cv[*]', fl=1 )
+    
+    for component in components:
+        pos = pymel.core.xform( component, q=1, ws=1, t=1 )
+        colorValues = surfaceColorAtPoint( surfaceNode, pos )
+        print component, colorValues
+    
+        
+        
+    
+def createBoundingBox( inputTarget ):
+    
+    target = pymel.core.ls( inputTarget )[0]
+    bb = pymel.core.exactWorldBoundingBox( target )    
+    bbmin = bb[:3]
+    bbmax = bb[-3:]
+    points = [[] for i in range(8)]
+    points[0] = [bbmin[0], bbmin[1], bbmax[2]]
+    points[1] = [bbmax[0], bbmin[1], bbmax[2]]
+    points[2] = [bbmin[0], bbmax[1], bbmax[2]]
+    points[3] = [bbmax[0], bbmax[1], bbmax[2]]
+    points[4] = [bbmin[0], bbmax[1], bbmin[2]]
+    points[5] = [bbmax[0], bbmax[1], bbmin[2]]
+    points[6] = [bbmin[0], bbmin[1], bbmin[2]]
+    points[7] = [bbmax[0], bbmin[1], bbmin[2]]
+    
+    cube = pymel.core.polyCube( ch=1, o=1, cuv=4, n= target.shortName() + '_boundingBox' )[0]
+    for i in range( 8 ):
+        pymel.core.move( points[i][0], points[i][1], points[i][2], cube + '.vtx[%d]' % i )
+    return cube
+
+
+    
+    
