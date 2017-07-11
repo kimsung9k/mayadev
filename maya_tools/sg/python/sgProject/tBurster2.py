@@ -18,6 +18,9 @@ def BG_ASM_SET():
         if proxyExists: topNodes.append( tr )
     
     targets = []
+    
+    pymel.core.makeIdentity( topNodes, apply=1, t=1, r=1, s=1, n=0, pn=1 )
+    
     for topNode in topNodes:
         children = topNode.listRelatives( c=1 )
         for child in children:
@@ -27,18 +30,11 @@ def BG_ASM_SET():
             pymel.core.delete( child )
     
     for target in targets:
-        pymel.core.select( target )
-        mel.eval( 'displaySmoothness -divisionsU 3 -divisionsV 3 -pointsWire 16 -pointsShaded 4 -polygonObject 3;' )
         children = target.listRelatives( c=1, ad=1 )
         for child in children:
             pymel.core.showHidden( child, a=1 )
         
-        mel.eval( 'displaySmoothness -divisionsU 3 -divisionsV 3 -pointsWire 16 -pointsShaded 4 -polygonObject 3;' )
-        
-        combinedObj = sgCmds.combineMultiShapes( target )
-        combinedObj.rename( target.shortName() + '_combined' )
-        
-        reducedObj = pymel.core.duplicate( combinedObj )[0]
+        reducedObj = sgCmds.combineMultiShapes( target )
         pymel.core.polyReduce( reducedObj, ver=1, trm=0, p=90, vct=0, tct=0, shp=0, keepBorder=1, keepMapBorder=1, 
                                keepColorBorder=1, keepFaceGroupBorder=1, keepHardEdge=1, keepCreaseEdge=1, keepBorderWeight=0.5, 
                                keepMapBorderWeight=0.5, keepColorBorderWeight=0.5, keepFaceGroupBorderWeight=0.5, keepHardEdgeWeight=0.5, 
@@ -61,8 +57,16 @@ def BG_ASM_SET():
         points[6] = [bbmin[0], bbmin[1], bbmin[2]]
         points[7] = [bbmax[0], bbmin[1], bbmin[2]]
         
-        boundingBoxObj = pymel.core.polyCube( ch=1, o=1, cuv=4, n= target.shortName() + '_boundingBox' )[0]
+        boundingBoxObj = pymel.core.polyCube( ch=1, o=1, cuv=4, n= target.shortName() + '_gpu' )[0]
         boundingBoxObjShape = boundingBoxObj.getShape()
+        boundingBoxObjShape.overrideEnabled.set( 1 )
+        boundingBoxObjShape.overrideDisplayType.set( 2 )
+        
+        newLambert = pymel.core.shadingNode( 'lambert', asShader=1 )
+        newLambertSG = pymel.core.sets( renderable=1, noSurfaceShader=1, empty=1, name= newLambert + 'SG' )
+        newLambert.outColor >> newLambertSG.surfaceShader
+        newLambert.transparency.set( 1,1,1 )
+        cmds.sets( boundingBoxObj.name(), e=1, forceElement=newLambertSG.name() )
         
         for i in range( 8 ):
             pymel.core.move( points[i][0], points[i][1], points[i][2], boundingBoxObj + '.vtx[%d]' % i )
@@ -70,13 +74,16 @@ def BG_ASM_SET():
         sceneName = cmds.file( q=1, sceneName=1 )
         gpuPath = os.path.dirname( sceneName )
         
+        pymel.core.select( target )
+        mel.eval( 'displaySmoothness -divisionsU 0 -divisionsV 0 -pointsWire 4 -pointsShaded 1 -polygonObject 1;' )
+        
         targetParents = cmds.listRelatives( target.name(), p=1, f=1 )
         targetPos = cmds.getAttr( target+ '.m' )
         cmds.xform( target.name(), os=1, matrix= sgCmds.getListFromMatrix( OpenMaya.MMatrix() ) )
         abcPath = cmds.gpuCache( target.name(), startTime=1, endTime=1, optimize=1, optimizationThreshold=1000, writeMaterials=0, dataFormat='ogawa',
                                  directory=gpuPath, fileName=target.replace( '|', '_' ), saveMultipleFiles=False )[0]
         cmds.xform( target.name(), os=1, matrix= targetPos )
-        gpuObjName = target.split( '|' )[-1]+'_gpu'
+        gpuObjName = target.split( '|' )[-1]+'_gpuOrig'
         gpuCacheNode = cmds.createNode( 'gpuCache' )
         gpuCacheObj = cmds.listRelatives( gpuCacheNode, p=1, f=1 )[0]
         gpuCacheObj = cmds.rename( gpuCacheObj, gpuObjName )
@@ -88,11 +95,17 @@ def BG_ASM_SET():
         gpuCacheObj = pymel.core.ls( gpuCacheObj )[0]
         
         src = target
-        others = [combinedObj,reducedObj,boundingBoxObj]
+        gpuShape = gpuCacheObj.getShape()
+        pymel.core.parent( gpuShape, boundingBoxObj, shape=1, add=1 )
+        pymel.core.delete( gpuCacheObj )
+        others = [reducedObj,boundingBoxObj]
         
         sceneName = cmds.file( q=1, sceneName=1 )
         fileName = sceneName.split( '/' )[-1].split( '.' )[0]
         targetPath = '.'.join( sceneName.split( '.' )[:-1] ) + '.mi'
+        
+        pymel.core.select( target )
+        mel.eval( 'displaySmoothness -divisionsU 3 -divisionsV 3 -pointsWire 16 -pointsShaded 4 -polygonObject 3;' )
         
         pymel.core.select( src )
         cmds.file( targetPath, options='binary=1;compression=0;tabstop=8;perframe=0;padframe=0;perlayer=1;pathnames=3313323333;assembly=0;fragment=0;fragsurfmats=0;fragsurfmatsassign=0;fragincshdrs=0;fragchilddag=0;passcontrimaps=1;passusrdata=1;overrideAssemblyRootName=0;assemblyRootName=binary=1;compression=0;tabstop=8;perframe=0;padframe=0;perlayer=0;pathnames=3313333333;assembly=1;fragment=1;fragsurfmats=1;fragsurfmatsassign=1;fragincshdrs=1;fragchilddag=1;passcontrimaps=1;passusrdata=0;filter=00000011010000001101000;overrideAssemblyRootName=0;assemblyRootName=',
@@ -122,7 +135,7 @@ def BG_ASM_SET():
         
         index = 0
         repNames = []
-        for sel in [gpuCacheObj,boundingBoxObj,reducedObj,combinedObj,target]:
+        for sel in [boundingBoxObj,reducedObj,target]:
             selShape = sel.getShape()
             repName = sel.split( '_' )[-1]
             repNames.append( repName )
@@ -148,3 +161,68 @@ def BG_ASM_SET():
         
         pymel.core.select( asmNode )
         cmds.file( exportPath, force=1, options="v=0;", typ="mayaBinary", pr=1, es=1 )
+
+
+
+def makeForAnimFile():
+    
+    asm = pymel.core.ls( type='assemblyDefinition' )[0]
+    reps = pymel.core.assembly( asm, q=1, lr=1 )
+    
+    dataPaths = []
+    for i in range( len( reps ) ):
+        dataPath = asm.attr( 'representations' )[i].repData.get()
+        dataPaths.append( dataPath )
+    
+    for rep in reps:
+        pymel.core.assembly( asm, e=1, dr=rep )
+    
+    cachePath = ''
+    for root, dirs, names in os.walk( os.path.dirname( dataPaths[0] ) ):
+        for name in names:
+            if not name.split( '.' )[-1].lower() == 'abc': continue
+            cachePath = root + '/' + name
+    
+    pymel.core.assembly( asm, edit=True, createRepresentation='Cache',
+                      input=cachePath )
+    asm.attr( 'representations' )[0].repName.set( reps[0] )
+    asm.attr( 'representations' )[0].repLabel.set( reps[0] )
+    for i in range( 1, 3 ):
+        pymel.core.assembly( asm, edit=True, createRepresentation='Scene',
+                      input=dataPaths[i] )
+        asm.attr( 'representations' )[i].repName.set( reps[i] )
+        asm.attr( 'representations' )[i].repLabel.set( reps[i] )
+
+
+    scenePath = cmds.file( q=1, sceneName=1 )
+    folderPath = os.path.dirname( scenePath )
+    newFileName = scenePath.split( '/' )[-1].replace( '.mb', '_forAnim.mb' )
+    newFilePath = folderPath + '/' + newFileName
+    cmds.file( rename=newFilePath )
+    cmds.file( f=1, save=1,  options="v=0;" )
+
+
+
+def convertAssemblyReference():
+    
+    from maya import cmds, mel
+    sels = cmds.ls( sl=1 )
+    results = []
+    for sel in sels:
+        path = cmds.getAttr( sel + '.representations[0].repData' )
+        asmPath = path.replace( '__gpu', '' ).replace( 'ASMOBJ_PRP_', 'ASM_' ).replace( 'ASMOBJ_BG_', 'ASM_' )
+        if not os.path.exists( asmPath ): continue
+        asmref = mel.eval( 'container -type assemblyReference -name "%s";' % sel )
+        cmds.setAttr( asmref + '.definition', asmPath, type='string' )
+        cmds.xform( asmref, ws=1, matrix= cmds.getAttr( sel + '.wm' ) )
+        results.append( asmref )
+    cmds.select( results )
+    
+    
+    
+def convertAssemblyReferenceForAnim():
+    
+    pass
+    
+    
+    

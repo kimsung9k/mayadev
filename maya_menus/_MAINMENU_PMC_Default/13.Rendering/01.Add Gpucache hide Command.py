@@ -1,0 +1,3 @@
+from maya import mel
+mel.eval( 'setAttr -type "string" defaultRenderGlobals.preMel "string $gpuCaches[] = `ls -type gpuCache`;int $i=0;for( $i=0; $i < size( $gpuCaches ); $i++ )setAttr( $gpuCaches[$i] + \\".template\\", 1 );";' )
+mel.eval( 'setAttr -type "string" defaultRenderGlobals.postMel "string $gpuCaches[] = `ls -type gpuCache`;int $i=0;for( $i=0; $i < size( $gpuCaches ); $i++ )setAttr( $gpuCaches[$i] + \\".template\\", 0 );";' )

@@ -2659,4 +2659,16 @@ def createBoundingBox( inputTarget ):
 
 
     
+def setAttrCurrentAsDefault( inputTarget ):
     
+    target = pymel.core.ls( inputTarget )[0]
+    attrs  = pymel.core.listAttr( target, ud=1, k=1 )
+    if not attrs: attrs = []
+    cbAttrs = pymel.core.listAttr( target, ud=1, cb=1 )
+    if not cbAttrs: cbAttrs = []
+    attrs += cbAttrs
+    
+    for attr in attrs:
+        value = target.attr( attr ).get()
+        cmds.addAttr( target + '.' + attr, e=1, dv=value )
+
