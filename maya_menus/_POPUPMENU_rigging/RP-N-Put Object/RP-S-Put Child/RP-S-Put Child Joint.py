@@ -4,8 +4,8 @@ sels = cmds.ls( sl=1 )
 
 targets = []
 for sel in sels:
-    putTarget = sgcommands.convertSg( sgcommands.putObject( sel, 'joint' ) )
-    sgcommands.parent( putTarget, sel )
+    cmds.select( sel )
+    putTarget =  cmds.joint()
     
     selName = sel.split('|')[-1]
     childName = ''
@@ -14,7 +14,7 @@ for sel in sels:
     else:
         childName = sel.split('|')[-1] + '_child'
         
-    putTarget.rename( childName )
-    targets.append( putTarget.name() )
+    putTarget = cmds.rename( putTarget, childName )
+    targets.append( putTarget )
 
 cmds.select( targets )

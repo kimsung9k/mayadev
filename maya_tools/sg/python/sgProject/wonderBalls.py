@@ -226,6 +226,94 @@ def copyWeightByOnlySpecifyJoints( srcJointsGrp, trgJointsGrp, srcMesh, trgMesh 
             
 
 
+def createMatrixTransformFromVertex( inputVtx ):
+    centerVtx = pymel.core.ls( inputVtx )[0]
+    vertices = sgCmds.getConnectedVertices( centerVtx )
+    if len( vertices ) < 3: return None
+    
+    curveTr = pymel.core.curve( p=[ [0,0,0] for i in range( len( vertices ) ) ], d=2 )
+    curveShape = curveTr.getShape()
+    
+    for i in range( len( vertices ) ):
+        connectedVtx = vertices[i]
+        curveInfo = sgCmds.getPointOnCurveFromMeshVertex( connectedVtx )
+        curveInfo.position >> curveShape.controlPoints[i]
+    pymel.core.closeCurve(  curveShape, ch=0, ps=0, rpo=1, bb=0.5, bki=0, p=0.1 )
+    
+    curveInfos = []
+    for i in range( 4 ):
+        curveInfo = pymel.core.createNode( 'pointOnCurveInfo' )
+        curveShape.worldSpace >> curveInfo.inputCurve
+        curveInfo.parameter.set( i * 0.25 )
+        curveInfos.append( curveInfo )
+    
+    newTr = pymel.core.createNode( 'transform' )
+    distX = pymel.core.createNode( 'distanceBetween' )
+    distY = pymel.core.createNode( 'distanceBetween' )
+    curveInfos[0].position >> distX.point1
+    curveInfos[2].position >> distX.point2
+    curveInfos[1].position >> distY.point1
+    curveInfos[3].position >> distY.point2
+    sgCmds.addAttr( newTr, ln='origLengthX', cb=1, dv=distX.distance.get() )
+    sgCmds.addAttr( newTr, ln='origLengthY', cb=1, dv=distY.distance.get() )
+    divScaleX = pymel.core.createNode( 'multiplyDivide' ); divScaleX.op.set( 2 )
+    divScaleY = pymel.core.createNode( 'multiplyDivide' ); divScaleY.op.set( 2 )
+    newTr.origLengthX >> divScaleX.input2X
+    distX.distance >> divScaleX.input1X
+    newTr.origLengthY >> divScaleY.input2X
+    distY.distance >> divScaleY.input1X
+    
+    divScaleX.outputX >> newTr.sx
+    divScaleY.outputX >> newTr.sy
+    divScaleY.outputX >> newTr.sz
+    
+    vectorX = pymel.core.createNode( 'plusMinusAverage' ); vectorX.op.set( 2 )
+    vectorY = pymel.core.createNode( 'plusMinusAverage' ); vectorY.op.set( 2 )
+    
+    curveInfos[0].position >> vectorX.input3D[0]
+    curveInfos[2].position >> vectorX.input3D[1]
+    curveInfos[1].position >> vectorY.input3D[0]
+    curveInfos[3].position >> vectorY.input3D[1]
+    centerCurveInfo = sgCmds.getPointOnCurveFromMeshVertex( centerVtx )
+    
+    fbf = pymel.core.createNode( 'fourByFourMatrix' )
+    vectorX.output3Dx >> fbf.in00
+    vectorX.output3Dy >> fbf.in01
+    vectorX.output3Dz >> fbf.in02
+    vectorY.output3Dx >> fbf.in10
+    vectorY.output3Dy >> fbf.in11
+    vectorY.output3Dz >> fbf.in12
+    centerCurveInfo.positionX >> fbf.in30
+    centerCurveInfo.positionY >> fbf.in31
+    centerCurveInfo.positionZ >> fbf.in32
+    
+    mm = pymel.core.createNode( 'multMatrix' )
+    fbf.output >> mm.i[0]
+    newTr.pim >> mm.i[1]
+    dcmp = pymel.core.createNode( 'decomposeMatrix' )
+    mm.matrixSum >> dcmp.imat
+    
+    dcmp.ot >> newTr.t
+    dcmp.outputRotate >> newTr.r
+    
+    newTr.dla.set( 1)
+    return newTr, curveTr
+
+
+
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
 
         
         

@@ -2672,3 +2672,101 @@ def setAttrCurrentAsDefault( inputTarget ):
         value = target.attr( attr ).get()
         cmds.addAttr( target + '.' + attr, e=1, dv=value )
 
+
+
+
+def getVerticesFromEdge( fnMesh, edgeNum ):
+
+    util = OpenMaya.MScriptUtil()
+    util.createFromList( [0,0], 2 )
+    int2Ptr = util.asInt2Ptr()
+    fnMesh.getEdgeVertices( edgeNum, int2Ptr )
+    first = OpenMaya.MScriptUtil.getInt2ArrayItem( int2Ptr, 0, 0 )
+    second = OpenMaya.MScriptUtil.getInt2ArrayItem( int2Ptr, 0, 1 )
+    return first, second
+
+
+
+def getConnectedVertices( inputVtx ):
+    vtx = pymel.core.ls( inputVtx )[0]
+    mesh = vtx.node()
+    vtxIndex = vtx.index()
+    itMeshVtx = OpenMaya.MItMeshVertex( getDagPath(mesh))
+    
+    util = OpenMaya.MScriptUtil()
+    util.createFromInt(0)
+    ptrInt = util.asIntPtr()
+    itMeshVtx.setIndex( vtxIndex, ptrInt )
+    indices = OpenMaya.MIntArray()
+    itMeshVtx.getConnectedVertices( indices )
+    return [ pymel.core.ls( mesh + '.vtx[%d]' % indices[i] )[0] for i in range( indices.length() ) ]
+    
+
+
+
+def getPointOnCurveFromMeshVertex( inputVtx ):
+    vtx = pymel.core.ls( inputVtx )[0]
+    
+    mesh = vtx.node()
+    vtxIndex = vtx.index()
+    
+    targetEdgeCurveNode = None
+    if pymel.core.attributeQuery( 'curveInfo_%d' % vtxIndex, node=mesh, ex=1 ):
+        cons = mesh.attr('curveInfo_%d' % vtxIndex).listConnections( s=1, d=0 )
+        if cons: return cons[0]
+    
+    paramValue = 0.0
+    if pymel.core.attributeQuery( 'edgeToCurve_%d' % vtxIndex, node=mesh, ex=1 ):
+        edgeCurveNodes = mesh.attr('edgeToCurve_%d' % vtxIndex).listConnections( s=1, d=0, type='polyEdgeToCurve' )
+        for edgeCurveNode in edgeCurveNodes:
+            fnNode = OpenMaya.MFnDependencyNode( getMObject(edgeCurveNode.name()))
+            plugInputComponts = fnNode.findPlug( 'inputComponents' )
+            compData = OpenMaya.MFnComponentListData( plugInputComponts.asMObject() )
+            for i in range( compData.length() ):
+                singleComp = OpenMaya.MFnSingleIndexedComponent( compData[i] )
+                indices = OpenMaya.MIntArray()
+                singleComp.getElements( indices )
+                for j in range( indices.length() ):
+                    if vtxIndex == indices[j]:
+                        targetEdgeCurveNode = edgeCurveNode
+                        if i == 1: paramValue = 1.0
+                if targetEdgeCurveNode: break
+    
+    if not targetEdgeCurveNode:
+        dagMesh = getDagPath( mesh )
+        itMeshVtx = OpenMaya.MItMeshVertex( dagMesh )
+        prevIndex = getIntPtr()
+        itMeshVtx.setIndex( vtxIndex, prevIndex )
+        edgeIndices = OpenMaya.MIntArray()
+        itMeshVtx.getConnectedEdges( edgeIndices )
+        createdTransform, polyToCurveNode = pymel.core.polyToCurve( mesh + '.e[%d]' % edgeIndices[0], form=2, degree=1 )
+        targetEdgeCurveNode = pymel.core.ls( polyToCurveNode )[0]
+        
+        fnNode = OpenMaya.MFnDependencyNode( getMObject(targetEdgeCurveNode.name()))
+        plugInputComponts = fnNode.findPlug( 'inputComponents' )
+        compData = OpenMaya.MFnComponentListData( plugInputComponts.asMObject() )
+
+        for i in range( compData.length() ):
+            singleComp = OpenMaya.MFnSingleIndexedComponent( compData[i] )
+            indices = OpenMaya.MIntArray()
+            singleComp.getElements( indices )
+            if indices[0] == vtxIndex and i == 1:
+                paramValue = 1.0
+            addAttr( mesh, ln='edgeToCurve_%d' % indices[0], at='message' )
+            targetEdgeCurveNode.message >> mesh.attr( 'edgeToCurve_%d' % indices[0] )
+            
+    
+    curveInfo = pymel.core.createNode( 'pointOnCurveInfo' )
+    targetEdgeCurveNode.outputcurve >> curveInfo.inputCurve
+    curveInfo.parameter.set( paramValue )
+    try:pymel.core.delete( createdTransform )
+    except:pass
+    
+    addAttr( mesh, ln='curveInfo_%d' % vtxIndex, at='message' )
+    curveInfo.message >> mesh.attr('curveInfo_%d' % vtxIndex)
+    
+    return curveInfo
+    
+
+
+

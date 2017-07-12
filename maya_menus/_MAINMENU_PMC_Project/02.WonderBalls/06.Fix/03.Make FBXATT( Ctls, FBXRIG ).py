@@ -11,7 +11,7 @@ fbxAttName = ns + ':FBXATT'
 for ctl in ctls:
     if not pymel.core.objExists( fbxAttName ):
         fbxAtt = pymel.core.createNode( 'transform', n=fbxAttName )    
-        fbxAtt.setParent( ns + ':FBXRIG' )
+        fbxAtt.setParent( fbxRig )
     keyAttrs = fbxAtt.listAttr( k=1 )
     for attr in keyAttrs:
         attr.setKeyable( False )
