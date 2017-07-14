@@ -150,7 +150,7 @@ class SGFileBaseMenu:
                 f.close() 
                 
                 if extention in ['mel','melScript']:
-                    targets.append( [name, 'import maya.mel\nf=open( "%s", "r" )\ndata = f.read().decode("utf8")\nf.close()\nmel.eval( data )' % (root + '/' + name) ] )
+                    targets.append( [name, 'import maya.mel\nmel.eval( \'source "%s"\' )' % (root + '/' + name) ] )
                 else:
                     if data.find( '%' ) != -1:
                         targets.append( [name, 'execfile( "%s" )' % (root + '/' + name) ] )

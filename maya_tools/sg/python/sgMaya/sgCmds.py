@@ -2769,4 +2769,141 @@ def getPointOnCurveFromMeshVertex( inputVtx ):
     
 
 
+def getPivotMatrix( inputTarget ):
+    
+    target = pymel.core.ls( inputTarget )[0]
+    rp = cmds.getAttr( target + '.rotatePivot' )[0]
+    rpMtx = listToMatrix( [1,0,0,0, 0,1,0,0, 0,0,1,0 , rp[0], rp[1], rp[2], 1 ] )
+    mtx = listToMatrix( cmds.getAttr( target + '.wm' ) )
+    
+    return matrixToList( rpMtx * mtx )
+
+
+
+def getUVAtPoint( point, inputMesh ):
+    
+    if type( point ) in [ type([]), type(()) ]:
+        point = OpenMaya.MPoint( *point )
+    mesh = pymel.core.ls( inputMesh )[0]
+    
+    meshShape = mesh.name()
+    fnMesh = OpenMaya.MFnMesh( getDagPath( meshShape ) )
+    
+    util = OpenMaya.MScriptUtil()
+    util.createFromList( [0.0,0.0], 2 )
+    uvPoint = util.asFloat2Ptr()
+    fnMesh.getUVAtPoint( point, uvPoint, OpenMaya.MSpace.kWorld )
+    u = OpenMaya.MScriptUtil.getFloat2ArrayItem( uvPoint, 0, 0 )
+    v = OpenMaya.MScriptUtil.getFloat2ArrayItem( uvPoint, 0, 1 )
+    
+    return u, v
+
+
+
+
+
+def getSourceConnection( targets, src ):
+    
+    cons = src.listConnections( s=1, d=0, c=1, p=1 )
+
+    srcAttrs = []
+    connectedAttrs = []
+    
+    for origCon, src in cons:
+        srcAttrs.append( src )
+        connectedAttrs.append( origCon.attrName() )
+    
+    for target in targets:
+        for i in range( len( connectedAttrs ) ):
+            try:
+                srcAttrs[i] >> target.attr( connectedAttrs[i] )
+            except:
+                pass
+
+
+
+
+def putObject( inputPutTarget, typ='null' ):
+    
+    putTarget = pymel.core.ls( inputPutTarget )[0]
+    
+    if typ == 'locator':
+        newObj = pymel.core.spaceLocator()[0]
+    elif typ == 'null':
+        newObj = pymel.core.createNode( 'transform' )
+        pymel.core.setAttr( newObj + '.dh', 1 )
+    else:
+        newObj = pymel.core.createNode( typ )
+    
+    mtx = getPivotMatrix( putTarget )
+    pymel.core.xform( newObj, ws=1, matrix= mtx )
+    return newObj
+
+
+
+
+
+def getLookAtAngleNode( inputLookTarget, inputRotTarget, **options ):
+
+    def createLookAtMatrix( lookTarget, rotTarget ):
+        mm = pymel.core.createNode( 'multMatrix' )
+        compose = pymel.core.createNode( 'composeMatrix' )
+        mm2 = pymel.core.createNode( 'multMatrix' )
+        invMtx = pymel.core.createNode( 'inverseMatrix' )
+        
+        lookTarget.wm >> mm.i[0]
+        rotTarget.t >> compose.it
+        compose.outputMatrix >> mm2.i[0]
+        rotTarget.pm >> mm2.i[1]
+        mm2.matrixSum >> invMtx.inputMatrix
+        invMtx.outputMatrix >> mm.i[1]
+        return mm
+    
+    if options.has_key( 'direction' ) and options['direction']:
+        direction = options['direction']
+    else:
+        direction = [1,0,0]
+    
+    lookTarget = pymel.core.ls( inputLookTarget )[0]
+    rotTarget = pymel.core.ls( inputRotTarget )[0]
+    
+    dcmpLookAt = getDecomposeMatrix( createLookAtMatrix( lookTarget, rotTarget ).matrixSum )
+    
+    abnodes = dcmpLookAt.listConnections( type='angleBetween' )
+    if not abnodes:
+        node = cmds.createNode( 'angleBetween' )
+        cmds.setAttr( node + ".v1", *direction )
+        cmds.connectAttr( dcmpLookAt + '.ot', node + '.v2' )
+    else:
+        node = abnodes[0]
+    return node
+
+
+
+
+def lookAtConnect( inputLookTarget, inputRotTarget, **options ):
+    
+    if options.has_key( 'direction' ) and options['direction']:
+        direction = options['direction']
+    else:
+        direction = None
+    
+    lookTarget = pymel.core.ls( inputLookTarget )[0]
+    rotTarget  = pymel.core.ls( inputRotTarget )[0]
+    
+    if not inputRotTarget:
+        pRotTarget = rotTarget.getParent()
+        if pRotTarget:
+            wim = listToMatrix( pRotTarget.wim.get() )
+        else:
+            wim = OpenMaya.MMatrix()
+        pos = OpenMaya.MPoint( *pymel.core.xform( lookTarget, q=1, ws=1, t=1 ) )
+        directionIndex = getDirectionIndex( pos*wim )
+        direction = [[1,0,0], [0,1,0], [0,0,1],[-1,0,0], [0,-1,0], [0,0,-1]][directionIndex]
+    
+    node = getLookAtAngleNode( lookTarget, rotTarget, direction=direction )
+    cmds.connectAttr( node + '.euler', rotTarget + '.r' )
+
+
+
 

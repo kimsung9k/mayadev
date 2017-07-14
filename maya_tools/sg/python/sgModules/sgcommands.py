@@ -1673,7 +1673,7 @@ def putObject( putTarget, typ='joint', putType='' ):
         cmds.move( center.x, center.y, center.z, newObj, ws=1 )
     else:
         try:
-            mtx = cmds.getAttr( putTarget + '.wm' )
+            mtx = getWorldPivotMatrix( putTarget )
             cmds.xform( newObj, ws=1, matrix= mtx )
         except:
             pos = getCenter( putTarget )
@@ -2476,6 +2476,17 @@ def getPivotMatrix( target ):
     mtxList[ 13 ] = piv.y
     mtxList[ 14 ] = piv.z
     return listToMatrix( mtxList )
+
+
+
+def getWorldPivotMatrix( inputTarget ):
+    
+    target = pymel.core.ls( inputTarget )[0]
+    rp = cmds.getAttr( target + '.rotatePivot' )[0]
+    rpMtx = listToMatrix( [1,0,0,0, 0,1,0,0, 0,0,1,0 , rp[0], rp[1], rp[2], 1 ] )
+    mtx = listToMatrix( cmds.getAttr( target + '.wm' ) )
+    
+    return matrixToList( rpMtx * mtx )
 
 
 

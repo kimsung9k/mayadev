@@ -304,9 +304,46 @@ def createMatrixTransformFromVertex( inputVtx ):
 
     
     
+def treeBendingLookAtConnect( inputLookTarget, inputAimTarget ):
     
+    lookTarget = pymel.core.ls( inputLookTarget )[0]
+    aimTarget  = pymel.core.ls( inputAimTarget )[0]
     
+    aimTargetBase = aimTarget.getParent()
+    aimTargetList = aimTarget.listRelatives( c=1, ad=1, type='joint' )
+    map( lambda x : sgCmds.makeParent( x ) if x.getParent().nodeType() == 'joint' else None, aimTargetList )
+    aimTargetPoints = map( lambda x : sgCmds.putObject( x ), aimTargetList )
+    aimTargetPointsBase = sgCmds.makeChild( aimTargetBase )
+    aimTargetList.append( aimTarget )
     
+    sgCmds.lookAtConnect( lookTarget, aimTargetPointsBase )
+    pymel.core.parent( aimTargetPoints, aimTargetPointsBase )
+    
+    aimTargetList.reverse()
+    aimTargetPoints.reverse()
+    
+    for i in range( len( aimTargetList )-1 ):
+        aimTargetH = aimTargetList[i]
+        aimTargetHBase = aimTargetH.getParent()
+        aimTargetChild = aimTargetH.listRelatives( c=1 )[0]
+        aimCuPointPiv = sgCmds.makeChild( aimTargetHBase )
+        aimCuPointBase = sgCmds.makeChild( aimCuPointPiv )
+        aimCuPoint = sgCmds.makeChild( aimCuPointBase )
+        pymel.core.xform( aimCuPointPiv, ws=1, matrix=aimTargetH.wm.get() )
+        pymel.core.xform( aimCuPointBase, ws=1, matrix=aimTargetChild.wm.get() )
+        
+        aimTargetPoint = aimTargetPoints[i]
+        dcmp = sgCmds.getLocalDecomposeMatrix( aimTargetPoint.wm, aimCuPointBase.wim )
+        sgCmds.addAttr( aimTargetH, ln='lookWeight', min=0, max=1, k=1 )
+        multNode = pymel.core.createNode( 'multiplyDivide' )
+        dcmp.outputTranslate >> multNode.input1
+        aimTargetH.lookWeight >> multNode.input2X
+        aimTargetH.lookWeight >> multNode.input2Y
+        aimTargetH.lookWeight >> multNode.input2Z
+        multNode.output >> aimCuPoint.t
+        sgCmds.lookAtConnect( aimCuPoint, aimTargetH )
+        
+        
     
     
     
