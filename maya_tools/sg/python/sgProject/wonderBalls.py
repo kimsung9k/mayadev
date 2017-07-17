@@ -1,4 +1,4 @@
-from sgMaya import sgCmds
+from sgMaya import sgCmds, sgModel
 import pymel.core
 from maya import OpenMaya, cmds
 import copy
@@ -304,55 +304,101 @@ def createMatrixTransformFromVertex( inputVtx ):
 
     
     
-def treeBendingLookAtConnect( inputLookTarget, inputAimTarget ):
+def treeBendingLookAtConnect( inputLookTarget, inputRotTarget ):
     
     lookTarget = pymel.core.ls( inputLookTarget )[0]
-    aimTarget  = pymel.core.ls( inputAimTarget )[0]
+    rotTarget  = pymel.core.ls( inputRotTarget )[0]
     
-    aimTargetBase = aimTarget.getParent()
-    aimTargetList = aimTarget.listRelatives( c=1, ad=1, type='joint' )
-    map( lambda x : sgCmds.makeParent( x ) if x.getParent().nodeType() == 'joint' else None, aimTargetList )
-    aimTargetPoints = map( lambda x : sgCmds.putObject( x ), aimTargetList )
-    aimTargetPointsBase = sgCmds.makeChild( aimTargetBase )
-    aimTargetList.append( aimTarget )
+    rotTargetBase = rotTarget.getParent()
+    rotTargetList = rotTarget.listRelatives( c=1, ad=1, type='joint' )
+    map( lambda x : sgCmds.makeParent( x ) if x.getParent().nodeType() == 'joint' else None, rotTargetList )
+    rotTargetPoints = map( lambda x : sgCmds.putObject( x ), rotTargetList )
+    map( lambda x : x.dh.set( 0 ), rotTargetPoints )
+    rotTargetPointsBase = sgCmds.makeChild( rotTargetBase )
+    rotTargetList.append( rotTarget )
     
-    sgCmds.lookAtConnect( lookTarget, aimTargetPointsBase )
-    pymel.core.parent( aimTargetPoints, aimTargetPointsBase )
+    sgCmds.lookAtConnect( lookTarget, rotTargetPointsBase )
+    sgCmds.makeParent( rotTargetPointsBase )
+    pymel.core.parent( rotTargetPoints, rotTargetPointsBase )
     
-    aimTargetList.reverse()
-    aimTargetPoints.reverse()
+    rotTargetList.reverse()
+    rotTargetPoints.reverse()
     
-    for i in range( len( aimTargetList )-1 ):
-        aimTargetH = aimTargetList[i]
-        aimTargetHBase = aimTargetH.getParent()
-        aimTargetChild = aimTargetH.listRelatives( c=1 )[0]
-        aimCuPointPiv = sgCmds.makeChild( aimTargetHBase )
+    numRotTargets = len( rotTargetList )
+    sgCmds.addAttr( lookTarget, ln='bendWeight', min=0, max=1, dv=1, k=1 )
+    sgCmds.addAttr( lookTarget, ln='powRate', min=0, max=2, dv=1, k=1 )
+    
+    for i in range( len( rotTargetList )-1 ):
+        powRateBaseValue = ( i + 1.0 )/numRotTargets
+        rotTargetH = rotTargetList[i]
+        rotTargetHBase = rotTargetH.getParent()
+        rotTargetChild = rotTargetH.listRelatives( c=1 )[0]
+        aimCuPointPiv = sgCmds.makeChild( rotTargetHBase )
         aimCuPointBase = sgCmds.makeChild( aimCuPointPiv )
         aimCuPoint = sgCmds.makeChild( aimCuPointBase )
-        pymel.core.xform( aimCuPointPiv, ws=1, matrix=aimTargetH.wm.get() )
-        pymel.core.xform( aimCuPointBase, ws=1, matrix=aimTargetChild.wm.get() )
+        pymel.core.xform( aimCuPointPiv, ws=1, matrix=rotTargetH.wm.get() )
+        pymel.core.xform( aimCuPointBase, ws=1, matrix=rotTargetChild.wm.get() )
         
-        aimTargetPoint = aimTargetPoints[i]
-        dcmp = sgCmds.getLocalDecomposeMatrix( aimTargetPoint.wm, aimCuPointBase.wim )
-        sgCmds.addAttr( aimTargetH, ln='lookWeight', min=0, max=1, k=1 )
-        multNode = pymel.core.createNode( 'multiplyDivide' )
-        dcmp.outputTranslate >> multNode.input1
-        aimTargetH.lookWeight >> multNode.input2X
-        aimTargetH.lookWeight >> multNode.input2Y
-        aimTargetH.lookWeight >> multNode.input2Z
-        multNode.output >> aimCuPoint.t
-        sgCmds.lookAtConnect( aimCuPoint, aimTargetH )
+        rotTargetPoint = rotTargetPoints[i]
+        dcmp = sgCmds.getLocalDecomposeMatrix( rotTargetPoint.wm, aimCuPointBase.wim )
+        sgCmds.addAttr( rotTargetH, ln='lookWeight', min=0, max=1, k=1, dv= 1.0/numRotTargets )
         
+        multEnv = pymel.core.createNode( 'multDoubleLinear' )
+        multPow = pymel.core.createNode( 'multiplyDivide' ); multPow.op.set( 3 )
+        multPowAndEnv = pymel.core.createNode( 'multDoubleLinear' )
+        multEnv.output >> multPowAndEnv.input1
+        multPow.outputX >> multPowAndEnv.input2
+        multPow.input1X.set( powRateBaseValue )
+        lookTarget.powRate >> multPow.input2X
         
+        rotTargetH.lookWeight >> multEnv.input1
+        lookTarget.bendWeight >> multEnv.input2
+        
+        multTrans = pymel.core.createNode( 'multiplyDivide' )
+        dcmp.outputTranslate >> multTrans.input1
+        multPowAndEnv.output >> multTrans.input2X
+        multPowAndEnv.output >> multTrans.input2Y
+        multPowAndEnv.output >> multTrans.input2Z
+        multTrans.output >> aimCuPoint.t
+        sgCmds.lookAtConnect( aimCuPoint, rotTargetH )
     
+    sgCmds.addAttr( lookTarget, ln='rotTarget', at='message' )
+    rotTargetPointsBase.message >> lookTarget.rotTarget
     
+
+
+
+def treeBendingLookAtConnectReset( inputLookTarget ):
     
+    lookTarget = pymel.core.ls( inputLookTarget )[0]
+    rotTargetPointsBase = lookTarget.attr( 'rotTarget' ).listConnections( s=1, d=0 )[0]
     
+    localMtx = rotTargetPointsBase.m.get()
+    origWorldMtx = rotTargetPointsBase.pm.get()
+    cuWorldMtx = localMtx * origWorldMtx
     
+    rotTargetPoints = rotTargetPointsBase.listRelatives( c=1 )
+    rotPointMtxs = map( lambda x : x.wm.get() * cuWorldMtx.inverse() * origWorldMtx, rotTargetPoints )
     
+    pymel.core.xform( rotTargetPointsBase.getParent(), ws=1, matrix=cuWorldMtx )
     
+    for i in range( len( rotTargetPoints ) ):
+        pymel.core.xform( rotTargetPoints[i], ws=1, matrix=rotPointMtxs[i] )
 
         
         
+
+
+def treeBendingRig( topJnt ):
+    children = topJnt.listRelatives( c=1, ad=1 )
+    lastChild = children[0]
+    ctl = sgCmds.makeController( sgModel.Controller.diamondPoints, 1, makeParent=1 )
+    pCtl = ctl.getParent()
+    pymel.core.xform( pCtl, ws=1, matrix=lastChild.wm.get() )
+    treeBendingLookAtConnect( ctl, topJnt )
+
+
+
+
 
 

@@ -56,12 +56,18 @@ def createXLookAtJointLine( inputTargets ):
 def makeWaveJoint( inputTopJoint ): 
     
     topJoint = pymel.core.ls( inputTopJoint )[0]
-    children = topJoint.listRelatives( c=1, type='joint' )
+    children = topJoint.listRelatives( c=1, type='transform' )
     joints = [topJoint]
+    
+    print "children : ", children
+    
     while children:
-        if len( children ) > 1: break
         joints.append( children[0] )
-        children = children[0].listRelatives( c=1, type='joint' )
+        children = children[0].listRelatives( c=1, type='transform' )
+    
+    joints = list( filter( lambda x : x.nodeType() == 'joint', joints ) )
+    
+    print joints
     
     methodList = ['Sine', 'Rand', 'RandBig']
     axisList   = ['X', 'Y', 'Z']
@@ -79,7 +85,8 @@ def makeWaveJoint( inputTopJoint ):
     sgCmds.addAttr( firstJnt, ln='intervalValueAdd', min=0, dv=15, k=1 )
     
     for joint in joints:
-        sgCmds.freezeJoint( joint )
+        try:sgCmds.freezeJoint( joint )
+        except:pass
     
     for method in methodList:
         dvOffset = 0

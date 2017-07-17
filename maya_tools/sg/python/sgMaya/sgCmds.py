@@ -83,7 +83,15 @@ def listToMatrix( mtxList ):
     if type( mtxList ) == OpenMaya.MMatrix:
         return mtxList
     matrix = OpenMaya.MMatrix()
-    OpenMaya.MScriptUtil.createMatrixFromList( mtxList, matrix  )
+    if type( mtxList ) == list:
+        resultMtxList = mtxList
+    else:
+        resultMtxList = []
+        for i in range( 4 ):
+            for j in range( 4 ):
+                resultMtxList.append( mtxList[i][j] )
+    
+    OpenMaya.MScriptUtil.createMatrixFromList( resultMtxList, matrix )
     return matrix
 
 
@@ -103,7 +111,11 @@ def getMatrixFromList( mtxList ):
     if type( mtxList ) == OpenMaya.MMatrix:
         return mtxList
     matrix = OpenMaya.MMatrix()
-    OpenMaya.MScriptUtil.createMatrixFromList( mtxList, matrix  )
+    if type( mtxList[0] ) == list:
+        resultMtxList = reduce( lambda x, y : x + y, mtxList )
+    else:
+        resultMtxList = mtxList
+    OpenMaya.MScriptUtil.createMatrixFromList( resultMtxList, matrix )
     return matrix
 
 
@@ -2906,4 +2918,43 @@ def lookAtConnect( inputLookTarget, inputRotTarget, **options ):
 
 
 
+def getClosestPointBigestWeightJoint( inputPoint, mesh ):
 
+    if type( inputPoint ) != type( OpenMaya.MPoint() ):
+        point = OpenMaya.MPoint( *inputPoint )
+    else:
+        point = inputPoint
+    
+    dagPath = getDagPath( mesh )
+    meshMtx = dagPath.inclusiveMatrix()
+    localPoint = point * meshMtx.inverse()
+    intersector = OpenMaya.MMeshIntersector()
+    intersector.create( dagPath.node() )
+    
+    pointOnMesh = OpenMaya.MPointOnMesh()
+    intersector.getClosestPoint( localPoint, pointOnMesh )
+    closeFaceIndex = pointOnMesh.faceIndex()
+    
+    fnMesh = OpenMaya.MFnMesh( dagPath )
+    vtxIds = OpenMaya.MIntArray()
+    fnMesh.getPolygonVertices( closeFaceIndex, vtxIds )
+    
+    points = OpenMaya.MPointArray()
+    fnMesh.getPoints( points )
+    
+    closeDist = 10000000.0
+    closeIndex = 0
+    for i in range( vtxIds.length() ):
+        targetPoint = points[vtxIds[i]]
+        dist = localPoint.distanceTo( targetPoint )
+        if dist < closeDist:
+            closeDist = dist
+            closeIndex = vtxIds[i]
+    
+    plugs = getWeightPlugFromSkinedVertex( mesh + '.vtx[%d]' % closeIndex )
+    for plug in plugs:
+        print plug.index(), plug.get()
+        
+    
+    
+    
