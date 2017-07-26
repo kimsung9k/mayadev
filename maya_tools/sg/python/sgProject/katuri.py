@@ -1,7 +1,8 @@
 from sgMaya import sgCmds
-from maya import cmds
+from maya import cmds, OpenMaya
 import pymel.core
 from sgMaya import sgModel
+from audioop import reverse
 
 
 
@@ -376,4 +377,24 @@ def buildBearHipController():
 
 
 
-
+def leafSetting( inputTargetMesh, edgeList=[29, 34, 39, 44, 77, 128], **options ):
+    
+    reverseOrder = False
+    if options.has_key( 'reverseOrder' ):
+        reverseOrder = True
+    
+    targetMesh = pymel.core.ls( inputTargetMesh )[0]
+    
+    edges = []
+    for edgeIndex in edgeList:
+        edges.append( targetMesh + '.e[%d]' % edgeIndex )
+    
+    bindJoints = sgCmds.edgeToJointLine( edges, 4, reverseOrder=reverseOrder )
+    ctls = sgCmds.createFkControl( bindJoints[0], 5 )
+    
+    for ctl in ctls:
+        sgCmds.setIndexColor( ctl.getShape(), 6 )
+    
+        
+    
+    

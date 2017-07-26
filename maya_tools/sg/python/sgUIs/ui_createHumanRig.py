@@ -230,7 +230,8 @@ class UI_stdArea:
     
     def create(self):
         
-        frame = cmds.frameLayout( l='Std Area', bgs=1, bgc=[0.4,0.2,0.2] )
+        try:frame = cmds.frameLayout( l='Std Area', bgs=1, bgc=[0.4,0.2,0.2] )
+        except:frame = cmds.frameLayout( l='Std Area', bgc=[0.4,0.2,0.2] )
         form = cmds.formLayout()
         buttonCreate = cmds.button( l='Create Std', c=Win_Cmd.createStds )
         buttonSymmetry = cmds.button( l='Set Symmetry', c=Win_Cmd.setSymmetry )
@@ -260,7 +261,8 @@ class UI_rigArea:
     
     def create(self):
         
-        frame = cmds.frameLayout( l='Rig Area', bgs=1, bgc=[0.2,0.4,0.2] )
+        try:frame = cmds.frameLayout( l='Rig Area', bgs=1, bgc=[0.4,0.2,0.2] )
+        except:frame = cmds.frameLayout( l='Rig Area', bgc=[0.4,0.2,0.2] )
         form = cmds.formLayout()
         controllerSize = cmds.floatFieldGrp( l='Controller Size : ', v1=1.0 )
         numBodyJoints = cmds.intFieldGrp( l='Num Body Joints : ', v1=5 )
@@ -317,7 +319,8 @@ class UI_FollowArea:
     
     def create(self):
         
-        frame = cmds.frameLayout( l='Follow Area', bgs=1, bgc=[0.2,0.2,.4] )
+        try:frame = cmds.frameLayout( l='Follow Area', bgs=1, bgc=[0.2,0.2,.4] )
+        except:frame = cmds.frameLayout( l='Follow Area', bgc=[0.2,0.2,.4] )
         form = cmds.formLayout()
         text  = cmds.text( l='Select Ik And Set' )
         root  = cmds.checkBox( l='Root', v=1 )
@@ -357,7 +360,8 @@ class UI_AddRigArea:
     
     def create(self):
         
-        frame = cmds.frameLayout( l='Add Rig Area', bgs=1, bgc=[0.2, 0.5, 0.5] )
+        try:frame = cmds.frameLayout( l='Add Rig Area', bgs=1, bgc=[0.2, 0.5, 0.5] )
+        except:frame = cmds.frameLayout( l='Add Rig Area', bgc=[0.2, 0.5, 0.5] )
         form = cmds.formLayout()
         btIkScaleOption = cmds.button( l='Add Ik Scale Options( ikCtls )', c = Win_Cmd.addIkStretchAndSlide )
         btAddAutoTwist  = cmds.button( l='Add Auto Twist PoleVector( ikCtls )', c = Win_Cmd.addAutoTwistPoleVector )

@@ -1,0 +1,1 @@
+copySkinWeights  -noMirror -surfaceAssociation closestPoint -influenceAssociation closestJoint -influenceAssociation closestJoint -normalize;

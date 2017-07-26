@@ -5840,10 +5840,43 @@ def getParentNameOf( target, searchName ):
     return '|'.join( splits[:targetIndex+1] ) 
     
     
-    
-    
-    
-    
-    
 
+def getClosestParamAtPoint( inputTargetObj, inputCurve ):
+    
+    targetObj = pymel.core.ls( inputTargetObj )[0]
+    curve = pymel.core.ls( inputCurve )[0]
+    
+    crvShape = curve.getShape()
+    
+    dagPathTarget = getDagPath( targetObj.name() )
+    mtxTarget = dagPathTarget.inclusiveMatrix()
+    dagPathCurve  = getDagPath( crvShape.name() )
+    mtxCurve  = dagPathCurve.inclusiveMatrix()
+    
+    pointTarget = OpenMaya.MPoint( mtxTarget[3] )
+    pointTarget *= mtxCurve.inverse()
+    
+    fnCurve = OpenMaya.MFnNurbsCurve( getDagPath( crvShape.name() ) )
+    
+    util = OpenMaya.MScriptUtil()
+    util.createFromDouble( 0.0 )
+    ptrDouble = util.asDoublePtr()
+    fnCurve.closestPoint( pointTarget, 0, ptrDouble )
+    
+    paramValue = OpenMaya.MScriptUtil().getDouble( ptrDouble )
+    return paramValue
+    
+    
+    
+    
+def makeLookAtChild_( inputLookTarget, inputLookBase, **options ):
+    
+    lookTarget = pymel.core.ls( inputLookTarget )[0]
+    lookBase   = pymel.core.ls( inputLookBase )[0]
+    
+    lookAtChild = pymel.core.createNode( 'transform' )
+    lookAtChild.setParent( lookBase )
+    lookAtConnect( lookTarget, lookAtChild, **options )
+    lookAtChild.t.set( 0,0,0 )
+    return lookAtChild
 

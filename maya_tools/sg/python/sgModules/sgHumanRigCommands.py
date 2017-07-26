@@ -2474,7 +2474,7 @@ class HandRig:
         self.createRigBase()
         self.createControllers()
         self.createJoints()
-        self.createFingerAttributeControl( self.stdHandPrefixList )
+        #self.createFingerAttributeControl( self.stdHandPrefixList )
     
 
 
@@ -2822,6 +2822,11 @@ def createHumanByStd( **options ):
     
     rigGrp = createNode( 'transform', n='rig' )
     parent( jntGrp, ctlsGrp, rigGrp )
+    
+    versionNum = int( pymel.core.about( v=1 ).split( '-' )[0] )
+    if versionNum < 2016:
+        AddAndFixRig.fixFor2015AndLater()
+        
 
 
 
@@ -3042,6 +3047,37 @@ class FollowingIk:
 class AddAndFixRig:
 
     @staticmethod
+    def fixFor2015AndLater():
+        ikHandle1 = pymel.core.ls( 'ikHandle1' )[0]
+        
+        startJoint = ikHandle1.startJoint.listConnections( s=1, d=0 )[0]
+        endEffector = ikHandle1.endEffector.listConnections( s=1, d=0 )[0]
+        endJoint = endEffector.listConnections( s=1, d=0 )[0]
+        
+        allParents = endJoint.getAllParents()
+        targetJoints = [endJoint]
+        for parent in allParents:
+            if parent == startJoint: break
+            targetJoints.append( parent )
+        
+        for targetJoint in targetJoints:
+            cons = targetJoint.ty.listConnections( s=1, d=0, p=1 )
+            cons[0] // targetJoint.ty
+            targetJoint.ty.set( 0 )
+            cons[0] >> targetJoint.tx
+        
+        
+        ikHandles = pymel.core.ls( 'ikHandle9', 'ikHandle10', 'ikHandle12', 'ikHandle13' )
+        
+        for ikHandle1 in ikHandles:
+            endEffector = ikHandle1.endEffector.listConnections( s=1, d=0 )[0]
+            endJoint = endEffector.listConnections( s=1, d=0 )[0]
+            
+            md = endJoint.tx.listConnections( s=1, d=0 )[0]
+            md.input2.set( -md.input2.get() )
+
+
+    @staticmethod
     def fixSplineJointConnections( inputCurveShape, *inputJnts ):
         
         curveShape = pymel.core.ls( inputCurveShape )[0]
@@ -3170,101 +3206,63 @@ class AddAndFixRig:
         targetCurveShape = targetCurve.getShape()
         curveBase = targetCurve.getParent()
         
-        point1Con = targetCurveShape.controlPoints[0].listConnections( s=1, d=0, p=1 )
+        blBase = None
+        for parent in curveBase.getAllParents():
+            if parent.nodeType() == 'transform':
+                blBase = parent
+                break
+        if not blBase: return None
+        
         point2Con = targetCurveShape.controlPoints[1].listConnections( s=1, d=0, p=1 )
         
-        lookAtObject = pymel.core.createNode( 'transform' )
+        lookAtObject = pymel.core.createNode( 'transform', n='lookAtObject' )
         pymel.core.parent( lookAtObject, curveBase )
         lookAtObject.t.set( 0,0,0 )
         angleNode = pymel.core.createNode( 'angleBetween' )
         
         ctl, circleNode = pymel.core.circle()
-        curvePoint1 = pymel.core.createNode( 'transform' )
-        curvePoint2 = pymel.core.createNode( 'transform' )
-        pymel.core.parent( curvePoint1, curvePoint2, ctl )
-        pymel.core.parent( ctl, lookAtObject )
+        ctlP = pymel.core.createNode( 'transform' )
+        ctlP.setParent( blBase )
+        ctl.setParent( ctlP )
         ctl.t.set( 0,0,0 ); ctl.r.set( 0,0,0 )
+        constrain_parent( lookAtObject, ctlP )
+
+        pointNode = pymel.core.createNode( 'multiplyDivide' )
+        baseVector = getDirection( point2Con[0].get() )
+        angleNode.vector1.set( baseVector )
+        point2Con[0] >> pointNode.input1
+        point2Con[0] >> angleNode.vector2
+        pointNode.input2.set( 0.5, 0.5, 0.5 )
+        pointNode.output >> lookAtObject.t
+        angleNode.euler >> lookAtObject.r
         
-        pointAttrs = []
-        if point1Con:
-            pointNode = pymel.core.createNode( 'plusMinusAverage' )
-            vectorNode = pymel.core.createNode( 'plusMinusAverage' )
-            point2Con[0] >> vectorNode.input3D[0]
-            point1Con[0] >> vectorNode.input3D[1]
-            pointNode.op.set( 3 )
-            vectorNode.op.set( 2 )
-            baseVector = getDirection( vectorNode.output3D.get() )
-            angleNode.vector1.set( baseVector )
-            vectorNode.output3D >> angleNode.vector2
-            point1Con[0] >> pointNode.input3D[0]
-            point2Con[0] >> pointNode.input3D[1]
-            pointNode.output3D >> lookAtObject.t
-            angleNode.euler >> lookAtObject.r
-            
-            circleNode.normal.set( baseVector )
-            
-            curvePoint1Mult = pymel.core.createNode( 'multDoubleLinear' )
-            curvePoint2Mult = pymel.core.createNode( 'multDoubleLinear' )
-            curvePoint1Compose = pymel.core.createNode( 'composeMatrix' )
-            curvePoint2Compose = pymel.core.createNode( 'composeMatrix' )
-            vectorNode.output3Dx >> curvePoint1Mult.input1
-            vectorNode.output3Dx >> curvePoint2Mult.input1
-            curvePoint1Mult.input2.set( -.3 )
-            curvePoint2Mult.input2.set( 0.3 )
-            curvePoint1Mult.output >> curvePoint1Compose.itx
-            curvePoint2Mult.output >> curvePoint2Compose.itx
-            
-            mmPoint1 = pymel.core.createNode( 'multMatrix' )
-            dcmpPoint1 = pymel.core.createNode( 'decomposeMatrix' )
-            curvePoint1Compose.outputMatrix >> mmPoint1.i[0]
-            ctl.m >> mmPoint1.i[1]
-            lookAtObject.m >> mmPoint1.i[2]
-            mmPoint1.o >> dcmpPoint1.imat
-            mmPoint2 = pymel.core.createNode( 'multMatrix' )
-            dcmpPoint2 = pymel.core.createNode( 'decomposeMatrix' )
-            curvePoint2Compose.outputMatrix >> mmPoint2.i[0]
-            ctl.m >> mmPoint2.i[1]
-            lookAtObject.m >> mmPoint2.i[2]
-            mmPoint2.o >> dcmpPoint2.imat
-            
-            pointAttrs = [ point1Con[0], dcmpPoint1.ot, dcmpPoint2.ot, point2Con[0] ]
-        else:
-            pointNode = pymel.core.createNode( 'multiplyDivide' )
-            baseVector = getDirection( point2Con[0].get() )
-            angleNode.vector1.set( baseVector )
-            point2Con[0] >> pointNode.input1
-            point2Con[0] >> angleNode.vector2
-            pointNode.input2.set( 0.5, 0.5, 0.5 )
-            pointNode.output >> lookAtObject.t
-            angleNode.euler >> lookAtObject.r
-            
-            circleNode.normal.set( baseVector )
-            
-            curvePoint1Mult = pymel.core.createNode( 'multDoubleLinear' )
-            curvePoint2Mult = pymel.core.createNode( 'multDoubleLinear' )
-            curvePoint1Compose = pymel.core.createNode( 'composeMatrix' )
-            curvePoint2Compose = pymel.core.createNode( 'composeMatrix' )
-            point2Con[0].getChildren()[0] >> curvePoint1Mult.input1
-            point2Con[0].getChildren()[0] >> curvePoint2Mult.input1
-            curvePoint1Mult.input2.set( -.3 )
-            curvePoint2Mult.input2.set( 0.3 )
-            curvePoint1Mult.output >> curvePoint1Compose.itx
-            curvePoint2Mult.output >> curvePoint2Compose.itx
-            
-            mmPoint1 = pymel.core.createNode( 'multMatrix' )
-            dcmpPoint1 = pymel.core.createNode( 'decomposeMatrix' )
-            curvePoint1Compose.outputMatrix >> mmPoint1.i[0]
-            ctl.m >> mmPoint1.i[1]
-            lookAtObject.m >> mmPoint1.i[2]
-            mmPoint1.o >> dcmpPoint1.imat
-            mmPoint2 = pymel.core.createNode( 'multMatrix' )
-            dcmpPoint2 = pymel.core.createNode( 'decomposeMatrix' )
-            curvePoint2Compose.outputMatrix >> mmPoint2.i[0]
-            ctl.m >> mmPoint2.i[1]
-            lookAtObject.m >> mmPoint2.i[2]
-            mmPoint2.o >> dcmpPoint2.imat
-            
-            pointAttrs = [ None, dcmpPoint1.ot, dcmpPoint2.ot, point2Con[0] ]
+        circleNode.normal.set( baseVector )
+        
+        curvePoint1Mult = pymel.core.createNode( 'multDoubleLinear' )
+        curvePoint2Mult = pymel.core.createNode( 'multDoubleLinear' )
+        curvePoint1Compose = pymel.core.createNode( 'composeMatrix' )
+        curvePoint2Compose = pymel.core.createNode( 'composeMatrix' )
+        point2Con[0].getChildren()[0] >> curvePoint1Mult.input1
+        point2Con[0].getChildren()[0] >> curvePoint2Mult.input1
+        curvePoint1Mult.input2.set( -.3 )
+        curvePoint2Mult.input2.set( 0.3 )
+        curvePoint1Mult.output >> curvePoint1Compose.itx
+        curvePoint2Mult.output >> curvePoint2Compose.itx
+        
+        mmPoint1 = pymel.core.createNode( 'multMatrix' )
+        dcmpPoint1 = pymel.core.createNode( 'decomposeMatrix' )
+        curvePoint1Compose.outputMatrix >> mmPoint1.i[0]
+        ctl.wm >> mmPoint1.i[1]
+        targetCurve.getParent().wim >> mmPoint1.i[2]
+        mmPoint1.o >> dcmpPoint1.imat
+        mmPoint2 = pymel.core.createNode( 'multMatrix' )
+        dcmpPoint2 = pymel.core.createNode( 'decomposeMatrix' )
+        curvePoint2Compose.outputMatrix >> mmPoint2.i[0]
+        ctl.wm >> mmPoint2.i[1]
+        lookAtObject.getParent().wim >> mmPoint2.i[2]
+        mmPoint2.o >> dcmpPoint2.imat
+        
+        pointAttrs = [ None, dcmpPoint1.ot, dcmpPoint2.ot, point2Con[0] ]
         
         newCurve = pymel.core.curve( p=[[0,0,0] for i in range(4)], d=3 )
         newCurveShape = newCurve.getShape()
@@ -3279,6 +3277,39 @@ class AddAndFixRig:
         for origCon, destCon in targetCurveShape.listConnections( s=0, d=1, p=1, c=1 ):
             attrName = origCon.attrName()
             newCurve.attr( attrName ) >> destCon
+        
+        selShape = newCurveShape
+        curveInfo = selShape.listConnections( s=0, d=1, type='curveInfo' )[0]
+        multNode = curveInfo.listConnections( d=1, s=0, type='multDoubleLinear' )[0]
+        joints = multNode.listConnections( s=0, d=1, type='joint' )
+        maxValue = selShape.maxValue.get()
+        
+        pointOnCurve = pymel.core.createNode( 'pointOnCurveInfo' )
+        selShape.local >> pointOnCurve.inputCurve
+        jntAndCurveInfos = [[0.0,None,pointOnCurve]]
+        
+        for jnt in joints:
+            paramValue = getClosestParamAtPoint( jnt, selShape.getParent() )/maxValue
+            pointOnCurve = pymel.core.createNode( 'pointOnCurveInfo' )
+            selShape.local >> pointOnCurve.inputCurve
+            pointOnCurve.parameter.set( paramValue )
+            jntAndCurveInfos.append( [ paramValue, jnt, pointOnCurve ] )
+        jntAndCurveInfos.sort()
+        for i in range( 1, len( jntAndCurveInfos ) ):
+            beforeCurveInfo = jntAndCurveInfos[i-1][2]
+            param, jnt, curveInfo = jntAndCurveInfos[i]
+            distNode= pymel.core.createNode( 'distanceBetween' )
+            beforeCurveInfo.position >> distNode.point1
+            curveInfo.position >> distNode.point2
+            eachMultNode = pymel.core.createNode( 'multDoubleLinear' )
+            eachMultNode.input2.set( 1 )
+            distNode.distance >> eachMultNode.input1
+            eachMultNode.output >> jnt.tx
+            if multNode.input2.get() < 0:
+                eachMultNode.input2.set( -1 )
+            eachMultNode.output >> jnt.tx
+        
+        pymel.core.delete( targetCurve )
     
     
     @staticmethod
@@ -3310,6 +3341,28 @@ class AddAndFixRig:
         
         if pymel.core.attributeQuery( 'ballRot', node=ctlFootPiv, ex=1 ):
             ctlFootPiv.ballRot.delete()
+    
+    
+    @staticmethod
+    def fixIkToeJointOrient():
+        
+        for side in ['_L_', '_R_']:
+            
+            if side == '_L_': direction = [1,0,0]
+            elif side == '_R_': direction = [-1,0,0]
+            
+            lookBase = pymel.core.ls( 'PCtl_FootIkToe' + side )[0]
+            lookTarget = pymel.core.ls( 'Ctl_FootIkToe%sEnd' % side )[0]
+            targetJoint = pymel.core.ls( 'FootIkJnt_Toe' + side )[0]
+            lookChild = makeLookAtChild_( lookTarget, lookBase, direction=direction )
+            
+            mm = pymel.core.createNode( 'multMatrix' )
+            lookChild.wm >> mm.i[0]
+            targetJoint.getParent().wim >> mm.i[1]
+            dcmp= pymel.core.createNode( 'decomposeMatrix' )
+            mm.matrixSum >> dcmp.imat
+            dcmp.outputRotate >> targetJoint.jo
+            
         
         
     @staticmethod
