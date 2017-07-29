@@ -1,12 +1,16 @@
-from sgModules import sgcommands
+import pymel.core
+from sgMaya import sgCmds
 
-sels = sgcommands.listNodes( sl=1 )
+sels = pymel.core.ls( sl=1 )
 
-srcMesh = sels[0]
-dstMesh = sels[1]
+firstChildren = sels[0].listRelatives( c=1, ad=1, type='transform' )
+if not firstChildren: firstChildren = []
+firstChildren.append( sels[0] )
 
-orig = sgcommands.getOrigShape( dstMesh )
-if not orig:
-    srcMesh.shape().attr( 'outMesh' ) >> dstMesh.shape().attr( 'inMesh' )
-else:
-    srcMesh.shape().attr( 'outMesh' ) >> orig.attr( 'inMesh' )
+secondChildren = sels[1].listRelatives( c=1, ad=1, type='transform' )
+if not secondChildren: secondChildren = []
+secondChildren.append( sels[1] )
+print len( firstChildren )
+for i in range( len( firstChildren ) ):
+    if not firstChildren[i].getShape(): continue
+    sgCmds.outMeshToInMesh( firstChildren[i], secondChildren[i] )

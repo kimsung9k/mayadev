@@ -4070,6 +4070,7 @@ def createSquashBend( *geos, **options ):
     allbb = OpenMaya.MBoundingBox()
     for geo in geos:
         bb = cmds.exactWorldBoundingBox( geo.name() )
+        if math.fabs( bb[0] ) > 1000000: continue
         bbmin = bb[:3]
         bbmax = bb[3:]
         pointer00 = OpenMaya.MPoint( *bbmin )

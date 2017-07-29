@@ -1,7 +1,8 @@
 from sgModules import sgcommands
 
 sels = cmds.ls( sl=1 )
-children = cmds.listRelatives( sels, c=1, ad=1, type='transform' )
+children = cmds.listRelatives( sels, c=1, ad=1, f=1, type='transform' )
+if not children: children = []
 children += sels
 
 meshs = []

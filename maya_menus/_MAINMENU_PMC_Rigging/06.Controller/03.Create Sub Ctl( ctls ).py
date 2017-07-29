@@ -1,5 +1,5 @@
-from sgModules import sgcommands
+from sgMaya import sgCmds
 import maya.cmds as cmds
 sels = cmds.ls( sl=1 )
 for sel in sels:
-    sgcommands.makeSubCtl( sel )
+    sgCmds.makeSubCtl( sel )
