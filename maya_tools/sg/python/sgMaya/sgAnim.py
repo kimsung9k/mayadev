@@ -220,6 +220,12 @@ def makeWaveGlobal( inputTopJoints, inputCtl ):
         offsetInterval.output >> offsetAll.input2
         offsetAll.output >> topJoint.attr( 'offsetSine' )
         index += 1
+        allWeightPlug = topJoint.allWeight.listConnections( s=1, d=0, p=1 )[0]
+        sgCmds.addAttr( topJoint, ln='globalWeight', min=0, max=1, k=1, dv=1 )
+        multGlobal = pymel.core.createNode( 'multDoubleLinear' )
+        topJoint.globalWeight >> multGlobal.input1
+        allWeightPlug >> multGlobal.input2
+        multGlobal.output >> topJoint.allWeight
 
 
 

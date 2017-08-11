@@ -1,34 +1,34 @@
-from sgModules import sgdata
-from sgModules import sgcommands
-from maya import cmds
+from sgMaya import sgModel, sgCmds
+import pymel.core
+reload( sgCmds )
 
-sels  = cmds.ls( sl=1 )
-mtx   = sgcommands.getMatrixFromSelection( sels )
+sels  = pymel.core.ls( sl=1 )
+mtx   = sgCmds.getMatrixFromSelection( sels )
 
-circleR = sgcommands.makeController( sgdata.Controllers.circlePoints )
-circleG = sgcommands.makeController( sgdata.Controllers.circlePoints )
-circleB = sgcommands.makeController( sgdata.Controllers.circlePoints )
-lineR   = sgcommands.makeController( sgdata.Controllers.linePoints )
-lineG   = sgcommands.makeController( sgdata.Controllers.linePoints )
-lineB   = sgcommands.makeController( sgdata.Controllers.linePoints )
-base    = sgcommands.makeController( sgdata.Controllers.planPoints )
+circleR = sgCmds.makeController( sgModel.Controller.circlePoints )
+circleG = sgCmds.makeController( sgModel.Controller.circlePoints )
+circleB = sgCmds.makeController( sgModel.Controller.circlePoints )
+lineR   = sgCmds.makeController( sgModel.Controller.linePoints )
+lineG   = sgCmds.makeController( sgModel.Controller.linePoints )
+lineB   = sgCmds.makeController( sgModel.Controller.linePoints )
+base    = sgCmds.makeController( sgModel.Controller.planPoints )
 
-circleR.setAttr( 'shape_sx', 0.08 ).setAttr( 'shape_sy', 0.16 ).setAttr( 'shape_sz', 0.16 )
-circleG.setAttr( 'shape_sx', 0.08 ).setAttr( 'shape_sy', 0.16 ).setAttr( 'shape_sz', 0.16 )
-circleB.setAttr( 'shape_sx', 0.08 ).setAttr( 'shape_sy', 0.16 ).setAttr( 'shape_sz', 0.16 )
-lineR.setAttr( 'shape_sz', 0.01 ).setAttr( 'tz', -0.5 )
-lineG.setAttr( 'shape_sz', 0.01 ).setAttr( 'tz',  0.0 )
-lineB.setAttr( 'shape_sz', 0.01 ).setAttr( 'tz',  0.5 )
+circleR.setAttr( 'shape_sx', 0.08 );circleR.setAttr( 'shape_sy', 0.16 );circleR.setAttr( 'shape_sz', 0.16 )
+circleG.setAttr( 'shape_sx', 0.08 );circleG.setAttr( 'shape_sy', 0.16 );circleG.setAttr( 'shape_sz', 0.16 )
+circleB.setAttr( 'shape_sx', 0.08 );circleB.setAttr( 'shape_sy', 0.16 );circleB.setAttr( 'shape_sz', 0.16 )
+lineR.setAttr( 'shape_sz', 0.01 );lineR.setAttr( 'tz', -0.5 )
+lineG.setAttr( 'shape_sz', 0.01 );lineG.setAttr( 'tz',  0.0 )
+lineB.setAttr( 'shape_sz', 0.01 );lineB.setAttr( 'tz',  0.5 )
 base.setAttr( 'shape_sx', 1.5 )
 
-pCircleR = sgcommands.makeParent( circleR ).setAttr( 'tx', -1 ).setAttr( 'tz', -0.5 ).setAttr( 'sx', 2 )
-pCircleG = sgcommands.makeParent( circleG ).setAttr( 'tx', -1 ).setAttr( 'tz',  0.0 ).setAttr( 'sx', 2 )
-pCircleB = sgcommands.makeParent( circleB ).setAttr( 'tx', -1 ).setAttr( 'tz',  0.5 ).setAttr( 'sx', 2 )
+pCircleR = sgCmds.makeParent( circleR );pCircleR.setAttr( 'tx', -1 );pCircleR.setAttr( 'tz', -0.5 );pCircleR.setAttr( 'sx', 2 )
+pCircleG = sgCmds.makeParent( circleG );pCircleG.setAttr( 'tx', -1 );pCircleG.setAttr( 'tz',  0.0 );pCircleG.setAttr( 'sx', 2 )
+pCircleB = sgCmds.makeParent( circleB );pCircleB.setAttr( 'tx', -1 );pCircleB.setAttr( 'tz',  0.5 );pCircleB.setAttr( 'sx', 2 )
 
-sgcommands.parent( pCircleR, pCircleG, pCircleB, lineR, lineG, lineB, base )
+pymel.core.parent( pCircleR, pCircleG, pCircleB, lineR, lineG, lineB, base )
 
 cmds.transformLimits( circleR.name(), tx=[0,1], etx=[1,1] )
 cmds.transformLimits( circleG.name(), tx=[0,1], etx=[1,1] )
 cmds.transformLimits( circleB.name(), tx=[0,1], etx=[1,1] )
 
-sgcommands.select( base )
+pymel.core.select( base )

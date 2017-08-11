@@ -655,10 +655,10 @@ def copyShader( inputFirst, inputSecond ):
         selObjs = pymel.core.ls( sl=1 )
         targetObjs = []
         for selObj in selObjs:
+            if selObj.node() != firstShape: continue
             if selObj.find( '.' ) != -1:
-                if selObj.node() == firstShape:
-                    targetObjs.append( second+'.'+ selObj.split( '.' )[-1] )
-            elif selObj.name() == firstShape.name():
+                targetObjs.append( second+'.'+ selObj.split( '.' )[-1] )
+            else:
                 targetObjs.append( secondShape.name() )
 
         if not targetObjs: continue        
@@ -666,7 +666,30 @@ def copyShader( inputFirst, inputSecond ):
             cmds.sets( targetObj, e=1, forceElement=engine.name() )
             copyObjAndEngines.append( [targetObj, engine.name()] )
     return copyObjAndEngines
+
+
+
+
+def getShaderInfo( inputMesh ):
     
+    mesh = pymel.core.ls( inputMesh )[0]
+    meshShape = getShape( mesh )
+    
+    engines = meshShape.listConnections( type='shadingEngine' )
+    for engine in engines:
+        srcCons = filter( lambda x : x.longName() in ['message', 'outColor'], engine.listConnections( s=1, d=0, p=1 ) )
+        if not srcCons: continue
+        pymel.core.hyperShade( objects = srcCons[0].node() )
+        selObjs = pymel.core.ls( sl=1 )
+        targetObjs = []
+        for selObj in selObjs:
+            if selObj.find( '.' ) != -1:
+                if selObj.node() == meshShape:
+                    targetObjs.append( selObj.split( '.' )[-1] )
+            elif selObj.name() == firstShape.name():
+                targetObjs.append( secondShape.name() )
+
+
 
 
 def getTranslateFromMatrix( mtxValue ):
@@ -691,6 +714,44 @@ def getRotateFromMatrix( mtxValue ):
     return [math.degrees(rotVector.x), math.degrees(rotVector.y), math.degrees(rotVector.z)]
 
 
+def getScaleFromMatrix( mtxValue ):
+    
+    if type( mtxValue ) == list:
+        mtxValue = listToMatrix( mtxValue )
+    
+    trMtx = OpenMaya.MTransformationMatrix( mtxValue )
+    
+    util = OpenMaya.MScriptUtil()
+    util.createFromDouble(0.0, 0.0, 0.0)
+    ptr = util.asDoublePtr()
+    trMtx.getScale(ptr, OpenMaya.MSpace.kObject)
+    
+    scaleX = util.getDoubleArrayItem(ptr, 0)
+    scaleY = util.getDoubleArrayItem(ptr, 1)
+    scaleZ = util.getDoubleArrayItem(ptr, 2)
+    
+    return [scaleX, scaleY, scaleZ]
+
+
+def getShearFromMatrix( mtxValue ):
+    
+    if type( mtxValue ) == list:
+        mtxValue = listToMatrix( mtxValue )
+    
+    trMtx = OpenMaya.MTransformationMatrix( mtxValue )
+    
+    util = OpenMaya.MScriptUtil()
+    util.createFromDouble(0.0, 0.0, 0.0)
+    ptr = util.asDoublePtr()
+    trMtx.getShear(ptr, OpenMaya.MSpace.kObject)
+    
+    shearXY = util.getDoubleArrayItem(ptr, 0)
+    shearXZ = util.getDoubleArrayItem(ptr, 1)
+    shearYZ = util.getDoubleArrayItem(ptr, 2)
+    
+    return [shearXY, shearXZ, shearYZ]
+
+
     
 def freezeJoint( inputJnt ):
     
@@ -698,6 +759,11 @@ def freezeJoint( inputJnt ):
     jntChildren = jnt.listRelatives( c=1, ad=1, type='joint' )
     if not jntChildren: jntChildren = []
     jntChildren.append( jnt )
+    
+    if jnt.r.listConnections( s=1, d=0 ): return
+    if jnt.rx.listConnections( s=1, d=0 ): return
+    if jnt.ry.listConnections( s=1, d=0 ): return
+    if jnt.rz.listConnections( s=1, d=0 ): return
     
     for jnt in jntChildren:
         mtxJnt = pymel.core.xform( jnt, q=1, os=1, matrix=1 )
@@ -808,6 +874,26 @@ def getConstrainMatrix( inputFirst, inputTarget ):
 
 
 
+def insertMatrix( inputTargetAttr, inputMM ):
+
+    targetAttr = pymel.core.ls( inputTargetAttr )[0]
+    mm = pymel.core.ls( inputMM )[0]
+    
+    cons = mm.i.listConnections( s=1, d=0, p=1, c=1 )    
+    srcAttrs = []
+    dstIndices = []
+    for i in range( len( cons ) ):
+        origCon, srcCon = cons[i]
+        srcAttrs.append( srcCon )
+        dstIndices.append( origCon.index()+1 )
+        srcCon // origCon
+    
+    targetAttr >> mm.i[0]
+    for i in range( len( srcAttrs ) ):
+        srcAttrs[i] >> mm.i[dstIndices[i]]
+
+
+
 def constrain_point( first, target ):
     
     mm = getConstrainMatrix( first, target )
@@ -827,18 +913,37 @@ def constrain_rotate( first, target ):
 def constrain_scale( first, target ):
     
     mm = getConstrainMatrix( first, target )
-    dcmp = getDecomposeMatrix( mm )
+    dcmp = getDecomposeMatrix( mm.matrixSum )
     cmds.connectAttr( dcmp + '.os', target + '.s', f=1 )
 
 
 
-
-def constrain_parent( first, target ):
+def constrain_parent( first, target, **options ):
+    
+    mo = False
+    if options.has_key( 'mo' ):
+        mo = options['mo']
     
     mm = getConstrainMatrix( first, target )
     dcmp = getDecomposeMatrix( mm.matrixSum )
+    
+    if mo:
+        localMtx = getMMatrix( target.wm ) * getMMatrix( first.wim )
+        trValue = getTranslateFromMatrix( localMtx )
+        rotValue = getRotateFromMatrix( localMtx )
+        scaleValue = getScaleFromMatrix( localMtx )
+        shearValue = getShearFromMatrix( localMtx )
+        compose = pymel.core.createNode( 'composeMatrix' )
+        compose.it.set( trValue )
+        compose.ir.set( rotValue )
+        compose.inputScale.set( scaleValue )
+        compose.ish.set( shearValue )
+        insertMatrix( compose.outputMatrix, mm )
+    
     cmds.connectAttr( dcmp + '.ot',  target + '.t', f=1 )
     cmds.connectAttr( dcmp + '.or',  target + '.r', f=1 )
+
+
 
 
 def constrain_all( first, target ):
@@ -2089,7 +2194,7 @@ def makeCurveFromSelection( *inputSels, **options ):
         curve.wim >> vp.matrix
         vp.output >> curveShape.attr( 'controlPoints' )[i]
     
-    return curve.name()
+    return curve
 
 
 
@@ -2850,7 +2955,7 @@ def getPointOnCurveFromMeshVertex( inputVtx ):
 def getPivotMatrix( inputTarget ):
     
     target = pymel.core.ls( inputTarget )[0]
-    rp = cmds.getAttr( target + '.rotatePivot' )[0]
+    rp = pymel.core.getAttr( target + '.rotatePivot' )
     rpMtx = listToMatrix( [1,0,0,0, 0,1,0,0, 0,0,1,0 , rp[0], rp[1], rp[2], 1 ] )
     mtx = listToMatrix( cmds.getAttr( target + '.wm' ) )
     
@@ -2880,8 +2985,10 @@ def getUVAtPoint( point, inputMesh ):
 
 
 
-def getSourceConnection( targets, src ):
+def getSourceConnection( inputTargets, inputSrc ):
     
+    targets = pymel.core.ls( inputTargets )
+    src = pymel.core.ls( inputSrc )[0]
     cons = src.listConnections( s=1, d=0, c=1, p=1 )
 
     srcAttrs = []
@@ -2901,9 +3008,31 @@ def getSourceConnection( targets, src ):
 
 
 
+def getCenter( inputSels ):
+    if not inputSels: return None
+    
+    def chunks(l, n):
+        for i in xrange(0, len(l), n):
+            yield l[i:i+n]
+    
+    sels = pymel.core.ls( inputSels, fl=1 )
+    
+    bb = OpenMaya.MBoundingBox()
+    for sel in sels:
+        posList = list( chunks( pymel.core.xform( sel, q=1, ws=1, t=1 ), 3 ) )
+        for pos in posList:
+            pos = OpenMaya.MPoint( *pos )
+            bb.expand( pos )
+    return bb.center()
+
+
+
+
 def putObject( inputPutTarget, typ='null' ):
     
-    putTarget = pymel.core.ls( inputPutTarget )[0]
+    putTarget = pymel.core.ls( inputPutTarget, fl=1 )
+    if len( putTarget ) == 1:
+        putTarget = pymel.core.ls( inputPutTarget )[0]
     
     if typ == 'locator':
         newObj = pymel.core.spaceLocator()[0]
@@ -2913,8 +3042,12 @@ def putObject( inputPutTarget, typ='null' ):
     else:
         newObj = pymel.core.createNode( typ )
     
-    mtx = getPivotMatrix( putTarget )
-    pymel.core.xform( newObj, ws=1, matrix= mtx )
+    if type( putTarget ) in [list, tuple]:
+        center = getCenter( putTarget )
+        pymel.core.move( center.x, center.y, center.z, newObj, ws=1 )
+    else:
+        mtx = getPivotMatrix( putTarget )
+        pymel.core.xform( newObj, ws=1, matrix= mtx )
     return newObj
 
 
@@ -3088,6 +3221,50 @@ def bindTransformBySkinedMesh( inputTransform, inputSkinedMesh ):
     dcmp.ot >> tr.t
     dcmp.outputRotate >> tr.r
     dcmp.os >> tr.s
+
+
+
+
+def bindTransformToMesh( inputTransform, inputMesh, **options ):
+
+    connectTrans = True
+    connectRotate = True
+    constrain = False
+    
+    if options.has_key( 'ct' ):
+        connectTrans = options['ct']
+    if options.has_key( 'cr' ):
+        connectRotate = options['cr']
+
+    tr = pymel.core.ls( inputTransform )[0]
+    mesh = pymel.core.ls( inputMesh )[0]
+    
+    u, v = getUVAtPoint( pymel.core.xform( tr, q=1, ws=1, t=1 ), mesh )
+    follicle = pymel.core.createNode( 'follicle' )
+    follicle.parameterU.set( u )
+    follicle.parameterV.set( v )
+    
+    meshShape = getShape( mesh )
+    meshShape.outMesh >> follicle.inputMesh
+    meshShape.worldMatrix >> follicle.inputWorldMatrix
+    
+    follicleTr = follicle.getParent()
+    
+    if constrain:
+        compose = pymel.core.createNode( 'composeMatrix' )
+        follicle.outTranslate >> compose.it
+        follicle.outRotate >> compose.ir
+        dcmp = getLocalDecomposeMatrix( compose.outputMatrix, follicleTr.pim )
+        if connectTrans: dcmp.ot >> follicleTr.t
+        if connectRotate : dcmp.outputRotate >> follicleTr.r
+    else:
+        if connectTrans: follicle.outTranslate >> follicleTr.t
+        if connectRotate : follicle.outRotate >> follicleTr.r
+    
+    tr.setParent( follicleTr )
+    
+    
+
     
     
     
@@ -3429,7 +3606,8 @@ def setTranslateDefault( inputTarget ):
     attrs = ['tx', 'ty', 'tz']
     for attr in attrs:
         dv = pymel.core.attributeQuery( attr, node= target, ld=1 )[0]
-        target.attr( attr ).set( dv )
+        try:target.attr( attr ).set( dv )
+        except:pass
         
     
 
@@ -3439,7 +3617,8 @@ def setRotateDefault( inputTarget ):
     attrs = ['rx', 'ry', 'rz']
     for attr in attrs:
         dv = pymel.core.attributeQuery( attr, node= target, ld=1 )[0]
-        target.attr( attr ).set( dv )
+        try:target.attr( attr ).set( dv )
+        except:pass
 
 
 
@@ -3449,7 +3628,8 @@ def setScaleDefault( inputTarget ):
     attrs = ['sx', 'sy', 'sz']
     for attr in attrs:
         dv = pymel.core.attributeQuery( attr, node= target, ld=1 )[0]
-        target.attr( attr ).set( dv )
+        try:target.attr( attr ).set( dv )
+        except:pass
 
 
 
@@ -3459,7 +3639,8 @@ def setAllDefault( inputTarget ):
     attrs = cmds.listAttr( target.name(), k=1 )
     for attr in attrs:
         dv = pymel.core.attributeQuery( attr, node= target, ld=1 )[0]
-        target.attr( attr ).set( dv )
+        try:target.attr( attr ).set( dv )
+        except:pass
 
 
 
@@ -3470,7 +3651,10 @@ def getClosestParamAtPoint( inputTargetObj, inputCurve ):
     targetObj = pymel.core.ls( inputTargetObj )[0]
     curve = pymel.core.ls( inputCurve )[0]
     
-    crvShape = curve.getShape()
+    if curve.nodeType() == 'transform':
+        crvShape = curve.getShape()
+    else:
+        crvShape = curve
     
     dagPathTarget = getDagPath( targetObj )
     mtxTarget = dagPathTarget.inclusiveMatrix()
@@ -3731,10 +3915,14 @@ def createFkControlJoint( inputTopFk ):
     beforeJoint = None
     
     topFkP = topFk.getParent()
+    targets = []
+    joints = []
     for child in children:
         if not child.getShape(): continue
         childP = child.getParent()
         childPVec = OpenMaya.MVector( *childP.t.get() )
+        if childPVec.length() == 0: continue
+        
         if isFirst:
             if topFkP: pymel.core.select( topFkP )
             else:pymel.core.select( d=1 )
@@ -3743,16 +3931,23 @@ def createFkControlJoint( inputTopFk ):
         else:
             pymel.core.select( beforeJoint )
             newJoint = pymel.core.joint()
-            if childPVec.length() == 0: continue
         
         pymel.core.xform( newJoint, ws=1, matrix=childP.wm.get() )
-        dcmp = pymel.core.createNode( 'decomposeMatrix' )
-        newJoint.m >> dcmp.imat
-        dcmp.ot >> childP.t
-        dcmp.outputRotate >> childP.r
         newJoint.rename( 'cj_' + childP )
         
+        targets.append( childP )
+        joints.append( newJoint )
+        
         beforeJoint = newJoint
+    
+    for i in range( len( targets ) ):
+        if i == 0:
+            constrain_parent( joints[i], targets[i] )
+        else:
+            dcmp = pymel.core.createNode( 'decomposeMatrix' )
+            joints[i].m >> dcmp.imat
+            dcmp.ot >> targets[i].t
+            dcmp.outputRotate >> targets[i].r
 
 
 
@@ -4096,10 +4291,6 @@ def createRigedCurve( *ctls ):
         ctlPointer1 = makeChild( ctlPointerGrp )
         ctlPointer2 = makeChild( ctlPointerGrp )
         
-        print "ctl : ", ctl
-        print "beforeCtl : ", beforeCtl
-        print "nextCtl : ", nextCtl
-        
         dcmpBefore = getLocalDecomposeMatrix( beforeCtl.wm, ctl.wim )
         distBefore = getDistance( dcmpBefore )
         dcmpAfter  = getLocalDecomposeMatrix( nextCtl.wm, ctl.wim )
@@ -4112,8 +4303,8 @@ def createRigedCurve( *ctls ):
         reverseMultA = -1 if dirindexA >= 3 else 1
         targetAttrA = ['tx','ty','tz'][dirindexA%3]
         
-        ctl.addAttr( 'beforeMult', dv=0.3, cb=1 )
-        ctl.addAttr( 'afterMult', dv=0.3, cb=1 )
+        addAttr( ctl, ln='beforeMult', dv=0.3, cb=1 )
+        addAttr( ctl, ln='afterMult', dv=0.3, cb=1 )
         multBefore = pymel.core.createNode( 'multDoubleLinear' );multBefore.setAttr( 'input2', reverseMultB )
         multAfter  = pymel.core.createNode( 'multDoubleLinear' );multAfter.setAttr( 'input2', reverseMultA )
         ctl.beforeMult >> multBefore.input1
@@ -4301,4 +4492,332 @@ def createSquashBend( geos, **options ):
         
         cmds.connectAttr( upperCtl.name() + '.showDetail', targetNodes[i] + '.v' )
 
+
+
+def copyDeformer( inputSrc, *inputTrgs ):
+    
+    source = pymel.core.ls( inputSrc )[0]
+    targets = [ pymel.core.ls( inputTrg )[0] for inputTrg in inputTrgs ]
+    
+    hists = pymel.core.listHistory( source, pdo=1 )
+    hists.reverse()
+    
+    for hist in hists:
+        if pymel.core.nodeType( hist ) == 'nonLinear':
+            for target in targets:
+                pymel.core.nonLinear( hist, e=1, geometry=target )
+        elif pymel.core.nodeType( hist ) == 'wire':
+            for target in targets:
+                pymel.core.wire( hist, e=1, geometry=target )
+        elif pymel.core.nodeType( hist ) == 'ffd':
+            for target in targets:
+                pymel.core.lattice( hist, e=1, geometry=target )
+        elif pymel.core.nodeType( hist ) == 'skinCluster':
+            for target in targets:
+                autoCopyWeight( source, target )
+
+
+
+
+def getMPoint( inputSrc ):
+    
+    if type( inputSrc ) in [ type( OpenMaya.MVector() ), type( OpenMaya.MPoint() ) ]:
+        return OpenMaya.MPoint( inputSrc )
+    elif type( inputSrc ) == list:
+        return OpenMaya.MPoint( *inputSrc )
+    return OpenMaya.MPoint( *pymel.core.xform( inputSrc, q=1, ws=1, t=1 ) )
+
+
+
+def getMVector( inputSrc ):
+    
+    if type( inputSrc ) in [ type( OpenMaya.MVector() ), type( OpenMaya.MPoint() ) ]:
+        return OpenMaya.MVector( inputSrc )
+    elif type( inputSrc ) == list:
+        return OpenMaya.MVector( *inputSrc )
+    return OpenMaya.MVector( *pymel.core.xform( inputSrc, q=1, ws=1, t=1 ) )
+    
+
+
+
+def getMMatrix( inputAttr ):
+    
+    attr = pymel.core.ls( inputAttr )[0]
+    return listToMatrix( cmds.getAttr( attr.name() ) )
+
+
+
+
+
+def tangentContraint( inputCurve, inputUpObject, inputTarget ):
+
+    curve    = pymel.core.ls( inputCurve )[0]
+    upObject = pymel.core.ls( inputUpObject )[0]
+    target   = pymel.core.ls( inputTarget )[0]
+    
+    if curve.nodeType() == 'transform':
+        curveShape = curve.getShape()
+    else:
+        curveShape = curve
+    
+    paramValue = getClosestParamAtPoint( target, curveShape )
+    curveInfo = pymel.core.createNode( 'pointOnCurveInfo' )
+    
+    curveShape.worldSpace[0] >> curveInfo.inputCurve
+    curveInfo.parameter.set( paramValue )
+    
+    fnCurve = OpenMaya.MFnNurbsCurve( getDagPath( curveShape ) )
+    aimVector = fnCurve.tangent( paramValue, OpenMaya.MSpace.kWorld )
+    
+    targetDagPath = getDagPath( inputTarget )
+    localAimVector = aimVector * targetDagPath.inclusiveMatrixInverse()
+    
+    aimIndex = getDirectionIndex( localAimVector )
+    upIndex = (aimIndex+1) % 3
+    vectorList = [ [1,0,0], [0,1,0], [0,0,1], [-1,0,0], [0,-1,0], [0,0,-1] ]
+    
+    aimVector = vectorList[ aimIndex ]
+    upVector = vectorList[ upIndex ]
+    
+    pymel.core.tangentConstraint( curve, target, aim= aimVector, u= upVector, wu= upVector, wut='objectrotation', wuo=upObject )
+
+
+
+def aimConstraint( inputAim, inputUp, inputTarget ):
+    
+    aim = pymel.core.ls( inputAim )[0]
+    up  = pymel.core.ls( inputUp )[0]
+    target = pymel.core.ls( inputTarget )[0]
+    direction = ( getMVector( aim ) - getMVector( target ) ) * getMMatrix( target.wim )
+    aimIndex = getDirectionIndex( direction )
+    upIndex = (aimIndex+1) % 3
+    vectorList = [ [1,0,0], [0,1,0], [0,0,1], [-1,0,0], [0,-1,0], [0,0,-1] ]
+    aimVector = vectorList[ aimIndex ]
+    upVector = vectorList[ upIndex ]
+    pymel.core.aimConstraint( aim, target, aim=aimVector, u=upVector, wu=upVector, wut='objectrotation', wuo=up )
+
+
+
+def createLineController( inputTopJoint, **options ):
+    
+    topJoint = pymel.core.ls( inputTopJoint )[0]
+    jointH = topJoint.listRelatives( c=1, ad=1, type='joint' )
+    jointH.append( topJoint )
+    jointH.reverse()
+    
+    startJoint = jointH[0]
+    endJoint   = jointH[-1]
+    
+    firstCtl  = makeController( sgModel.Controller.cubePoints, makeParent=1 )
+    secondCtl = makeController( sgModel.Controller.cubePoints, makeParent=1 )
+    pymel.core.xform( firstCtl.getParent(),  ws=1, matrix=startJoint.wm.get() )
+    pymel.core.xform( secondCtl.getParent(), ws=1, matrix=endJoint.wm.get() )
+    
+    curveFirst   = createRigedCurve( firstCtl, secondCtl )
+    
+    middlePoint = createPointOnCurve( curveFirst, 1 )[0]
+    blendTwoMatrixConnect( firstCtl, secondCtl, middlePoint, ct=0 )
+    
+    middleCtl = makeController( sgModel.Controller.spherePoints, makeParent=1 )
+    pymel.core.xform( middleCtl.getParent(), ws=1, matrix=middlePoint.wm.get() )
+    constrain_point( middlePoint, middleCtl.getParent() )
+    tangentContraint( curveFirst, middlePoint, middleCtl.getParent() )
+    
+    curveSecond = createRigedCurve( firstCtl, middleCtl, secondCtl )
+    
+    minValue = curveSecond.getShape().minValue.get()
+    maxValue = curveSecond.getShape().maxValue.get()
+    
+    middleParam = getClosestParamAtPoint( middleCtl, curveSecond )
+    eachCtls = []
+    allPoints = [middlePoint]
+    for i in range( len( jointH ) ):
+        closeParam = getClosestParamAtPoint( jointH[i], curveSecond )
+        paramAttrValue = ( closeParam - minValue )/maxValue * 10
+        eachPointBase = createPointOnCurve( curveSecond, 1 )[0]
+        eachPointBase.parameter.set( paramAttrValue )
+        allPoints.append( eachPointBase )
+        
+        if closeParam < middleParam:
+            blendTwoMatrixConnect( firstCtl, middleCtl, eachPointBase, ct=0 )
+            eachPointBase.blend.set( closeParam/(middleParam - minValue) )
+        else:
+            blendTwoMatrixConnect( middleCtl, secondCtl, eachPointBase, ct=0 )
+            eachPointBase.blend.set( (closeParam-middleParam)/(maxValue - middleParam) )
+        
+        eachPoint = makeChild( eachPointBase )
+        pymel.core.xform( eachPoint, ws=1, matrix=jointH[i].wm.get() )
+        
+        eachCtl = makeController( sgModel.Controller.planePoints, makeParent=1 )
+        if i == len( jointH )-1:
+            constrain_parent( secondCtl, eachCtl.getParent() )
+        else:
+            pymel.core.xform( eachCtl.getParent(), ws=1, matrix= eachPoint.wm.get() )
+            constrain_point( eachPoint, eachCtl.getParent() )
+            tangentContraint( curveSecond, eachPoint, eachCtl.getParent() )
+        eachCtls.append( eachCtl )
+    
+    for i in range( len( eachCtls )-1 ):
+        constrain_point( eachCtls[i], jointH[i] )
+        aimConstraint( eachCtls[i+1], eachCtls[i], jointH[i] )
+    constrain_parent( eachCtls[i+1], jointH[i+1] )
+    
+    direction = ( getMVector(eachCtls[1]) - getMVector( jointH[0] ) ) * getMMatrix( jointH[0].wim )
+    aimIndex = getDirectionIndex( direction )
+    for i in range( len( eachCtls ) ):
+        if aimIndex == 0: eachCtls[i].shape_rz.set( 90 )
+        elif aimIndex == 2: eachCtls[i].shape_rx.set( 90 )
+    
+    etcGrp = pymel.core.group( allPoints, curveFirst, curveSecond )
+    ctlsGrp = pymel.core.group( firstCtl.getParent(), secondCtl.getParent(), middleCtl.getParent(), [ eachCtl.getParent() for eachCtl in eachCtls ] )
+    etcGrp.v.set( 0 )
+
+    return firstCtl, secondCtl, middleCtl, eachCtls, ctlsGrp, etcGrp
+
+
+
+def putControllerToGeo( inputTarget, points, multSize = 1.0 ):
+    
+    def makeParent( target ):
+        targetP = pymel.core.createNode( 'transform' )
+        pymel.core.xform( targetP, ws=1, matrix= target.wm.get() )
+        pymel.core.parent( target, targetP )
+        targetP.rename( 'P' + target.shortName() )
+        return targetP
+    
+    target = pymel.core.ls( inputTarget )[0]
+    
+    if target:
+        if type( target ) in [list, tuple] or target.find( '.' ) != -1:
+            worldCenter = getCenter( target )
+            controllerMatrix = [1,0,0,0, 0,1,0,0, 0,0,1,0, worldCenter.x, worldCenter.y, worldCenter.z, 1 ]
+            sizeX = 1
+            sizeY = 1
+            sizeZ = 1
+        else:
+            bbmin = target.boundingBoxMin.get()
+            bbmax = target.boundingBoxMax.get()
+            sizeX = (bbmax[0]-bbmin[0])/2 * multSize
+            sizeY = (bbmax[1]-bbmin[1])/2 * multSize
+            sizeZ = (bbmax[2]-bbmin[2])/2 * multSize
+            controllerMatrix = matrixToList( getPivotMatrix( target ) )
+    else:
+        controllerMatrix = OpenMaya.MMatrix()
+
+    if sizeX == 0: sizeX = 1
+    if sizeY == 0: sizeY = 1
+    if sizeZ == 0: sizeZ = 1
+
+    targetCtl = makeController( points )
+    targetCtl.shape_sx.set( sizeX )
+    targetCtl.shape_sy.set( sizeY )
+    targetCtl.shape_sz.set( sizeZ )
+    pymel.core.xform( targetCtl, ws=1, matrix=controllerMatrix )
+    makeParent( targetCtl )
+    
+    return targetCtl
+
+
+
+def getMatrixFromSelection( sels ):
+    
+    isTransform = False
+    if len( sels ) == 1:
+        if sels[0].find( '.' ) == -1:
+            if cmds.objExists( sels[0] ) and cmds.nodeType( sels[0] ) in ['mesh', 'transform']:
+                isTransform = True
+            
+    if sels:
+        if isTransform:
+            return pymel.core.xform( sels[0], q=1, ws=1, matrix=1 )
+        else:
+            try:
+                centerPos = getCenter( sels )
+                mtx = [1,0,0,0, 0,1,0,0, 0,0,1,0, centerPos.x, centerPos.y, centerPos.z,1 ]
+                return mtx
+            except:
+                return [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]
+    else:
+        return [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]
+
+
+
+def createSliderBase( axis=None ):
+    
+    axisX = True
+    axisY = True
+    
+    if axis:
+        axisX = False
+        axisY = False
+        if axis == 'x': axisX = True
+        elif axis == 'y': axisY = True
+        elif axis == 'xy': axisX = True; axisY = True
+
+    baseData = [[-.5,-.5,0],[.5,-.5,0],[.5,.5,0],[-.5,.5,0],[-.5,-.5,0]]
+    baseCurve = pymel.core.curve( p=baseData, d=1 )
+    baseCurveOrigShape= addIOShape( baseCurve )
+    baseCurveShape = baseCurve.getShape()
+    
+    trGeo = pymel.core.createNode( 'transformGeometry' )
+    composeMatrix = pymel.core.createNode( 'composeMatrix' )
+    
+    if axisX:
+        multNodeX = pymel.core.createNode( 'multDoubleLinear' );multNodeX.setAttr( 'input2', 0.5 )
+        addNodeX = pymel.core.createNode( 'addDoubleLinear' );addNodeX.setAttr( 'input2', 1 )
+        baseCurve.addAttr( 'slideSizeX', min=0 ); baseCurve.attr( 'slideSizeX' ).set( e=1, cb=1 )
+        baseCurve.slideSizeX >> multNodeX.input1
+        baseCurve.slideSizeX >> addNodeX.input1
+        addNodeX.output >> composeMatrix.inputScaleX
+        multNodeX.output >> composeMatrix.inputTranslateX
+    
+    if axisY:
+        multNodeY = pymel.core.createNode( 'multDoubleLinear' );multNodeY.setAttr( 'input2', 0.5 )
+        addNodeY = pymel.core.createNode( 'addDoubleLinear' );addNodeY.setAttr( 'input2', 1 )
+        baseCurve.addAttr( 'slideSizeY', min=0 ); baseCurve.attr( 'slideSizeY' ).set( e=1, cb=1 )
+        baseCurve.slideSizeY >> multNodeY.input1
+        baseCurve.slideSizeY >> addNodeY.input1
+        addNodeY.output >> composeMatrix.inputScaleY
+        multNodeY.output >> composeMatrix.inputTranslateY
+    
+    composeMatrix.outputMatrix >> trGeo.transform
+    baseCurveOrigShape.local >> trGeo.inputGeometry
+    trGeo.outputGeometry >> baseCurveShape.create
+
+    return baseCurve
+
+
+
+def connectControllerAttrToBlendAttr( inputCtl, blendTarget ):
+
+    ctl = pymel.core.ls( inputCtl )[0]
+    blendNode = getNodeFromHistory( blendTarget, 'blendShape' )[0]
+    
+    ctlAttrs = [ pymel.core.ls( ctl + '.' + attr )[0] for attr in cmds.listAttr( ctl.name(), k=1 ) ]
+    
+    driverAttr = None
+    driverAttrValue = None
+    for ctlAttr in ctlAttrs:
+        if math.fabs( ctlAttr.get() ) < 0.0001: continue
+        driverAttr = ctlAttr
+        driverAttrValue = driverAttr.get()
+        break
+    
+    blendNodeAttrs = pymel.core.ls( blendNode + '.w[*]' )
+    targetAttr = None
+    targetAttrValue = None
+    for blendNodeAttr in blendNodeAttrs:
+        if math.fabs( blendNodeAttr.get() ) < 0.0001: continue
+        targetAttr = blendNodeAttr
+        targetAttrValue = targetAttr.get()
+        break
+        
+    if driverAttr and targetAttr:
+        animNode = pymel.core.createNode( 'animCurveUU' )
+        pymel.core.setKeyframe( animNode, f=0, v=0 )
+        pymel.core.setKeyframe( animNode, f=driverAttrValue, v=targetAttrValue )
+        pymel.core.keyTangent( animNode, itt='linear', ott='linear' )
+    
+        driverAttr >> animNode.input
+        animNode.output >> targetAttr
 
