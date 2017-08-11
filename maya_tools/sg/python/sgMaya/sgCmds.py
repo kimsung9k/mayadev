@@ -280,10 +280,11 @@ def editShapeByMatrix( inputShapeNode, inputMatrix ):
 
 
 
-def separateParentConnection( node, attrName ):
+def separateParentConnection( inputNode, attrName ):
     
-    if not type( node ) in [ str, unicode ]:
-        node = node.name()
+    node = pymel.core.ls( inputNode )[0]
+    node = node.name()
+    
     parentAttr = cmds.attributeQuery( attrName, node=node, listParent=1 )
     
     if parentAttr:
@@ -1196,16 +1197,9 @@ def setGeometryMatrixToTarget( inputGeo, inputMatrixTarget ):
     for geoShape in geoShapes:
         cmds.select( geoShape.name() )
         cmds.CreateCluster()
-        shapeHists = cmds.listHistory( geoShape.name() )
-        origShape = None
-        cluster = None
-        for hist in shapeHists:
-            if cmds.nodeType( hist ) == 'cluster':
-                cluster = hist
-            if not cmds.nodeType( hist ) in ['mesh','nurbsCurve', 'nurbsSurface']: continue
-            if not cmds.getAttr( hist + '.io' ): continue
-            origShape = pymel.core.ls( hist )[0]
-            break
+        cmds.select( geoShape.name() )
+        cmds.DeleteHistory()
+        origShape = geoShape
         
         outputAttr = None
         inputAttr = None
@@ -3861,7 +3855,7 @@ def createFkControl( topJoint, controllerSize = 1,  pinExists = False ):
     pinCtls = []
     for i in range( len( selH ) ):    
         target = selH[i]
-        ctlTarget = makeController( sgModel.Controller.rhombusPoints, controllerSize, makeParent=1 )
+        ctlTarget = makeController( sgModel.Controller.circlePoints, controllerSize, makeParent=1 )
         ctlTarget.shape_rz.set( 90 )
         ctlP = ctlTarget.getParent()
         pymel.core.xform( ctlP, ws=1, matrix=target.wm.get() )
@@ -3948,6 +3942,8 @@ def createFkControlJoint( inputTopFk ):
             joints[i].m >> dcmp.imat
             dcmp.ot >> targets[i].t
             dcmp.outputRotate >> targets[i].r
+    
+    return joints
 
 
 
@@ -4598,6 +4594,70 @@ def aimConstraint( inputAim, inputUp, inputTarget ):
 
 
 
+def getDecomposeRotateConnection( inputTarget ):
+    
+    target = pymel.core.ls( inputTarget )[0]
+    
+    dcmp = target.listConnections( s=1, d=0, type='decomposeMatrix' )
+    if not dcmp: return
+    if cmds.isConnected( dcmp[0] + '.or', target + '.r' ): return
+    cmds.connectAttr( dcmp[0] + '.or', target + '.r' )
+
+
+
+def getDecomposeScaleConnection( inputTarget ):
+    
+    target = pymel.core.ls( inputTarget )[0]
+    
+    dcmp = target.listConnections( s=1, d=0, type='decomposeMatrix' )
+    if not dcmp: return
+    if cmds.isConnected( dcmp[0] + '.os', target + '.s' ): return
+    cmds.connectAttr( dcmp[0] + '.os', target + '.s' )
+
+
+
+def getDecomposeShearConnection( inputTarget ):
+    
+    target = pymel.core.ls( inputTarget )[0]
+    
+    dcmp = target.listConnections( s=1, d=0, type='decomposeMatrix' )
+    if not dcmp: return
+    if cmds.isConnected( dcmp[0] + '.osh', target + '.sh' ): return
+    cmds.connectAttr( dcmp[0] + '.osh', target + '.sh' )
+
+
+
+
+def connectScaleByTranslateDistance( inputDistTarget1, inputDistTarget2, inputTarget, axisIndex ):
+    
+    distTarget1 = pymel.core.ls( inputDistTarget1 )[0]
+    distTarget2 = pymel.core.ls( inputDistTarget2 )[0]
+    target = pymel.core.ls( inputTarget )[0]
+    targetChild = target.listRelatives( c=1 )[0]
+    if not targetChild: return
+    
+    dcmpPoint1 = getLocalDecomposeMatrix( distTarget1.wm, target.pim )
+    dcmpPoint2 = getLocalDecomposeMatrix( distTarget2.wm, target.pim )
+    distNode = pymel.core.createNode( 'distanceBetween' )
+    dcmpPoint1.ot >> distNode.point1
+    dcmpPoint2.ot >> distNode.point2
+    
+    scaleAttrName = ['sx','sy','sz'][axisIndex]
+    
+    defaultAttrName = 'distanceDefault'
+    addAttr( targetChild, ln=defaultAttrName, cb=1, dv= distNode.distance.get() )
+
+    divNode = pymel.core.createNode( 'multiplyDivide' )
+    divNode.op.set( 2 )
+    
+    distNode.distance >> divNode.input1X
+    targetChild.attr( defaultAttrName ) >> divNode.input2X
+    
+    divNode.outputX >> target.attr( scaleAttrName )
+
+
+
+
 def createLineController( inputTopJoint, **options ):
     
     topJoint = pymel.core.ls( inputTopJoint )[0]
@@ -4650,7 +4710,7 @@ def createLineController( inputTopJoint, **options ):
         
         eachCtl = makeController( sgModel.Controller.planePoints, makeParent=1 )
         if i == len( jointH )-1:
-            constrain_parent( secondCtl, eachCtl.getParent() )
+            constrain_all( secondCtl, eachCtl.getParent() )
         else:
             pymel.core.xform( eachCtl.getParent(), ws=1, matrix= eachPoint.wm.get() )
             constrain_point( eachPoint, eachCtl.getParent() )
@@ -4660,6 +4720,12 @@ def createLineController( inputTopJoint, **options ):
     for i in range( len( eachCtls )-1 ):
         constrain_point( eachCtls[i], jointH[i] )
         aimConstraint( eachCtls[i+1], eachCtls[i], jointH[i] )
+        getDecomposeScaleConnection( jointH[i] )
+        getDecomposeShearConnection( jointH[i] )
+        jointH[i].segmentScaleCompensate.set( 0 )
+        separateParentConnection( jointH[i], 'scale' )
+        connectScaleByTranslateDistance( eachCtls[i], eachCtls[i+1], jointH[i], 0 )
+        
     constrain_parent( eachCtls[i+1], jointH[i+1] )
     
     direction = ( getMVector(eachCtls[1]) - getMVector( jointH[0] ) ) * getMMatrix( jointH[0].wim )
@@ -4821,3 +4887,128 @@ def connectControllerAttrToBlendAttr( inputCtl, blendTarget ):
         driverAttr >> animNode.input
         animNode.output >> targetAttr
 
+
+
+def getMatrixFromRotate( rotValue ):
+    
+    trMtx = OpenMaya.MTransformationMatrix()
+    radRotValues = [ math.radians(i) for i in rotValue ]
+    trMtx.rotateTo( OpenMaya.MEulerRotation( OpenMaya.MVector( *radRotValues ) ) ) 
+    return trMtx.asMatrix()
+
+
+
+def setMatrixToTarget( mtxValue, inputTarget ):
+
+    mtx = OpenMaya.MMatrix()
+    if type( mtxValue ) == list:
+        mtx = listToMatrix( mtxValue )
+    else:
+        mtx = mtxValue
+    transMtxList = [1,0,0,0,
+                    0,1,0,0,
+                    0,0,1,0,
+                    mtx(3,0), mtx(3,1), mtx(3,2), 1]
+    target = pymel.core.ls( inputTarget )[0]
+    
+    if target.type() == 'joint':
+        joValue = target.jo.get()
+        rotMtx = getMatrixFromRotate( joValue )
+        parentMtx = listToMatrix( target.pm.get() )
+        localRotMtx = mtx * ( rotMtx * parentMtx ).inverse()
+        pymel.core.xform( target, ws=1, matrix= transMtxList )
+        rotValue = getRotateFromMatrix( localRotMtx )
+        target.r.set( rotValue )
+    else:
+        pymel.core.xform( target, ws=1, matrix= matrixToList( mtx ) )
+
+
+
+
+def setMatrixToGeoGroup( mtx, inputTarget ):
+    
+    target = pymel.core.ls( inputTarget )[0]
+    tr = cmds.createNode( 'transform' )
+    setMatrixToTarget( mtx, tr )
+    selChildren = cmds.listRelatives( target.name(), c=1, f=1, ad=1, type='transform' )
+    if not selChildren: selChildren = []
+    selChildren.append( target.name() )
+    unParentList = []
+    for selChild in selChildren:
+        if cmds.listRelatives( selChild, s=1, f=1 ):
+            try:selP = cmds.listRelatives( selChild, p=1, f=1 )[0]
+            except:selP = None
+            try:selChild = cmds.parent( selChild, w=1 )[0]
+            except:pass
+            setGeometryMatrixToTarget( selChild, tr )
+            unParentList.append( [selChild,selP] )
+        else:
+            setMatrixToTarget( mtx, selChild )
+    for child, parent in unParentList:
+        if not parent: continue
+        cmds.parent( child, parent )
+    cmds.delete( tr )
+
+
+
+def createDefaultPropRig( propGrp ):
+    
+    propGrp = pymel.core.ls( propGrp )[0]
+    
+    def makeParent( target ):
+        targetP = pymel.core.createNode( 'transform' )
+        pymel.core.xform( targetP, ws=1, matrix= target.wm.get() )
+        pymel.core.parent( target, targetP )
+        targetP.rename( 'P' + target.shortName() )
+        return targetP
+    
+    worldCtl = pymel.core.ls( makeController( sgModel.Controller.circlePoints ).name() )[0]
+    moveCtl  = pymel.core.ls( makeController( sgModel.Controller.crossPoints ).name() )[0]
+    rootCtl  = pymel.core.ls( makeController( sgModel.Controller.circlePoints ).name() )[0]
+    
+    bb = cmds.exactWorldBoundingBox(propGrp.name())
+    bbmin = bb[:3]
+    bbmax = bb[3:]
+    
+    bbsize = max( bbmax[0] - bbmin[0], bbmax[2] - bbmin[2] )/2
+    
+    center     = ( ( bbmin[0] + bbmax[0] )/2, ( bbmin[1] + bbmax[1] )/2, ( bbmin[2] + bbmax[2] )/2 )
+    floorPoint = ( ( bbmin[0] + bbmax[0] )/2, bbmin[1], ( bbmin[2] + bbmax[2] )/2 )
+    
+    worldCtl.t.set( *floorPoint )
+    moveCtl.t.set( *floorPoint )
+    rootCtl.t.set( *center )
+    
+    rootCtl.shape_sx.set( bbsize*1.2 )
+    rootCtl.shape_sy.set( bbsize*1.2 )
+    rootCtl.shape_sz.set( bbsize*1.2 )
+
+    moveCtl.shape_sx.set( bbsize*1.3 )
+    moveCtl.shape_sy.set( bbsize*1.3 )
+    moveCtl.shape_sz.set( bbsize*1.3 )
+    
+    worldCtl.shape_sx.set( bbsize*1.5 )
+    worldCtl.shape_sy.set( bbsize*1.5 )
+    worldCtl.shape_sz.set( bbsize*1.5 )
+    
+    rootCtl.getShape().setAttr( 'overrideEnabled', 1 )
+    rootCtl.getShape().setAttr( 'overrideColor', 29 )
+    moveCtl.getShape().setAttr( 'overrideEnabled', 1 )
+    moveCtl.getShape().setAttr( 'overrideColor', 20 )
+    worldCtl.getShape().setAttr( 'overrideEnabled', 1 )
+    worldCtl.getShape().setAttr( 'overrideColor', 17 )
+    
+    shortName = propGrp.shortName().split( '|' )[-1]
+    rootCtl.rename( 'Ctl_%s_Root' % shortName )
+    moveCtl.rename( 'Ctl_%s_Move' % shortName )
+    worldCtl.rename( 'Ctl_%s_World' % shortName )
+    
+    pRootCtl = makeParent( rootCtl )
+    pMoveCtl = makeParent( moveCtl )
+    pWorldCtl = makeParent( worldCtl )
+    
+    pymel.core.parent( pRootCtl, moveCtl )
+    pymel.core.parent( pMoveCtl, worldCtl )
+
+    setMatrixToGeoGroup( rootCtl.wm.get(), propGrp.name() )
+    constrain_all( rootCtl, propGrp )

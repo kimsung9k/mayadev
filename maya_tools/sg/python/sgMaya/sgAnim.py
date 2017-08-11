@@ -190,6 +190,10 @@ def makeWaveGlobal( inputTopJoints, inputCtl ):
 
     ctl = pymel.core.ls( inputCtl )[0]
 
+    sgCmds.addOptionAttribute( ctl, 'control_offset' )
+    sgCmds.addAttr( ctl, ln='offsetInterval', k=1, dv=1 )
+    sgCmds.addAttr( ctl, ln='offsetRand', k=1, dv=1 )
+
     attrs = topJoints[0].listAttr( ud=1 )
     for attr in attrs:
         if attr.lower().find( 'offset' ) != -1: continue
@@ -201,11 +205,6 @@ def makeWaveGlobal( inputTopJoints, inputCtl ):
         for circleAttr in circleAttrs:
             if not pymel.core.attributeQuery( circleAttr.longName(), node=topJoint, ex=1 ): continue
             circleAttr >> topJoint.attr( circleAttr.longName() )
-    
-    sgCmds.addOptionAttribute( ctl, 'control_offset' )
-    
-    sgCmds.addAttr( ctl, ln='offsetInterval', k=1, dv=1 )
-    sgCmds.addAttr( ctl, ln='offsetRand', k=1, dv=1 )
     
     index = 0
     for topJoint in topJoints:
