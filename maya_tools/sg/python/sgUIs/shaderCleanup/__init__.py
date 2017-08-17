@@ -47,6 +47,9 @@ class Window_global:
             
             lines = data.split( '\n' )
             
+            for line in lines:
+                print "line : ", line
+            
             shaders = map( lambda x : x.strip(), lines[0].split( '\t' ) )
             shaderAttrs = [ [] for i in range( len( shaders ) ) ]
             

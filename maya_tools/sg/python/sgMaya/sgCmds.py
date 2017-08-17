@@ -7,6 +7,15 @@ import math
 from sgMaya import sgModel
 
 
+
+def getOptionValue( keyName, returnValue, **options ):
+    
+    if options.has_key( keyName ):
+        returnValue = options[ keyName ]
+    return returnValue
+
+
+
 def getIntPtr( intValue = 0 ):
     util = OpenMaya.MScriptUtil()
     util.createFromInt(intValue)
@@ -955,6 +964,87 @@ def constrain_all( first, target ):
     cmds.connectAttr( dcmp + '.or',  target + '.r', f=1 )
     cmds.connectAttr( dcmp + '.os',  target + '.s', f=1 )
     cmds.connectAttr( dcmp + '.osh',  target + '.sh', f=1 )
+
+
+
+def getOffsetNode( target, base ):
+    
+    offsetNode = pymel.core.createNode( 'composeMatrix' )
+    matValue = getMMatrix( target.wm ) * getMMatrix( base.wim )
+    offsetNode.it.set( getTranslateFromMatrix( matValue ) )
+    offsetNode.ir.set( getRotateFromMatrix( matValue ) )
+    offsetNode.inputScale.set( getScaleFromMatrix( matValue ) )
+    offsetNode.ish.set( getShearFromMatrix( matValue ) )
+    return offsetNode
+
+
+
+def constrain( *inputs, **options ):
+    
+    srcs   = inputs[:-1]
+    target = inputs[-1]
+    
+    atToChild = False
+    mo = False
+    ct = True
+    cr = True
+    cs = False
+    csh = False
+    
+    atToChild = getOptionValue( 'atToChild', atToChild, **options )
+    mo = getOptionValue( 'mo', mo, **options )
+    ct = getOptionValue( 'ct', ct, **options )
+    cr = getOptionValue( 'cr', cr, **options )
+    cs = getOptionValue( 'cs', cs, **options )
+    csh = getOptionValue( 'csh', csh, **options )
+    
+    if len( srcs ) == 1:
+        mm = getLocalMatrix( srcs[0].wm, target.pim )
+        if mo: 
+            offsetNode = getOffsetNode( target, srcs[0] )
+            insertMatrix( offsetNode.outputMatrix, mm )
+    else:
+        addNode = pymel.core.createNode( 'plusMinusAverage' )
+        conditionNode = pymel.core.createNode( 'condition' )
+        addNode.output1D >> conditionNode.firstTerm
+        addNode.output1D >> conditionNode.colorIfFalseR
+        conditionNode.colorIfTrueR.set( 1 )
+        
+        wtAddMtx = pymel.core.createNode( 'wtAddMatrix' )
+        mm = getLocalMatrix( wtAddMtx.matrixSum, target.pim )
+        
+        for i in range( len( srcs ) ):
+            eachMM = pymel.core.createNode( 'multMatrix' )
+            srcs[i].wm >> eachMM.i[0]
+            if mo: 
+                offsetNode = getOffsetNode( target, srcs[i] )
+                insertMatrix( offsetNode.outputMatrix, eachMM )
+                
+            if atToChild:
+                targetChild = target.listRelatives( c=1, type='transform' )
+                if targetChild:
+                    addAttr( targetChild[0], ln='blend_%d' % i, k=1, min=0, dv=1 )
+                    blendAttr = targetChild[0].attr( 'blend_%d' % i )
+                else:
+                    addAttr( target, ln='blend_%d' % i, k=1, min=0, dv=1 )
+                    blendAttr = target.attr( 'blend_%d' % i )
+            else:
+                addAttr( target, ln='blend_%d' % i, k=1, min=0, dv=1 )
+                blendAttr = target.attr( 'blend_%d' % i )
+            blendAttr >> addNode.input1D[i]
+            divNode = pymel.core.createNode( 'multiplyDivide' ); divNode.op.set( 2 )
+            blendAttr >> divNode.input1X
+            conditionNode.outColorR >> divNode.input2X
+            
+            eachMM.o >> wtAddMtx.i[i].m
+            divNode.outputX >> wtAddMtx.i[i].w
+    resultDcmp = getDecomposeMatrix( mm.o )
+    
+    if ct  : resultDcmp.ot >> target.t
+    if cr  : resultDcmp.outputRotate >> target.r
+    if cs  : resultDcmp.os >> target.s
+    if csh : resultDcmp.osh >> target.sh
+            
 
 
 
@@ -2615,6 +2705,7 @@ def renameSelOrder( sels ):
 
 
 
+
 def getDefaultAnimCurveUU( floats, values ):
 
     animCurve = pymel.core.createNode( 'animCurveUU' )
@@ -2625,6 +2716,8 @@ def getDefaultAnimCurveUU( floats, values ):
 
 
 
+
+
 def getDefaultAnimCurveUA( floats, values ):
 
     animCurve = pymel.core.createNode( 'animCurveUA' )
@@ -2632,6 +2725,7 @@ def getDefaultAnimCurveUA( floats, values ):
         pymel.core.setKeyframe( animCurve, f=floats[i], v=values[i] )
     pymel.core.keyTangent( animCurve, itt='linear', ott='linear' )
     return animCurve
+
 
 
 
@@ -2666,6 +2760,7 @@ def getMatrixAngleNode( inputTargetObj, directionIndex ):
     mm.o >> dcmp.imat
     return dcmp
     
+
 
 
 
@@ -2793,6 +2888,8 @@ def surfaceColorAtPoint( inputSurfaceNode, position ):
     
 
 
+
+
 def getAverageColorFromSurface( inputSurface ):
     
     surfaceNode = pymel.core.ls( inputSurface )[0]
@@ -2835,7 +2932,9 @@ def createBoundingBox( inputTarget ):
     return cube
 
 
-    
+
+
+
 def setAttrCurrentAsDefault( inputTarget ):
     
     target = pymel.core.ls( inputTarget )[0]
@@ -2852,6 +2951,7 @@ def setAttrCurrentAsDefault( inputTarget ):
 
 
 
+
 def getVerticesFromEdge( fnMesh, edgeNum ):
 
     util = OpenMaya.MScriptUtil()
@@ -2861,6 +2961,8 @@ def getVerticesFromEdge( fnMesh, edgeNum ):
     first = OpenMaya.MScriptUtil.getInt2ArrayItem( int2Ptr, 0, 0 )
     second = OpenMaya.MScriptUtil.getInt2ArrayItem( int2Ptr, 0, 1 )
     return first, second
+
+
 
 
 
@@ -2878,6 +2980,7 @@ def getConnectedVertices( inputVtx ):
     itMeshVtx.getConnectedVertices( indices )
     return [ pymel.core.ls( mesh + '.vtx[%d]' % indices[i] )[0] for i in range( indices.length() ) ]
     
+
 
 
 
@@ -2946,6 +3049,7 @@ def getPointOnCurveFromMeshVertex( inputVtx ):
     
 
 
+
 def getPivotMatrix( inputTarget ):
     
     target = pymel.core.ls( inputTarget )[0]
@@ -2954,6 +3058,8 @@ def getPivotMatrix( inputTarget ):
     mtx = listToMatrix( cmds.getAttr( target + '.wm' ) )
     
     return matrixToList( rpMtx * mtx )
+
+
 
 
 
@@ -3018,6 +3124,7 @@ def getCenter( inputSels ):
             pos = OpenMaya.MPoint( *pos )
             bb.expand( pos )
     return bb.center()
+
 
 
 
@@ -5012,3 +5119,56 @@ def createDefaultPropRig( propGrp ):
 
     setMatrixToGeoGroup( rootCtl.wm.get(), propGrp.name() )
     constrain_all( rootCtl, propGrp )
+
+
+
+def buildMouthDetailController( detailPointers ):
+    
+    ptUpper = detailPointers[0]
+    ptLeft  = detailPointers[3]
+    ptBottom = detailPointers[6]
+    ptRight = detailPointers[9]
+    
+    size = getMPoint( ptLeft ).distanceTo( getMPoint( ptRight ))
+    controllerSize = size / 20
+    
+    ctlUpper = makeController( sgModel.Controller.spherePoints, controllerSize * 1.3, makeParent=1, n= 'Ctl_Mouth_Upper' )
+    ctlLeft = makeController( sgModel.Controller.spherePoints, controllerSize * 1.3, makeParent=1, n= 'Ctl_Mouth_Left' )
+    ctlBottom = makeController( sgModel.Controller.spherePoints, controllerSize * 1.3, makeParent=1, n= 'Ctl_Mouth_Bottom' )
+    ctlRight = makeController( sgModel.Controller.spherePoints, controllerSize * 1.3, makeParent=1, n='Ctl_Mouth_Right' )
+    
+    pymel.core.xform( ctlUpper.getParent(), ws=1, matrix=ptUpper.wm.get() )
+    pymel.core.xform( ctlLeft.getParent(), ws=1, matrix=ptLeft.wm.get() )
+    pymel.core.xform( ctlBottom.getParent(), ws=1, matrix=ptBottom.wm.get() )
+    pymel.core.xform( ctlRight.getParent(), ws=1, matrix=ptRight.wm.get() )
+    
+    ctlDts = []
+    for i in range( len( detailPointers ) ): 
+        ctlDt = makeController( sgModel.Controller.spherePoints, controllerSize * 0.7, makeParent=1, n='Ctl_Mouth_dt_%d' % i )
+        pymel.core.xform( ctlDt.getParent(), ws=1, matrix= detailPointers[i].wm.get() )
+        ctlDts.append( ctlDt )
+    
+    constrain( ctlUpper, ctlDts[0].getParent() )
+    constrain( ctlUpper, ctlLeft, ctlDts[1].getParent(), mo=1, atToChild=1 )
+    constrain( ctlUpper, ctlLeft, ctlDts[2].getParent(), mo=1, atToChild=1 )
+    constrain( ctlLeft, ctlDts[3].getParent() )
+    constrain( ctlBottom, ctlLeft, ctlDts[4].getParent(), mo=1, atToChild=1 )
+    constrain( ctlBottom, ctlLeft, ctlDts[5].getParent(), mo=1, atToChild=1 )
+    constrain( ctlBottom, ctlDts[6].getParent() )
+    constrain( ctlBottom, ctlRight, ctlDts[7].getParent(), mo=1, atToChild=1 )
+    constrain( ctlBottom, ctlRight, ctlDts[8].getParent(), mo=1, atToChild=1 )
+    constrain( ctlRight, ctlDts[9].getParent() )
+    constrain( ctlUpper, ctlRight, ctlDts[10].getParent(), mo=1, atToChild=1 )
+    constrain( ctlUpper, ctlRight, ctlDts[11].getParent(), mo=1, atToChild=1 )
+    
+    ctlDts[1].blend_0.set( 5 )
+    ctlDts[2].blend_0.set( 0.3 )
+    ctlDts[4].blend_0.set( 0.3 )
+    ctlDts[5].blend_0.set( 5 )
+    ctlDts[7].blend_0.set( 5 )
+    ctlDts[8].blend_0.set( 0.3 )
+    ctlDts[10].blend_0.set( 0.3 )
+    ctlDts[11].blend_0.set( 5 )
+    
+    
+    

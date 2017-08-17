@@ -1,3 +1,5 @@
+#coding=utf8
+
 from maya import cmds
 from sgModules import sgHumanRigCommands
 import os, json
@@ -417,7 +419,7 @@ class Win:
         Win_Global.loadInfo()
         
         cmds.popupMenu( p=Win_Global.txf_parentAttr )
-        cmds.menuItem( l='Load Parent Ctls', c= Win_Cmd.loadParentCtls )
+        cmds.menuItem( l='Load Parent Controller', c= Win_Cmd.loadParentCtls )
         
         from functools import partial
         

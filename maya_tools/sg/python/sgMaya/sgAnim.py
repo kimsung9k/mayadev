@@ -59,15 +59,11 @@ def makeWaveJoint( inputTopJoint ):
     children = topJoint.listRelatives( c=1, type='transform' )
     joints = [topJoint]
     
-    print "children : ", children
-    
     while children:
         joints.append( children[0] )
         children = children[0].listRelatives( c=1, type='transform' )
     
     joints = list( filter( lambda x : x.nodeType() == 'joint', joints ) )
-    
-    print joints
     
     methodList = ['Sine', 'Rand', 'RandBig']
     axisList   = ['X', 'Y', 'Z']
@@ -191,12 +187,12 @@ def makeWaveGlobal( inputTopJoints, inputCtl ):
     ctl = pymel.core.ls( inputCtl )[0]
 
     sgCmds.addOptionAttribute( ctl, 'control_offset' )
-    sgCmds.addAttr( ctl, ln='offsetInterval', k=1, dv=1 )
-    sgCmds.addAttr( ctl, ln='offsetRand', k=1, dv=1 )
+    sgCmds.addAttr( ctl, ln='offsetGlobalInterval', k=1, dv=1 )
+    sgCmds.addAttr( ctl, ln='offsetGlobalRand', k=1, dv=1 )
 
     attrs = topJoints[0].listAttr( ud=1 )
+    sgCmds.addOptionAttribute( ctl, 'wave' )
     for attr in attrs:
-        if attr.lower().find( 'offset' ) != -1: continue
         sgCmds.copyAttribute( topJoints[0], ctl, attr.longName() )
     
     circleAttrs = ctl.listAttr( ud=1, k=1 )
@@ -212,9 +208,9 @@ def makeWaveGlobal( inputTopJoints, inputCtl ):
         offsetInterval = pymel.core.createNode( 'multDoubleLinear' )
         offsetAll = pymel.core.createNode( 'addDoubleLinear' )
         offsetRand.input1.set( random.uniform( -5, 5 ) )
-        ctl.attr( 'offsetRand' ) >> offsetRand.input2
+        ctl.attr( 'offsetGlobalRand' ) >> offsetRand.input2
         offsetInterval.input1.set( index )
-        ctl.attr( 'offsetInterval' ) >> offsetInterval.input2
+        ctl.attr( 'offsetGlobalInterval' ) >> offsetInterval.input2
         offsetRand.output >> offsetAll.input1
         offsetInterval.output >> offsetAll.input2
         offsetAll.output >> topJoint.attr( 'offsetSine' )
