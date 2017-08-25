@@ -1,4 +1,6 @@
 eclipse.preferences.version=1
+encoding//sgUIs/convertImage.py=utf-8
 encoding//sgUIs/pingowms/__init__.py=utf8
 encoding//sgUIs/shaderCleanup/__init__.py=utf-8
 encoding//sgUIs/ui_setMirrorType.py=utf8
+encoding//sgUIs/ui_visibilityConnect.py=utf8

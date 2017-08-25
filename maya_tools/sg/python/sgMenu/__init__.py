@@ -601,9 +601,15 @@ class MenuController:
 
     def create(self):
         
-        self.clearMenu()
-        self.clearPopupCa()
-        self.clearPopupSa()
+        try:self.clearMenu()
+        except:
+            cmds.warning( "Clear Mesh Error" )
+        try:self.clearPopupCa()
+        except:
+            cmds.warning( "Clear Popup(Ctrl + Alt) Error" )
+        try:self.clearPopupSa()
+        except:
+            cmds.warning( "Clear Popup(Shift + Alt) Error" )
         
         if cmds.menu( self.mainMenu, q=1, ex=1 ):
             cmds.deleteUI( self.mainMenu )

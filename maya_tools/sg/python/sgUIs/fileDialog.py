@@ -8,6 +8,7 @@ from functools import partial
 from PySide.QtGui import QFileDialog
 
 
+
 def makeFolder( pathName ):
     
     pathName = pathName.replace( '\\', '/' )
@@ -27,6 +28,7 @@ def makeFolder( pathName ):
     if folderExist: return None
         
     return pathName
+
 
 
 def makeFile( filePath ):

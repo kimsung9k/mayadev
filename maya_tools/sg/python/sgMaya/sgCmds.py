@@ -8,6 +8,13 @@ from sgMaya import sgModel
 
 
 
+def getVectorList():
+    
+    return [ [1,0,0], [0,1,0], [0,0,1], [-1,0,0], [0,-1,0], [0,0,-1] ]
+
+
+
+
 def getOptionValue( keyName, returnValue, **options ):
     
     if options.has_key( keyName ):
@@ -3806,7 +3813,8 @@ def getTangetAtParam( inputCurveObj, paramValue ):
     return [ tangent.x, tangent.y, tangent.z ]
     
     
-    
+
+
 def getNormalAtPoint( inputMesh, inputPoint ):
     
     if type( inputPoint ) in [ list, tuple ]:
@@ -3829,6 +3837,7 @@ def getNormalAtPoint( inputMesh, inputPoint ):
     normal = OpenMaya.MVector( pointOnMesh.getNormal() ) * dagPath.inclusiveMatrix()
     
     return [ normal.x, normal.y, normal.z ]
+
 
 
 

@@ -278,7 +278,7 @@ def cleanController( controller ):
     pController = cmds.listRelatives( controller, p=1, f=1 )
     if not pController: return None
     
-    controllerAttrList = ['shape_tx', 'shape_ty', 'shape_tz', 'shape_rx', 'shape_ry', 'shape_rz', 'shape_sx', 'shape_sy', 'shape_sz', 'radius']
+    controllerAttrList = ['shape_tx', 'shape_ty', 'shape_tz', 'shape_rx', 'shape_ry', 'shape_rz', 'shape_sx', 'shape_sy', 'shape_sz', 'radius', 'scaleMult']
     controllerKeyAttrList = ['v']
 
     for attr in controllerAttrList:
