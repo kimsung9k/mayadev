@@ -183,6 +183,7 @@ class ControlBase:
 
 class TreeWidgetCmds:
     
+    
     @staticmethod
     def setTreeItemCondition( targetItem ):
         
@@ -199,9 +200,7 @@ class TreeWidgetCmds:
 
 
     @staticmethod
-    def reloadTreeItems():
-        
-        treeWidget = ControlBase.uiTreeWidget
+    def reloadTreeItems( treeWidget ):
         
         def getAllChildItems( targetItem ):
             children = [targetItem]
@@ -216,6 +215,48 @@ class TreeWidgetCmds:
                 TreeWidgetCmds.setTreeItemCondition( item )
                 numItems += 1
         print "numItems : ", numItems
+    
+    
+    @staticmethod
+    def updateTaskHierarcy( *args ):
+        
+        expandedItem = args[0]
+        for i in range( expandedItem.childCount() ):
+            expandedItem.takeChild( 0 )
+        
+        if expandedItem.isExpanded():
+            serverPath = ControlBase.getCurrentServerPath()
+            localPath   = ControlBase.getCurrentLocalPath()
+            path = expandedItem.text(1)
+            
+            fullPath = serverPath + path
+            if not os.path.exists( fullPath ): return
+            
+            enableFont  = QtGui.QFont( "", 9, QtGui.QFont.Bold )
+            disableFont = QtGui.QFont( "", 9, QtGui.QFont.Light )
+            
+            numTasks = 0
+            for root, dirs, names in os.walk( fullPath ):
+                for dir in dirs:
+                    newItem = QtGui.QTreeWidgetItem( expandedItem )
+                    newItem.setText( 0, dir )
+                    newItem.setText( 1, root.replace( serverPath, '' ) + '/' + dir )
+                    emptyChild = QtGui.QTreeWidgetItem( newItem )
+                    numTasks += 1
+                for name in names:
+                    newItem = QtGui.QTreeWidgetItem( expandedItem )
+                    newItem.text
+                    newItem.setText( 0, name )
+                    newItem.setText( 1, root.replace( serverPath, '' ) + '/' + name )
+                    numTasks += 1
+                break
+        else:
+            QtGui.QTreeWidgetItem( expandedItem )
+        
+        treeWidget = expandedItem.treeWidget()
+        
+        TreeWidgetCmds.reloadTreeItems( treeWidget )
+        treeWidget.resizeColumnToContents( 0 )
 
 
 
@@ -304,25 +345,17 @@ class Window_manageProject( QtGui.QMainWindow ):
         tableModel.setHorizontalHeaderItem( 3, QtGui.QStandardItem( '최근사용'.decode('utf-8') ) )
         tableModel.setHorizontalHeaderItem( 4, QtGui.QStandardItem( '생성날짜'.decode('utf-8') ) )
         projectTableView.setModel( tableModel )
-
-        WorkAreaGroupBox = QtGui.QGroupBox( '작업 리스트'.decode('utf-8') )
-        WorkAreaGroupLayout = QtGui.QVBoxLayout()
-        workTableView = QtGui.QTableView()
-        tableModel = QtGui.QStandardItemModel( 0, 3, self )
-        tableModel.setHorizontalHeaderItem( 0, QtGui.QStandardItem( '작업이름'.decode('utf-8') ) )
-        tableModel.setHorizontalHeaderItem( 1, QtGui.QStandardItem( '최근사용'.decode('utf-8') ) )
-        tableModel.setHorizontalHeaderItem( 2, QtGui.QStandardItem( '생성날짜'.decode('utf-8') ) )
-        workTableView.setModel( tableModel )
         vLayoutProjects.addWidget( labelProjList )
         vLayoutProjects.addWidget( projectTableView )
-        
+
         widgetVLayoutWorks = QtGui.QWidget()
         vLayoutWorks = QtGui.QVBoxLayout( widgetVLayoutWorks )
-        workButtonsLayout = QtGui.QHBoxLayout()
+        WorkAreaGroupBox = QtGui.QGroupBox( '작업 리스트'.decode('utf-8') )
+        WorkAreaGroupLayout = QtGui.QVBoxLayout()
+        workTreeWidget = WorkTreeWidget()
         buttonDelWork = QtGui.QPushButton( "작업삭제".decode( 'utf-8' ) )
-        workButtonsLayout.addWidget( buttonDelWork )
-        WorkAreaGroupLayout.addWidget( workTableView )
-        WorkAreaGroupLayout.addLayout( workButtonsLayout )
+        WorkAreaGroupLayout.addWidget( workTreeWidget )
+        WorkAreaGroupLayout.addWidget( buttonDelWork )
         WorkAreaGroupBox.setLayout( WorkAreaGroupLayout )
         buttonDelWork.setEnabled( False )
         WorkAreaGroupBox.setEnabled(False)
@@ -338,7 +371,6 @@ class Window_manageProject( QtGui.QMainWindow ):
         verticalSplitter.addWidget( widgetVLayoutWorks )
         
         self.projectTableView = projectTableView
-        self.workTableView   = workTableView
         self.WorkAreaGroupBox = WorkAreaGroupBox
         self.buttonDelProject = buttonDelProject
         
@@ -826,7 +858,26 @@ class Dialog_addTask( QtGui.QDialog ):
         ControlBase.setProjectListData(projectListData)
         self.close()
         ControlBase.mainui.updateTaskList()
+
+
+
+
+
+class WorkTreeWidget( QtGui.QTreeWidget ):
     
+    def __init__(self, *args, **kwargs ):
+        
+        QtGui.QTreeWidget.__init__( self, *args, **kwargs )
+        self.setColumnCount(4)
+        headerItem = self.headerItem()
+        headerItem.setText( 0, '작업이름'.decode('utf-8') )
+        headerItem.setText( 1, '경로'.decode('utf-8') )
+        headerItem.setText( 2, '업데이트날짜'.decode('utf-8') )
+        headerItem.setText( 3, '생성날짜'.decode('utf-8') )
+        self.itemExpanded.connect( TreeWidgetCmds.updateTaskHierarcy )
+        self.itemCollapsed.connect( TreeWidgetCmds.updateTaskHierarcy )
+        
+
     
 
 
@@ -834,7 +885,7 @@ class Dialog_addTask( QtGui.QDialog ):
 class Window( QtGui.QMainWindow ):
     
     objectName = 'ui_pingowms'
-    title = "WMS for Maya Pingo Enter 1.0"
+    title = "Pingo WMS for Maya - v1.0"
     defaultWidth = 550
     defaultHeight = 300
     
@@ -860,13 +911,7 @@ class Window( QtGui.QMainWindow ):
         layout_project.addWidget( manageProject_button )
         
         layoutWorkArea = QtGui.QVBoxLayout()
-        treeWidget = QtGui.QTreeWidget()
-        treeWidget.setColumnCount(4)
-        headerItem = treeWidget.headerItem()
-        headerItem.setText( 0, '작업이름'.decode('utf-8') )
-        headerItem.setText( 1, '경로'.decode('utf-8') )
-        headerItem.setText( 2, '업데이트날짜'.decode('utf-8') )
-        headerItem.setText( 3, '생성날짜'.decode('utf-8') )
+        treeWidget = WorkTreeWidget()
         addTaskArea_button = QtGui.QPushButton( '작업추가'.decode('utf-8') )
         layoutWorkArea.addWidget( treeWidget )
         layoutWorkArea.addWidget( addTaskArea_button )
@@ -878,8 +923,6 @@ class Window( QtGui.QMainWindow ):
         manageProject_button.clicked.connect( self.show_manageProject )
         addTaskArea_button.clicked.connect( self.show_addTaskArea )
         comboBox.currentIndexChanged.connect( self.loadProject )
-        treeWidget.itemExpanded.connect( self.updateTaskHierarcy )
-        treeWidget.itemCollapsed.connect( self.updateTaskHierarcy )
         
         self.comboBox = comboBox
         self.addTaskArea_button = addTaskArea_button
@@ -1004,46 +1047,6 @@ class Window( QtGui.QMainWindow ):
             self.addTaskArea_button.setEnabled( True )
         else:
             self.addTaskArea_button.setEnabled( False )
-            
-            
-    
-    def updateTaskHierarcy(self, *args ):
-        
-        expandedItem = args[0]
-        for i in range( expandedItem.childCount() ):
-            expandedItem.takeChild( 0 )
-        
-        if expandedItem.isExpanded():
-            serverPath = ControlBase.getCurrentServerPath()
-            localPath   = ControlBase.getCurrentLocalPath()
-            path = expandedItem.text(1)
-            
-            fullPath = serverPath + path
-            if not os.path.exists( fullPath ): return
-            
-            enableFont  = QtGui.QFont( "", 9, QtGui.QFont.Bold )
-            disableFont = QtGui.QFont( "", 9, QtGui.QFont.Light )
-            
-            numTasks = 0
-            for root, dirs, names in os.walk( fullPath ):
-                for dir in dirs:
-                    newItem = QtGui.QTreeWidgetItem( expandedItem )
-                    newItem.setText( 0, dir )
-                    newItem.setText( 1, root.replace( serverPath, '' ) + '/' + dir )
-                    emptyChild = QtGui.QTreeWidgetItem( newItem )
-                    numTasks += 1
-                for name in names:
-                    newItem = QtGui.QTreeWidgetItem( expandedItem )
-                    newItem.text
-                    newItem.setText( 0, name )
-                    newItem.setText( 1, root.replace( serverPath, '' ) + '/' + name )
-                    numTasks += 1
-                break
-        else:
-            QtGui.QTreeWidgetItem( expandedItem )
-            
-        TreeWidgetCmds.reloadTreeItems()
-        ControlBase.uiTreeWidget.resizeColumnToContents( 0 )
 
 
 

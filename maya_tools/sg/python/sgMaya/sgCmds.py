@@ -686,29 +686,6 @@ def copyShader( inputFirst, inputSecond ):
 
 
 
-
-def getShaderInfo( inputMesh ):
-    
-    mesh = pymel.core.ls( inputMesh )[0]
-    meshShape = getShape( mesh )
-    
-    engines = meshShape.listConnections( type='shadingEngine' )
-    for engine in engines:
-        srcCons = filter( lambda x : x.longName() in ['message', 'outColor'], engine.listConnections( s=1, d=0, p=1 ) )
-        if not srcCons: continue
-        pymel.core.hyperShade( objects = srcCons[0].node() )
-        selObjs = pymel.core.ls( sl=1 )
-        targetObjs = []
-        for selObj in selObjs:
-            if selObj.find( '.' ) != -1:
-                if selObj.node() == meshShape:
-                    targetObjs.append( selObj.split( '.' )[-1] )
-            elif selObj.name() == firstShape.name():
-                targetObjs.append( secondShape.name() )
-
-
-
-
 def getTranslateFromMatrix( mtxValue ):
     
     if type( mtxValue ) != list:
@@ -3337,7 +3314,6 @@ def bindTransformToMesh( inputTransform, inputMesh, **options ):
 
     connectTrans = True
     connectRotate = True
-    constrain = False
     
     if options.has_key( 'ct' ):
         connectTrans = options['ct']
@@ -3357,23 +3333,17 @@ def bindTransformToMesh( inputTransform, inputMesh, **options ):
     meshShape.worldMatrix >> follicle.inputWorldMatrix
     
     follicleTr = follicle.getParent()
+    offsetTr = pymel.core.createNode( 'transform' )
+    offsetTr.setParent( follicleTr )
     
-    if constrain:
-        compose = pymel.core.createNode( 'composeMatrix' )
-        follicle.outTranslate >> compose.it
-        follicle.outRotate >> compose.ir
-        dcmp = getLocalDecomposeMatrix( compose.outputMatrix, follicleTr.pim )
-        if connectTrans: dcmp.ot >> follicleTr.t
-        if connectRotate : dcmp.outputRotate >> follicleTr.r
-    else:
-        if connectTrans: follicle.outTranslate >> follicleTr.t
-        if connectRotate : follicle.outRotate >> follicleTr.r
+    if connectTrans: follicle.outTranslate >> follicleTr.t
+    if connectRotate : follicle.outRotate >> follicleTr.r
     
-    tr.setParent( follicleTr )
-    
-    
+    pymel.core.xform( offsetTr, ws=1, matrix=tr.wm.get() )
+    constrain( offsetTr, tr )
 
-    
+
+
     
     
 def mirrorControllerShape( target ):
@@ -4167,7 +4137,11 @@ def createRivetFromMeshVertices( components ):
 
 
 
-def connectBindPreMatrix( joint, bindPreObj, targetMesh ):
+def connectBindPreMatrix( inputJoint, inputBindPreObj, inputTargetMesh ):
+    
+    joint = pymel.core.ls( inputJoint )[0]
+    bindPreObj = pymel.core.ls( inputBindPreObj )[0]
+    targetMesh = pymel.core.ls( inputTargetMesh )[0]
     
     skinNodes = getNodeFromHistory( targetMesh, 'skinCluster' )
     
@@ -5178,6 +5152,200 @@ def buildMouthDetailController( detailPointers ):
     ctlDts[8].blend_0.set( 0.3 )
     ctlDts[10].blend_0.set( 0.3 )
     ctlDts[11].blend_0.set( 5 )
+
+
+
+def setBindPreMatrix( inputJnt, inputBindPre ):
+
+    jnt = pymel.core.ls( inputJnt )[0]
+    bindPre = pymel.core.ls( inputBindPre )[0]
+    
+    targetAttrs = jnt.wm.listConnections( s=0, d=1, type='skinCluster', p=1 )
+    if not targetAttrs: return None
+    
+    for targetAttr in targetAttrs:
+        node = targetAttr.node()
+        try:index = targetAttr.index()
+        except: continue
+        bindPre.wim >> node.bindPreMatrix[ index ]
     
     
+
+def paperRig( target, div=[5,2,5] ):
     
+    ffd, lattice, latticeBase = pymel.core.lattice( target, divisions=div, objectCentered=True, ldv=[ i+1 for i in div ] )
+    
+    if math.fabs( lattice.sy.get() ) < 0.0001:
+        lattice.sy.set( 1 )
+        latticeBase.sy.set( 1 )
+    
+    bb = pymel.core.exactWorldBoundingBox( target )
+    bbmin = OpenMaya.MVector( *bb[:3] )
+    bbmax = OpenMaya.MVector( *bb[3:] )
+    
+    bbc = [ (bbmin[i] + bbmax[i])/2.0 for i in range( 3 ) ]
+    
+    startPoint = OpenMaya.MVector( bbmin.x, (bbmin.y + bbmax.y)/2, bbmin.z )
+    
+    xInterval = (bbmax.x - bbmin.x)/(div[0]-1)
+    zInterval = (bbmax.z - bbmin.z)/(div[2]-1)
+    xSize = (bbmax.x - bbmin.x)
+    zSize = (bbmax.z - bbmin.z)
+    
+    worldCtl = makeController( sgModel.Controller.circlePoints, 1, makeParent=1, n='Ctl_World' )
+    moveCtl  = makeController( sgModel.Controller.crossPoints, 1, makeParent=1, n='Ctl_Move' )
+    rootCtl = makeController( sgModel.Controller.planePoints, 1, makeParent=1, n='Ctl_Root' )
+    pWorldCtl = worldCtl.getParent()
+    pMoveCtl  = moveCtl.getParent()
+    pRootCtl  = rootCtl.getParent()
+    pWorldCtl.t.set( bbc )
+    pMoveCtl.t.set( bbc )
+    pRootCtl.t.set( bbc )
+    worldCtl.scaleMult.set( xSize/2.0*1.6 )
+    moveCtl.scaleMult.set( xSize/2.0*1.4 )
+    rootCtl.scaleMult.set( xSize/2.0*1.1 )
+    
+    pMoveCtl.setParent( worldCtl )
+    pRootCtl.setParent( moveCtl )
+    
+    setIndexColor( worldCtl, 17 )
+    setIndexColor( moveCtl, 20 )
+    setIndexColor( rootCtl, 15 )
+    
+    joints = []
+    ctls   = []
+    fkCtls = []
+    
+    for i in range( div[0] ):
+        xValue = startPoint.x + xInterval * i
+        yValue = startPoint.y
+        fkCtl = makeController( sgModel.Controller.planePoints, 1, makeParent=1, n='Ctl_Fk_%d' % i )
+        pFkCtl = fkCtl.getParent()
+        pFkCtl.t.set( xValue, yValue, bbc[2] )
+        fkCtl.shape_sz.set( zSize/2.0 )
+        fkCtl.shape_rz.set( 90 )
+        if fkCtls:
+            pFkCtl.setParent( fkCtls[-1] )
+        fkCtls.append( fkCtl )
+        setIndexColor( fkCtl, 23 )
+        
+        baseCtl = makeController( sgModel.Controller.spherePoints, 1, makeParent=1, n='Ctl_Base_%d' % i )
+        setIndexColor( baseCtl, 18 )
+        pBaseCtl = baseCtl.getParent()
+        pBaseCtl.t.set( xValue, yValue, bbc[2] )
+        pBaseCtl.setParent( fkCtl )
+        
+        eachJnts = []
+        eachCtls = []
+        for j in range( div[2] ):
+            zValue = startPoint.z + zInterval * j
+            eachCtl = makeController( sgModel.Controller.spherePoints, .8, makeParent=1, n='Ctl_Each_%d_%d' % ( i, j ) )
+            pEachCtl = eachCtl.getParent()
+            pEachCtl.t.set( xValue, yValue, zValue )
+            jnt = pymel.core.createNode( 'joint' )
+            constrain( eachCtl, jnt, ct=1, cr=1, cs=1, csh=1 )
+            pEachCtl.setParent( baseCtl )
+            eachJnts.append( jnt )
+            eachCtls.append( eachCtl )
+            setIndexColor( eachCtl, 31 )
+        joints.append( eachJnts )
+        ctls.append( eachCtls )
+
+    fkCtls[0].getParent().setParent( rootCtl )
+    bindJoints = []
+    for eachJoints in joints:
+        bindJoints += eachJoints
+
+    skinNode = pymel.core.skinCluster( bindJoints, lattice, tsb=1 )
+    lattice.wm >> skinNode.geomMatrix
+    bindJntGrp = pymel.core.group( bindJoints, n='bindJnts' )
+    
+    initObj = pymel.core.createNode( 'transform', n='initObj' )
+    pymel.core.xform( initObj, ws=1, t=bbc )
+    initBase = pymel.core.createNode( 'transform', n='initBase' )
+    pymel.core.xform( initBase, ws=1, matrix= initObj.wm.get() )
+    initObj.t >> initBase.t
+    initObj.r >> initBase.r
+    
+    bindPres = []
+    for eachJoints in joints:
+        eachBindPres = []
+        for bindJnt in eachJoints:
+            bindPre = pymel.core.createNode( 'transform' )
+            bindPre.dh.set( 1 )
+            pymel.core.xform( bindPre, ws=1, matrix= bindJnt.wm.get() )
+            setBindPreMatrix( bindJnt, bindPre )
+            eachBindPres.append( bindPre )
+        pymel.core.parent( eachBindPres, initBase )
+        bindPres.append( eachBindPres )
+    
+    #bindPre setting
+    beforeAverageNode = None
+    for i in range( len( joints ) ):
+        eachBindPres = bindPres[i]
+        eachJoints   = joints[i]
+        eachCtls     = ctls[i]
+        fkCtl        = fkCtls[i]
+        
+        bindPreControls = []
+        for eachBindPre in eachBindPres:
+            bindPreControl = pymel.core.createNode( 'transform' )
+            pymel.core.xform( bindPreControl, ws=1, matrix=eachBindPre.wm.get() )
+            bindPreControl.setParent( initObj )
+            constrain( bindPreControl, eachBindPre )
+            bindPreControls.append( bindPreControl )
+        
+        averageNode = pymel.core.createNode( 'plusMinusAverage' )
+        averageNode.op.set( 3 )
+        eachBindPres[0].t >> averageNode.input3D[0]
+        eachBindPres[-1].t >> averageNode.input3D[1]
+        
+        if not beforeAverageNode:
+            averageNode.output3D >> fkCtl.getParent().t
+        else:
+            minusNode = pymel.core.createNode( 'plusMinusAverage' )
+            minusNode.op.set( 2 )
+            averageNode.output3D >> minusNode.input3D[0]
+            beforeAverageNode.output3D >> minusNode.input3D[1]
+            minusNode.output3D >> fkCtl.getParent().t
+        
+        beforeAverageNode = averageNode
+        
+        for i in range( len( eachBindPres ) ):
+            minusNode = pymel.core.createNode( 'plusMinusAverage' )
+            minusNode.op.set( 2 )
+            eachBindPres[i].t >> minusNode.input3D[0]
+            averageNode.output3D >> minusNode.input3D[1]
+            minusNode.output3D >> eachCtls[i].getParent().t
+        
+    constrain( initObj, pWorldCtl )
+    
+    #shapeSetting
+    for i in range( len( joints ) ):
+        eachBindPres = bindPres[i]
+        fkCtl        = fkCtls[i]
+        minusNode = pymel.core.createNode( 'plusMinusAverage' ); minusNode.op.set( 2 )
+        multHalf = pymel.core.createNode( 'multDoubleLinear' )
+        eachBindPres[-1].t  >> minusNode.input3D[0]
+        eachBindPres[0].t >> minusNode.input3D[1]
+        minusNode.output3Dz >> multHalf.input1
+        multHalf.input2.set( 0.5 )
+        multHalf.output >> fkCtl.shape_sz
+        
+    
+    bindJntGrp.v.set( 0 )
+    initObj.v.set( 0 )
+    initBase.v.set( 0 )
+    lattice.v.set( 0 )
+    latticeBase.v.set( 0 )
+    
+    for targetCtl in [ rootCtl, moveCtl, worldCtl ]:
+        initObj.sx >> targetCtl.shape_sx
+        initObj.sy >> targetCtl.shape_sy
+        initObj.sz >> targetCtl.shape_sz
+    
+    pymel.core.group( lattice, latticeBase, target, pWorldCtl, bindJntGrp, initObj, initBase, n='SET' )
+
+
+
+
