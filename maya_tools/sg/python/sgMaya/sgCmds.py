@@ -249,8 +249,10 @@ def getDecomposeMatrix( matrixAttr ):
 
 
 
+
 def getLocalDecomposeMatrix( matrixAttr, matrixAttrInv ):
     return getDecomposeMatrix( getLocalMatrix( matrixAttr, matrixAttrInv ).matrixSum )
+
 
 
 
@@ -267,6 +269,7 @@ def makeChild( inputTarget, typ='null', **options ):
     childObject.setParent( target )
     childObject.setMatrix( getDefaultMatrix() )
     return childObject
+
 
 
 def printMatrix( inputMatrix ):
@@ -2250,6 +2253,7 @@ def makeCurveFromSelection( *inputSels, **options ):
     for sel in sels:
         pose = pymel.core.xform( sel, q=1, ws=1, t=1 )[:3]
         poses.append( pose )
+    
     curve = pymel.core.curve( p=poses, **options )
     curveShape = curve.getShape()
     
@@ -2270,7 +2274,7 @@ def makeCurveFromSelection( *inputSels, **options ):
 def getSortedEdgesInSameRing( inputEdges ):
     
     edges = [ pymel.core.ls( inputEdge )[0].name() for inputEdge in inputEdges ]
-    edgeRings = getOrderedEdgeRings( edges[0] )
+    edgeRings = [ i.name() for i in getOrderedEdgeRings( edges[0] ) ]
     
     orderedEdges = {}
     for edge in edges:
@@ -2317,7 +2321,7 @@ def rigWithEdgeRing( inputEdges, inputBaseTransform, degree=2 ):
         
     for edge in edges:
         loopCurve = createLoopCurve( edge )
-        loopCurves.append(loopCurve )
+        loopCurves.append( loopCurve )
         setWorldGeometryToLocalGeometry( loopCurve, baseTransform )
     
     pointsList = []
@@ -2325,6 +2329,7 @@ def rigWithEdgeRing( inputEdges, inputBaseTransform, degree=2 ):
     for loopCurve in loopCurves:
         points = createPointsFromCurve( loopCurve, 4 )
         pointsList.append( points )
+    
     centers = []
     for points in pointsList:
         center = createCenterPoint( points )
@@ -2346,7 +2351,7 @@ def rigWithEdgeRing( inputEdges, inputBaseTransform, degree=2 ):
     
     for i in range( len(edges) ):
         constrain_point( centers[i], jntCenters[i] )
-        tangentNode = cmds.tangentConstraint( curve, jntCenters[i], aim=[0,1,0], u=[1,0,0], wut='vector' )[0]
+        tangentNode = cmds.tangentConstraint( curve.name(), jntCenters[i], aim=[0,1,0], u=[1,0,0], wut='vector' )[0]
         upNode1 = pointsList[i][0]
         upNode2 = pointsList[i][2]
         dcmp1 = getDecomposeMatrix( upNode1 + '.wm' )
@@ -2377,7 +2382,7 @@ def rigWithEdgeRing( inputEdges, inputBaseTransform, degree=2 ):
     for points in pointsList:
         allPoints += points
     
-    cmds.parent( loopCurves, centers, jntCenters, curve, allPoints, baseTransform )
+    cmds.parent( loopCurves, centers, jntCenters, curve.name(), allPoints, baseTransform )
     
     setTransformDefault( curve )
     for target in loopCurves:
@@ -5155,6 +5160,7 @@ def buildMouthDetailController( detailPointers ):
 
 
 
+
 def setBindPreMatrix( inputJnt, inputBindPre ):
 
     jnt = pymel.core.ls( inputJnt )[0]
@@ -5170,6 +5176,7 @@ def setBindPreMatrix( inputJnt, inputBindPre ):
         bindPre.wim >> node.bindPreMatrix[ index ]
     
     
+
 
 def paperRig( target, div=[5,2,5] ):
     
@@ -5188,7 +5195,7 @@ def paperRig( target, div=[5,2,5] ):
     startPoint = OpenMaya.MVector( bbmin.x, (bbmin.y + bbmax.y)/2, bbmin.z )
     
     xInterval = (bbmax.x - bbmin.x)/(div[0]-1)
-    zInterval = (bbmax.z - bbmin.z)/(div[2]-1)
+    zInterval = (bbmax.z - bbmin.z)/(div[1]-1)
     xSize = (bbmax.x - bbmin.x)
     zSize = (bbmax.z - bbmin.z)
     
@@ -5237,9 +5244,9 @@ def paperRig( target, div=[5,2,5] ):
         
         eachJnts = []
         eachCtls = []
-        for j in range( div[2] ):
+        for j in range( div[1] ):
             zValue = startPoint.z + zInterval * j
-            eachCtl = makeController( sgModel.Controller.spherePoints, .8, makeParent=1, n='Ctl_Each_%d_%d' % ( i, j ) )
+            eachCtl = makeController( sgModel.Controller.spherePoints, .6, makeParent=1, n='Ctl_Each_%d_%d' % ( i, j ) )
             pEachCtl = eachCtl.getParent()
             pEachCtl.t.set( xValue, yValue, zValue )
             jnt = pymel.core.createNode( 'joint' )
@@ -5258,6 +5265,7 @@ def paperRig( target, div=[5,2,5] ):
 
     skinNode = pymel.core.skinCluster( bindJoints, lattice, tsb=1 )
     lattice.wm >> skinNode.geomMatrix
+    latticeGrp = pymel.core.group( em=1, n='latticeGrp' ); pymel.core.parent( lattice, latticeBase, latticeGrp )
     bindJntGrp = pymel.core.group( bindJoints, n='bindJnts' )
     
     initObj = pymel.core.createNode( 'transform', n='initObj' )
@@ -5266,6 +5274,7 @@ def paperRig( target, div=[5,2,5] ):
     pymel.core.xform( initBase, ws=1, matrix= initObj.wm.get() )
     initObj.t >> initBase.t
     initObj.r >> initBase.r
+    latticeGrp.setParent( initObj )
     
     bindPres = []
     for eachJoints in joints:
@@ -5331,7 +5340,6 @@ def paperRig( target, div=[5,2,5] ):
         minusNode.output3Dz >> multHalf.input1
         multHalf.input2.set( 0.5 )
         multHalf.output >> fkCtl.shape_sz
-        
     
     bindJntGrp.v.set( 0 )
     initObj.v.set( 0 )
@@ -5344,8 +5352,83 @@ def paperRig( target, div=[5,2,5] ):
         initObj.sy >> targetCtl.shape_sy
         initObj.sz >> targetCtl.shape_sz
     
-    pymel.core.group( lattice, latticeBase, target, pWorldCtl, bindJntGrp, initObj, initBase, n='SET' )
+    pymel.core.group( target, pWorldCtl, bindJntGrp, initObj, initBase, n='SET' )
 
 
 
 
+def makeFreezeGeometry( inputGeo ):
+    
+    targetGeo = pymel.core.ls( inputGeo )[0]
+    targetGeoShape = targetGeo.getShape()
+    if not targetGeoShape:
+        pymel.core.error( "'%s' is not freeze able geometry" % targetGeo.name() )
+        return None
+
+    outputAttrName = None; inputAttrName = None
+    if targetGeoShape.nodeType() == 'mesh':
+        outputAttrName = 'outMesh'
+        inputAttrName  = 'inMesh'
+    elif targetGeoShape.nodeType() in ['nurbsCurve', 'nurbsSurface']:
+        outputAttrName = 'local'
+        inputAttrName = 'create'
+    if not outputAttrName: 
+        pymel.core.error( "'%s' is not freeze able geometry" % targetGeo.name() )
+        return None
+        
+    duTargetGeo = pymel.core.duplicate( targetGeo )[0]
+    duTargetGeo.setParent( w=1 )
+    duTargetGeoShape = duTargetGeo.getShape()
+    trGeo = pymel.core.createNode( 'transformGeometry' )
+    targetGeo.attr( outputAttrName ) >> trGeo.inputGeometry
+    targetGeo.wm >> trGeo.transform
+    trGeo.outputGeometry >> duTargetGeoShape.attr( inputAttrName )
+    
+    return duTargetGeo
+    
+    
+    
+def getSourceGeometry( inputTarget, inputSource ):
+    
+    target = pymel.core.ls( inputTarget )[0]
+    source = pymel.core.ls( inputSource )[0]
+    
+    inputAttrName  = None
+    
+    try:
+        targetShape = target.getShape()
+    except:
+        pymel.core.error( "'%s' has no shape" % target )
+    
+    try:
+        sourceShape = source.getShape()
+    except:
+        pymel.core.error( "'%s' hat no shape" % source )
+    
+    if targetShape.nodeType() != sourceShape.nodeType():
+        pymel.core.error( "'%s' and '%s' has no same geometry type" %( targetShape, sourceShape ) )
+    
+    if targetShape.nodeType() == 'mesh':
+        inputAttrName = 'inMesh'
+    elif targetShape.nodeType() in ['nurbsCurve', 'nurbsSurface']:
+        inputAttrName = 'create'
+    
+    if not inputAttrName:
+        pymel.core.error( "'%s' is not connect able geometry" % target.name() )
+    
+    srcPlug = sourceShape.attr( inputAttrName ).listConnections( s=1, d=0, p=1 )
+    if not srcPlug:
+        pymel.core.error( "%s has no source connection" % sourceShape )
+    
+    srcPlug[0] >> targetShape.attr( inputAttrName )
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
