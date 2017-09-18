@@ -241,16 +241,30 @@ class Window( QtGui.QMainWindow ):
             
             enumNames     = []
             targetObjects = []
+            
+            attrName = 'mode'
+            
             for i in range( 1, numItems-1 ):
                 targetWidget = self.layout.itemAt( i ).widget()
                 eachEnumName = targetWidget.lineEdit_srcAttr.text()
-                targetObject = targetWidget.lineEdit_dstAttr.text()
+                targetObject = pymel.core.ls( targetWidget.lineEdit_dstAttr.text() )[0]
                 if not eachEnumName: continue
                 enumNames.append( eachEnumName )
                 targetObjects.append( targetObject )
             
             enumName = ':'.join( enumNames ) + ':'
-            addAttr( sels[-1], ln=eachEnumName, type='enum', enumName = enumName, k=1 )
+            addAttr( sels[-1], ln=attrName, at='enum', enumName = enumName, k=1 )
+            
+            for i in range( len( targetObjects ) ):
+                if not targetObjects[i]: continue
+                condition = pymel.core.createNode( 'condition' )
+                sels[-1].attr( attrName ) >> condition.firstTerm
+                condition.secondTerm.set( i )
+                condition.colorIfTrueR.set( 1 )
+                condition.colorIfFalseR.set( 0 )
+                condition.outColorR >> targetObjects[i].v
+                
+            
             cmds.undoInfo( cck=1 )
             
         self.ui_buttons.button_connect.clicked.connect( connectCommand )

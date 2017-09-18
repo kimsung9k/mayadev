@@ -327,6 +327,24 @@ class sgCmds:
         return sgCmds.createLocalMatrix( matrixAttr, inverseMatrixAttr )
     
     
+    @staticmethod
+    def getDecomposeMatrix( matrixAttr ):
+    
+        matrixAttr = pymel.core.ls( matrixAttr )[0]
+        cons = matrixAttr.listConnections( s=0, d=1, type='decomposeMatrix' )
+        if cons: 
+            pymel.core.select( cons[0] )
+            return cons[0]
+        decomposeMatrix = pymel.core.createNode( 'decomposeMatrix' )
+        matrixAttr >> decomposeMatrix.imat
+        return decomposeMatrix
+    
+    
+
+    @staticmethod
+    def getLocalDecomposeMatrix( matrixAttr, matrixAttrInv ):
+        return sgCmds.getDecomposeMatrix( sgCmds.getLocalMatrix( matrixAttr, matrixAttrInv ).matrixSum )
+    
     
     @staticmethod
     def listToMatrix( mtxList ):
@@ -491,19 +509,6 @@ class sgCmds:
         elif keyable:
             pymel.core.setAttr( target+'.'+attrName, e=1, k=1 )
 
-
-
-    @staticmethod
-    def getDecomposeMatrix( matrixAttr ):
-    
-        matrixAttr = pymel.core.ls( matrixAttr )[0]
-        cons = matrixAttr.listConnections( s=0, d=1, type='decomposeMatrix' )
-        if cons: 
-            pymel.core.select( cons[0] )
-            return cons[0]
-        decomposeMatrix = pymel.core.createNode( 'decomposeMatrix' )
-        matrixAttr >> decomposeMatrix.imat
-        return decomposeMatrix
     
     
     @staticmethod
@@ -573,11 +578,81 @@ class sgCmds:
         if cs  : resultDcmp.os >> target.s
         if csh : resultDcmp.osh >> target.sh
     
+    
+    @staticmethod
+    
+    def makeCurveFromSelection( *inputSels, **options ):
+        
+        poses = []
+        sels = []
+        for inputSel in inputSels:
+            sels.append( pymel.core.ls( inputSel )[0] )
+        for sel in sels:
+            pose = pymel.core.xform( sel, q=1, ws=1, t=1 )[:3]
+            poses.append( pose )
+        
+        curve = pymel.core.curve( p=poses, **options )
+        curveShape = curve.getShape()
+        
+        for i in range( len( sels ) ):
+            dcmp = pymel.core.createNode( 'decomposeMatrix' )
+            vp   = pymel.core.createNode( 'vectorProduct' )
+            vp.setAttr( 'op', 4 )
+            sels[i].wm >> dcmp.imat
+            dcmp.ot >> vp.input1
+            curve.wim >> vp.matrix
+            vp.output >> curveShape.attr( 'controlPoints' )[i]
+        
+        return curve
+
+
+    @staticmethod
+    def getDagPath( inputTarget ):
+        target = pymel.core.ls( inputTarget )[0]
+        dagPath = OpenMaya.MDagPath()
+        selList = OpenMaya.MSelectionList()
+        selList.add( target.name() )
+        try:
+            selList.getDagPath( 0, dagPath )
+            return dagPath
+        except:
+            return None
+
+    
+    @staticmethod
+    def getClosestParamAtPoint( inputTargetObj, inputCurve ):
+    
+        targetObj = pymel.core.ls( inputTargetObj )[0]
+        curve = pymel.core.ls( inputCurve )[0]
+        
+        if curve.nodeType() == 'transform':
+            crvShape = curve.getShape()
+        else:
+            crvShape = curve
+        
+        dagPathTarget = sgCmds.getDagPath( targetObj )
+        mtxTarget = dagPathTarget.inclusiveMatrix()
+        dagPathCurve  = sgCmds.getDagPath( crvShape )
+        mtxCurve  = dagPathCurve.inclusiveMatrix()
+        
+        pointTarget = OpenMaya.MPoint( mtxTarget[3] )
+        pointTarget *= mtxCurve.inverse()
+        
+        fnCurve = OpenMaya.MFnNurbsCurve( sgCmds.getDagPath( crvShape ) )
+        
+        util = OpenMaya.MScriptUtil()
+        util.createFromDouble( 0.0 )
+        ptrDouble = util.asDoublePtr()
+        fnCurve.closestPoint( pointTarget, 0, ptrDouble )
+        
+        paramValue = OpenMaya.MScriptUtil().getDouble( ptrDouble )
+        return paramValue
+    
 
     @staticmethod
     def createFkControl( topJoint, controllerSize = 1,  pinExists = False ):
 
-        selChildren = topJoint.listRelatives( c=1, ad=1 )
+        selChildren = topJoint.listRelatives( c=1, ad=1, type='joint' )
         selH = selChildren + [topJoint]
         selH.reverse()
         
@@ -587,13 +662,14 @@ class sgCmds:
         for i in range( len( selH ) ):    
             target = selH[i]
             ctlTarget = sgCmds.makeController( Controller.circlePoints, controllerSize, makeParent=1 )
+            ctlTarget.shape_rz.set( 90 )
             ctlP = ctlTarget.getParent()
             pymel.core.xform( ctlP, ws=1, matrix=target.wm.get() )
             if beforeCtl:
                 ctlTarget.getParent().setParent( beforeCtl )
             beforeCtl = ctlTarget
             
-            if pinExists and ( i != 0 and i != len( selH )-1 ):
+            if pinExists:
                 ctlPin = sgCmds.makeController( Controller.pinPoints, controllerSize * 1.2, makeParent=1 )
                 ctlPin.shape_ry.set( 90 )
                 ctlPinP = ctlPin.getParent()
@@ -604,28 +680,52 @@ class sgCmds:
                 pinCtls.append( None )
             ctls.append( ctlTarget )
         
+        aimList = []
+        upList = []
         for i in range( len( selH )-1 ):
             directionIndex = sgCmds.getDirectionIndex( selH[i+1].t.get() )
-            
-            if directionIndex % 3 == 0:
-                ctls[i].shape_rz.set( 90 )
-                ctls[i+1].shape_rz.set( 90 )
-            elif directionIndex % 3 == 2:
-                ctls[i].shape_rx.set( 90 )
-                ctls[i+1].shape_rx.set( 90 )
-            
             vectorList = [[1,0,0], [0,1,0], [0,0,1], [-1,0,0], [0,-1,0], [0,0,-1]]
             aim = vectorList[ directionIndex ]
             up  = vectorList[ (directionIndex + 1)%6 ]
-            aimObj = ctls[i+1]
-            upObj = ctls[i]
             if pinCtls[i]:
                 upObj = pinCtls[i]
+            else:
+                upObj = ctls[i]
             if pinCtls[i+1]:
                 aimObj = pinCtls[i+1]
+            else:
+                aimObj = ctls[i+1]
             pymel.core.aimConstraint( aimObj, selH[i], aim=aim, u=up, wu=up, wut='objectrotation', wuo=upObj )
-            sgCmds.constrain( upObj, selH[i], cr=0 )
-        sgCmds.constrain( ctls[-1], selH[-1], cr=0 ) 
+            aimList.append( aim )
+            upList.append( up )
+            sgCmds.constrain( upObj, selH[i], ct=1, cr=0 )
+        
+        if pinCtls[-1]:
+            sgCmds.constrain( pinCtls[-1], selH[-1], ct=1, cr=1 )
+        else:
+            sgCmds.constrain( ctls[-1], selH[-1], ct=1, cr=1 )
+        
+        aimList.append( aimList[-1] )
+        upList.append( upList[-1] )
+        
+        tangentCurve = sgCmds.makeCurveFromSelection( *ctls )
+        tangentCurveShape = tangentCurve.getShape()
+        for i in range( len( pinCtls ) ):
+            if not pinCtls[i]: continue
+            pPinCtl = pinCtls[i].getParent()
+            
+            closeParam = sgCmds.getClosestParamAtPoint( pPinCtl, tangentCurve )
+            curveInfo = pymel.core.createNode( 'pointOnCurveInfo' )
+            curveInfo.parameter.set( closeParam )
+            tangentCurveShape.worldSpace >> curveInfo.inputCurve
+            vectorNode = pymel.core.createNode( 'vectorProduct' )
+            curveInfo.position >> vectorNode.input1
+            pPinCtl.pim >> vectorNode.matrix
+            vectorNode.operation.set( 4 )
+            vectorNode.output >> pPinCtl.t
+            
+            pymel.core.tangentConstraint( tangentCurve, pPinCtl, aim=aimList[i], u=upList[i],
+                                          wu= upList[i], wut='objectrotation', wuo=ctls[i] )
         
         for i in range( len( selH ) ):
             dcmp = selH[i].listConnections( s=1, d=0, type='decomposeMatrix' )[0]

@@ -526,6 +526,9 @@ def createPointOnCurve( inputCurve, numPoints, **options ):
 
 
 
+
+
+
 def getOrderedEdgeRings( inputTargetEdge ):
     
     targetEdge = pymel.core.ls( inputTargetEdge )[0].name()
@@ -775,11 +778,17 @@ def blendTwoMatrixConnect( inputFirst, inputSecond, inputThird, **options ):
     
     connectTrans = True
     connectRotate = True
+    connectScale = True
+    connectShear = True
     
     if options.has_key( 'ct' ):
         connectTrans = options['ct']
     if options.has_key( 'cr' ):
         connectRotate = options['cr']
+    if options.has_key( 'cs' ):
+        connectScale = options['cs']
+    if options.has_key( 'csh' ):
+        connectShear = options['csh']
     
     first  = pymel.core.ls( inputFirst )[0]
     second = pymel.core.ls( inputSecond )[0]
@@ -807,6 +816,10 @@ def blendTwoMatrixConnect( inputFirst, inputSecond, inputThird, **options ):
         dcmp.ot >> third.t
     if connectRotate:
         dcmp.outputRotate >> third.r
+    if connectScale:
+        dcmp.outputScale >> third.s
+    if connectShear:
+        dcmp.outputShear >> third.sh
 
 
 
@@ -1758,6 +1771,43 @@ def getCurveInfo( inputCurveAttr ):
         curveInfo = pymel.core.createNode( 'curveInfo' )
         curveAttr >> curveInfo.inputCurve
     return curveInfo
+
+
+
+
+
+def attachJointLineToCurve( topJoint, curve ):
+    
+    childrenJnts = topJoint.listRelatives( c=1, ad=1 )
+    childrenJnts.append( topJoint )    
+    childrenJnts.reverse()    
+    topJnt = childrenJnts[0]
+    endJnt = childrenJnts[-1]
+    pymel.core.ikHandle( sj=topJnt, ee=endJnt, curve=curve, sol='ikSplineSolver', ccv=False, pcv=False )
+
+    curveInfos = []
+    for i in range( len( childrenJnts ) ):
+        paramValue = getClosestParamAtPoint( childrenJnts[i], curve )
+        curveInfo = pymel.core.createNode( 'pointOnCurveInfo' )
+        curveShape = curve.getShape()
+        curveShape.local >> curveInfo.inputCurve
+        curveInfo.parameter.set( paramValue )
+        curveInfos.append( curveInfo )
+    
+    for i in range( len( childrenJnts )-1 ):
+        distNode = pymel.core.createNode( 'distanceBetween' )
+        curveInfos[i].position >> distNode.point1
+        curveInfos[i+1].position >> distNode.point2
+        directionIndex = getDirectionIndex( childrenJnts[i+1].t.get() )
+        attr = ['tx', 'ty', 'tz'][ directionIndex % 3 ]
+        if directionIndex >= 3:
+            multMinus = pymel.core.createNode( 'multDoubleLinear' )
+            distNode.distance >> multMinus.input1
+            multMinus.input2.set( -1 )
+            multMinus.output >> childrenJnts[i+1].attr( attr )
+        else:
+            distNode.distance >> childrenJnts[i+1].attr( attr )
+
 
 
     
@@ -3756,6 +3806,33 @@ def getClosestParamAtPoint( inputTargetObj, inputCurve ):
     
     paramValue = OpenMaya.MScriptUtil().getDouble( ptrDouble )
     return paramValue
+
+
+
+
+def attachToCurve( inputTargetObj, inputCurve ):
+    
+    targetObj = pymel.core.ls( inputTargetObj )[0]
+    curve = pymel.core.ls( inputCurve )[0]
+    
+    if curve.nodeType() == 'transform':
+        crvShape = curve.getShape()
+    else:
+        crvShape = curve
+    
+    param = getClosestParamAtPoint( targetObj, curve )
+    curveInfo = pymel.core.createNode( 'pointOnCurveInfo' )
+    
+    crvShape.ws >> curveInfo.inputCurve
+    curveInfo.parameter.set( param )
+    
+    vectorNode = pymel.core.createNode( 'vectorProduct' )
+    vectorNode.op.set( 4 )
+    curveInfo.position >> vectorNode.input1
+    targetObj.pim >> vectorNode.matrix
+    vectorNode.output >> targetObj.t
+    
+
     
     
     
@@ -3954,7 +4031,7 @@ def createFkControl( topJoint, controllerSize = 1,  pinExists = False ):
             ctlTarget.getParent().setParent( beforeCtl )
         beforeCtl = ctlTarget
         
-        if pinExists and ( i != 0 and i != len( selH )-1 ):
+        if pinExists:
             ctlPin = makeController( sgModel.Controller.pinPoints, controllerSize * 1.2, makeParent=1 )
             ctlPin.shape_ry.set( 90 )
             ctlPinP = ctlPin.getParent()
@@ -3977,6 +4054,9 @@ def createFkControl( topJoint, controllerSize = 1,  pinExists = False ):
         if pinCtls[i+1]:
             aimObj = pinCtls[i+1]
         pymel.core.aimConstraint( aimObj, selH[i], aim=aim, u=up, wu=up, wut='objectrotation', wuo=upObj )
+        
+        blendTwoMatrixConnect( ctls[i], ctls[i].getParent(), pinCtls[i].getParent(), ct=0, cr=1, cs=0, csh=0 )
+        
         constrain_point( upObj, selH[i] )
     constrain_parent( ctls[-1], selH[-1] )
     
@@ -5422,6 +5502,101 @@ def getSourceGeometry( inputTarget, inputSource ):
     
     srcPlug[0] >> targetShape.attr( inputAttrName )
     
+    
+    
+    
+def tangentContraintByStartAndEndUp( inputStartUp, inputEndUp, inputCurve, *inputTargets ):
+    
+    startUp = pymel.core.ls( inputStartUp )[0]
+    endUp   = pymel.core.ls( inputEndUp )[0]
+    curve   = pymel.core.ls( inputCurve )[0]
+    targets = [ pymel.core.ls( inputTarget )[0] for inputTarget in inputTargets ]
+    
+    startParam = getClosestParamAtPoint( startUp, curve )
+    endParam   = getClosestParamAtPoint( endUp, curve )
+    
+    for target in targets:
+        cuParam = getClosestParamAtPoint( target, curve )
+        startWeight = ( cuParam - startParam )/( endParam - startParam )
+        if startWeight < 0:
+            startWeight = 0
+        if startWeight > 1:
+            startWeight = 1
+        
+        endWeight = 1.0 - startWeight
+        
+        tangent = OpenMaya.MVector( *getTangetAtParam( curve, cuParam ) )
+        
+        localStartUpTangent = tangent * getMMatrix( startUp.wim )
+        localEndUpTangent = tangent * getMMatrix( endUp.wim )
+        
+        avTangent = localStartUpTangent * startWeight + localEndUpTangent * endWeight
+
+        directionIndex = getDirectionIndex( avTangent )
+        aim = getVectorList()[ directionIndex ]
+        up  = getVectorList()[ (directionIndex + 1)%6 ]
+        
+        vectorStart = pymel.core.createNode( 'vectorProduct' ); vectorStart.op.set( 3 )
+        vectorEnd = pymel.core.createNode( 'vectorProduct' ); vectorEnd.op.set( 3 )
+        vectorStart.input1.set( up )
+        vectorEnd.input1.set( up )
+        multVectorStart = pymel.core.createNode( 'multiplyDivide' ); multVectorStart.input2.set( [endWeight for i in range(3)] )
+        multVectorEnd = pymel.core.createNode( 'multiplyDivide' ); multVectorEnd.input2.set( [startWeight for i in range(3)] )
+        vectorStart.output >> multVectorStart.input1
+        vectorEnd.output >> multVectorEnd.input1
+        
+        startUp.wm >> vectorStart.matrix
+        endUp.wm >> vectorEnd.matrix
+        
+        sumVector = pymel.core.createNode( 'plusMinusAverage' )
+        multVectorStart.output >> sumVector.input3D[0]
+        multVectorEnd.output   >> sumVector.input3D[1]
+        
+        tangentNode = pymel.core.tangentConstraint( curve, target, aim=aim, u=up, wu=up, wut='vector' )
+        sumVector.output3D >> tangentNode.attr( 'worldUpVector' )
+        
+        
+        
+        
+def createDetachPoints( inputCurve, numPoints=2 ):
+    
+    if numPoints == 0: return None
+    curve = pymel.core.ls( inputCurve )[0]
+    curveShape = getShape( curve )
+    
+    minParam = curveShape.minValue.get()
+    maxParam = curveShape.maxValue.get()
+    
+    eachParam = ( maxParam - minParam ) / ( numPoints + 1 )
+    
+    detachCurveNode = pymel.core.createNode( 'detachCurve' )
+    curveShape.local >> detachCurveNode.inputCurve
+    
+    for i in range( numPoints ):
+        cuParam = minParam + eachParam * ( i + 1 )
+        curveInfo = pymel.core.createNode( 'pointOnCurveInfo' )
+        curveShape.worldSpace >> curveInfo.inputCurve
+        
+        pointer = pymel.core.createNode( 'transform' )
+        pointer.dh.set( 1 )
+        addAttr( pointer, ln='param', min=minParam, max=maxParam, k=1, dv=cuParam )
+        
+        pointer.attr( 'param' ) >> curveInfo.parameter
+        
+        vectorNode = pymel.core.createNode( 'vectorProduct' )
+        vectorNode.op.set( 4 )
+        curveInfo.position >> vectorNode.input1
+        pointer.pim >> vectorNode.matrix
+        vectorNode.output >> pointer.t
+        
+        pointer.attr( 'param' ) >> detachCurveNode.parameter[i]
+    
+    for i in range( numPoints+1 ):
+        nurbsCurve = pymel.core.createNode( 'nurbsCurve' )
+        detachCurveNode.outputCurve[i] >> nurbsCurve.create
+        pymel.core.xform( nurbsCurve.getParent(), ws=1, matrix= curve.wm.get() )
+        
+        
     
     
     

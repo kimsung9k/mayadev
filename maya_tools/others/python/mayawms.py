@@ -31,7 +31,6 @@ import xml.etree.ElementTree as ET
 from functools import partial
 from collections import defaultdict
 from maya import cmds, mel
-import RMRigMenu2015
 
 # 레퍼런스 로딩이 느려지는 현상을 제거하기 위한 환경설정 적용
 # preferences/UI Elements
@@ -3528,12 +3527,10 @@ def openWork(w):
 
     if os.path.exists(w.mb):
         mayascene_load(w.mb)
-        reload(RMRigMenu2015)
     else:
         prior = {'rigging':'modeling', 'rendering':'animation', 'lighting':'animation', 'fx':'animation'}
         if w.process not in prior:
             newWork(w)
-            reload(RMRigMenu2015)
         else:
             answer = selectionWindow(u'작업이 없습니다. 이전 공정의 작업을 가져오시겠습니까?', title=u'이전 공정 작업 열기', items=[u'가져오기', u'새로 시작'])
             if answer == u'새로 시작':
@@ -3552,7 +3549,6 @@ def openWork(w):
                     saveScene(w.mb, 'priorwork')
             else:
                 return
-            reload(RMRigMenu2015)
     toWireframeMode()# 1.0.0
     linkOriginalTexture(LOCAL_ROOT)# 1.0.0
     
