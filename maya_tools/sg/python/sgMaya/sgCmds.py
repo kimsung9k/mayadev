@@ -5598,10 +5598,23 @@ def createDetachPoints( inputCurve, numPoints=2 ):
         
         
     
+def getClosestTransform( inputBase, inputCompairTargets ):
     
+    base = pymel.core.ls( inputBase )[0]
+    compairTargets = [ pymel.core.ls( inputCompairTarget )[0] for inputCompairTarget in inputCompairTargets ]
     
+    closeIndex = 0
+    closeDist = 10000000.0
     
+    pointBase = getMPoint( pymel.core.xform( base, q=1, ws=1, t=1 ) )
+    for i in range( len( compairTargets ) ):
+        pointTarget = getMPoint( pymel.core.xform( compairTargets[i], q=1, ws=1, t=1 ) )
+        dist = pointBase.distanceTo( pointTarget )
+        if dist < closeDist:
+            closeDist = dist
+            closeIndex = i
     
+    return compairTargets[ closeIndex ]
     
     
     

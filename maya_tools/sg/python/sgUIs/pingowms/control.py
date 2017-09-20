@@ -33,8 +33,38 @@ class FileControl:
         FileControl.makeFolder( folder )
         f = open( filePath, "w" )
         f.close()
-        
     
+    
+    @staticmethod
+    def fileCmp( first, second ):
+        import time
+        projectTaskState = os.stat(first)
+        if os.path.exists( second ):
+            localTaskState   = os.stat(second)
+            mTimeProjectTask = time.localtime( projectTaskState.st_mtime )
+            mTimeLocalTask   = time.localtime( localTaskState.st_mtime )
+        else:
+            mTimeProjectTask = time.localtime( projectTaskState.st_mtime )
+            mTimeLocalTask   = time.localtime( 0 )
+    
+            return mTimeProjectTask <= mTimeLocalTask
+
+    
+    @staticmethod
+    def updateFile( srcPath, trgPath ):
+        import shutil
+        if not FileControl.fileCmp( srcPath, trgPath ):
+            trgDir = os.path.dirname( trgPath )
+            FileControl.makeFolder( trgDir )
+            shutil.copy2( srcPath, trgPath )
+            return True
+        return False
+    
+    
+
+
+
+
 def isUpdateRequired( first, second ):
     import time
     
@@ -76,18 +106,22 @@ def getTextureFileToLocalList( srcPath, localPath, fileNode ):
 
 
 
-def setPathsServerToLocal( basePath, targetPath, taskPath ):
-    
+def setTextureFileServerToLocal( baseProjectPath, targetProjectPath, taskPath ):    
+    import pymel.core
     files = pymel.core.ls( type='file' )
     for textureFile in files:
         if pymel.core.referenceQuery( textureFile, inr=1 ): continue
         origPath = textureFile.fileTextureName.get()
-        if origPath.find( basePath ) == -1:
-            mapPath = targetPath + '/' + taskPath + '/map'
+        if origPath.find( baseProjectPath ) == -1:
+            mapPath = targetProjectPath + taskPath + '/map'
             FileControl.makeFolder( mapPath )
             replacedPath = mapPath + '/' + origPath.split( '/' )[-1]
         else:
-            replacedPath = origPath.replace( basePath, targetPath )
+            replacedPath = origPath.replace( baseProjectPath, targetProjectPath )
+        
+        if not os.path.exists( origPath ): continue
+        if origPath == replacedPath: continue
+        
         FileControl.updateFile( origPath, replacedPath )
         textureFile.fileTextureName.set( replacedPath )
 
@@ -101,15 +135,14 @@ def loadFile_local( instServerUnit, instLocalUnit ):
     taskPath    = instServerUnit.taskPath
     unitPath    = instServerUnit.unitPath
 
-    projectUnitPath = serverPath + taskPath + unitPath
+    serverUnitPath = serverPath + taskPath + unitPath
     localUnitPath   = localPath + taskPath + unitPath
     
-    if os.path.exists( projectUnitPath ):
-        FileControl.updateFile( projectUnitPath, localUnitPath )
+    if os.path.exists( serverUnitPath ):
+        FileControl.updateFile( serverUnitPath, localUnitPath )
 
     cmds.file( localUnitPath, o=1, f=1, options="v=0;", ignoreVersion=1, typ="mayaBinary" )
-
-    setPathsServerToLocal( serverPath, localPath, taskPath )
+    setTextureFileServerToLocal( serverPath, localPath, taskPath )
     cmds.file( s=1 )
 
 

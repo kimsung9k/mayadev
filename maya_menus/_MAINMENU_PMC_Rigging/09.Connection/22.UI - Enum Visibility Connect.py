@@ -1,0 +1,2 @@
+from sgUIs import ui_visibilityConnect_b
+ui_visibilityConnect_b.show()
