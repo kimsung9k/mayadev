@@ -117,6 +117,7 @@ def listToMatrix( mtxList ):
 def matrixToList( matrix ):
     if type( matrix ) == list:
         return matrix
+    
     mtxList = range( 16 )
     for i in range( 4 ):
         for j in range( 4 ):
@@ -182,6 +183,27 @@ def rotateToMatrix( rotation ):
     trMtx = OpenMaya.MTransformationMatrix()
     trMtx.rotateTo( OpenMaya.MEulerRotation( OpenMaya.MVector(rotX, rotY, rotZ) ) )
     return trMtx.asMatrix()
+
+
+
+
+def getMirrorMatrix( mtxValue ):
+
+    if type( mtxValue ) == list:
+        mtxList = mtxValue
+    else:
+        mtxList = matrixToList( mtxValue )
+        
+    mtxList[1]  *= -1
+    mtxList[2]  *= -1
+    mtxList[5]  *= -1
+    mtxList[6]  *= -1
+    mtxList[9]  *= -1
+    mtxList[10]  *= -1
+    mtxList[12] *= -1
+    
+    return listToMatrix( mtxList )
+
 
 
 
@@ -1129,7 +1151,9 @@ def copyShapeToTransform( inputShape, inputTransform ):
     shape = pymel.core.ls( inputShape )[0]
     transform = pymel.core.ls( inputTransform )[0]
     
-    oTarget = getMObject( transform )
+    tempTr = pymel.core.createNode( 'transform' )
+    oTarget = getMObject( tempTr )
+    
     if shape.type() == 'mesh':
         oMesh = getMObject( shape )
         fnMesh = OpenMaya.MFnMesh( oMesh )
@@ -1142,6 +1166,40 @@ def copyShapeToTransform( inputShape, inputTransform ):
         oSurface = getMObject( shape )
         fnSurface = OpenMaya.MFnNurbsSurface( oSurface )
         fnSurface.copy( oSurface, oTarget )
+
+    setIndexColor( tempTr.getShape(), getIndexColor( shape ) )
+    pymel.core.parent( tempTr.getShape(), transform, shape=1, add=1 )
+    pymel.core.delete( tempTr )
+
+
+
+def reverseShape( inputShape ):
+    
+    shape = pymel.core.ls( inputShape )[0]
+    
+    oShape = getMObject( shape )
+    points = OpenMaya.MPointArray()
+    
+    if shape.type() == 'mesh':
+        fnMesh = OpenMaya.MFnMesh( oShape )
+        fnMesh.getPoints( points )
+        for i in range( points.length() ):
+            points.set( points[i] * -1, i )
+        fnMesh.setPoints( points )
+    elif shape.type() == 'nurbsCurve':
+        fnCurve = OpenMaya.MFnNurbsCurve( oShape )
+        fnCurve.getCVs( points )
+        for i in range( points.length() ):
+            points.set( points[i] * -1, i )
+        fnCurve.setCVs( points )
+    elif shape.type() == 'nurbsSurface':
+        oSurface = getMObject( shape )
+        fnNurbsSurface = OpenMaya.MFnNurbsSurface( oSurface )
+        for i in range( points.length() ):
+            points.set( points[i] * -1, i )
+        fnNurbsSurface.getCVs( points )
+    
+
 
 
 
@@ -2630,7 +2688,7 @@ def makeCloneObject( inputTarget, **options  ):
             cuTarget.addAttr( op_cloneAttrName, at='message' )
         cloneConnection = cuTarget.attr( op_cloneAttrName ).listConnections(s=1, d=0 )
         if not cloneConnection:
-            targetClone = pymel.core.createNode( 'transform', n= cuTarget.split( '|' )[-1]+ '_' + cloneLabel )
+            targetClone = pymel.core.createNode( cuTarget.nodeType(), n= cuTarget.split( '|' )[-1]+ '_' + cloneLabel )
             targetClone.message >> cuTarget.attr( op_cloneAttrName )
             
             if op_shapeOn:
@@ -2652,6 +2710,11 @@ def makeCloneObject( inputTarget, **options  ):
                     getSourceConnection( cuTargetShape, targetCloneShape )
         else:
             targetClone = cloneConnection[0]
+        
+        udAttrs = cmds.listAttr( cuTarget.name(), ud=1 )
+        for attr in udAttrs:
+            try:copyAttribute( cuTarget, targetClone, attr )
+            except:pass
         
         targetCloneParentExpected = targetClone.getParent()
         if targetCloneParent and targetCloneParentExpected != targetCloneParent:
@@ -3242,7 +3305,7 @@ def lookAtConnect( inputLookTarget, inputRotTarget, **options ):
     lookTarget = pymel.core.ls( inputLookTarget )[0]
     rotTarget  = pymel.core.ls( inputRotTarget )[0]
     
-    if not inputRotTarget:
+    if inputRotTarget:
         pRotTarget = rotTarget.getParent()
         if pRotTarget:
             wim = listToMatrix( pRotTarget.wim.get() )
@@ -3399,27 +3462,36 @@ def bindTransformToMesh( inputTransform, inputMesh, **options ):
 
 
 
-    
-    
-def mirrorControllerShape( target ):
 
-    sideName = '_L_'
-    otherSideName = '_R_'
+def getOtherSideStr( inputStr ):
     
-    if target.find( '_L_' ) != -1:
-        sideName = '_L_'
-        otherSideName = '_R_'
-    elif target.find( '_R_' ) != -1:
-        sideName = '_R_'
-        otherSideName = '_L_'
+    leftList = [ '_L_', '_LU_', '_LD_', '_LF_', '_LB_', '_LUF_', '_LUB_' ]
+    rightList = [ '_R_', '_RU_', '_RD_', '_RF_', '_RB_', '_RUF_', '_RUB_' ]
+    
+    for i in range( len( leftList ) ):
+        if inputStr.find( leftList[i] ) != -1:
+            return inputStr.replace( leftList[i], rightList[i] )
+
+    return  inputStr
+
+
+    
+    
+def mirrorControllerShape( inputTarget ):
+
+    target = pymel.core.ls( inputTarget )[0]
+    targetName = target.shortName()
+    othersideName = getOtherSideStr( targetName )
+
     cvs = cmds.ls( target + '.cv[*]', fl=1 )
     poses = []
     for cv in cvs:
         cvPoint = cmds.xform( cv, q=1, ws=1, t=1 )
         poses.append( cvPoint )
-    otherCVs = cmds.ls( target.replace( sideName, otherSideName ) + '.cv[*]', fl=1 )
+    otherCVs = cmds.ls( target.replace( targetName, othersideName ) + '.cv[*]', fl=1 )
     for i in range( len( otherCVs ) ):
         cmds.move( -poses[i][0], poses[i][1], poses[i][2], otherCVs[i], ws=1 )
+
 
 
 
@@ -3833,10 +3905,7 @@ def attachToCurve( inputTargetObj, inputCurve ):
     vectorNode.output >> targetObj.t
     
 
-    
-    
-    
-    
+
 def getPointAtParam( inputCurveObj, paramValue ):
     
     curveObj = pymel.core.ls( inputCurveObj )[0]
@@ -5615,7 +5684,382 @@ def getClosestTransform( inputBase, inputCompairTargets ):
             closeIndex = i
     
     return compairTargets[ closeIndex ]
+
+
+
+
+def setMirrorTransform( inputSrcTr, inputDstTr ):
     
+    srcTr = pymel.core.ls( inputSrcTr )[0]
+    dstTr = pymel.core.ls( inputDstTr )[0]
+    
+    mirrorMtx = getMirrorMatrix( getMMatrix(srcTr.wm) )
+    
+    pymel.core.xform( dstTr, ws=1, matrix=matrixToList( mirrorMtx ) )
+
+
+
+
+def makeMirrorTransform( inputTrTarget ):
+    
+    trTarget = pymel.core.ls( inputTrTarget )[0]
+    mirrorTransform = pymel.core.createNode( trTarget.nodeType() )
+    mirrorTransform.rename( getOtherSideStr( trTarget.shortName() ) )
+    mirrorTransform.dh.set( trTarget.dh.get() )
+    setMirrorTransform( trTarget, mirrorTransform )
+    
+    for shape in trTarget.listRelatives( s=1 ):
+        if shape.io.get(): continue
+        copyShapeToTransform( shape, mirrorTransform )
+        reverseShape( mirrorTransform.getShape() )
+    
+    return mirrorTransform
+    
+
+
+
+def makeMirrorTransformWithHierarchy( inputTrTarget, cloneAttrName = 'mirrorH' ):
+    
+    trTarget = pymel.core.ls( inputTrTarget )[0]
+    cloneObj = makeCloneObject( inputTrTarget, cloneAttrName = cloneAttrName )
+    cloneParents = cloneObj.getAllParents()
+    cloneParents.reverse()
+    cloneParents.append( cloneObj )
+    
+    for cloneParent in cloneParents:
+        cons = cloneParent.message.listConnections( s=0, d=1 )
+        for con in cons:
+            if not pymel.core.attributeQuery( cloneAttrName, node=con, ex=1 ): continue
+            srcTarget = con
+            cloneParent.rename( getOtherSideStr(srcTarget.shortName()) )
+            mirrorMatrix = matrixToList( getMirrorMatrix( getMMatrix( srcTarget.wm ) ) )
+            pymel.core.xform( cloneParent, ws=1, matrix=mirrorMatrix )
+    cloneObj.dh.set( trTarget.dh.get() )
+    cloneObj.v.set( trTarget.v.get() )
+    
+    for shape in trTarget.listRelatives( s=1 ):
+        if shape.io.get(): continue
+        copyShapeToTransform( shape, cloneObj )
+        reverseShape( cloneObj.getShape() )
+
+
+
+def getSourceList( inputNode, nodeList = [] ):
+    
+    node = pymel.core.ls( inputNode )[0]
+    if node in nodeList: return []
+    
+    nodeList.append( node )
+    if node.nodeType() in ['transform','joint']:
+        cons = []
+        attrs = ['t', 'r', 's']
+        attrs += cmds.listAttr( node.name(), k=1 )
+        for attr in attrs:
+            cons += node.attr( attr ).listConnections( s=1, d=0, p=1, c=1 )
+    else:
+        cons = node.listConnections( s=1, d=0, p=1, c=1 )
+    srcs = cons[1::2]
+    
+    returnList = [node]
+    for origAttr, srcAttr in cons:
+        results = getSourceList( srcAttr.node(), nodeList )
+        if not results: continue
+        returnList += results
+    return returnList
+
+
+
+def getNameReplaceList( firstName, secondName ):
+    
+    splitsFirst = firstName.split( '_' )
+    splitsSecond = secondName.split( '_' )
+    
+    diffIndices = []
+    for i in range( len( splitsFirst ) ):
+        if splitsFirst[i] != splitsSecond[i]:
+            diffIndices.append(i)
+    
+    replaceStrsList = []
+    for diffIndex in diffIndices:
+        firstStr = splitsFirst[diffIndex]
+        secondStr = splitsSecond[diffIndex]
+        
+        if diffIndex == 0:
+            firstStr = firstStr + '_'
+            secondStr = secondStr + '_'
+        elif diffIndex == len( splitsFirst ) - 1:
+            firstStr = '_' + firstStr
+            secondStr = '_' + secondStr
+        else:
+            firstStr = '_' + firstStr + '_'
+            secondStr = '_' + secondStr + '_'
+        
+        replaceStrsList.append( [firstStr, secondStr] )
+    
+    return replaceStrsList
+
+
+def copyChildren( source, target ):
+    first = source
+    firstName = source.shortName()
+    secondName = target.shortName()
+    
+    replaceStrsList = getNameReplaceList(firstName, secondName)
+    
+    firstChildren = first.listRelatives( c=1, ad=1, type='transform' )
+    firstChildren.reverse()
+    
+    for firstChild in firstChildren:
+        childName = firstChild.shortName()
+        for replaceSrc, replaceDst in replaceStrsList:
+            childName = childName.replace( replaceSrc, replaceDst )
+        parentName = firstChild.getParent().shortName()
+        for replaceSrc, replaceDst in replaceStrsList:
+            parentName = parentName.replace( replaceSrc, replaceDst )
+        if not cmds.objExists( parentName ): continue
+        exists = False
+        if not cmds.objExists( childName ):
+            secondChild = pymel.core.createNode( firstChild.nodeType() ).rename( childName )
+        else:
+            secondChild = pymel.core.ls( childName )[0]
+            exists = True
+        try:
+            pymel.core.parent( secondChild, parentName )
+        except: pass
+        if not exists: 
+            pymel.core.xform( secondChild, os=1, matrix= firstChild.m.get() )
+            secondChild.attr( 'dh' ).set( firstChild.attr( 'dh' ).get() )
+            if secondChild.nodeType() == 'joint':
+                secondChild.attr( 'radius' ).set( firstChild.attr( 'radius' ).get() )
+
+
+
+
+def copyAndPastRig( inputCopyTarget, inputPastTarget, sourceTransformsDicts, mirrorCopy=False ):
+    
+    copyTarget = pymel.core.ls( inputCopyTarget )[0]
+    pastTarget = pymel.core.ls( inputPastTarget )[0]
+    
+    newDicts = copy.copy( sourceTransformsDicts )
+    newDicts[copyTarget.name()] = pastTarget.name()
+    
+    copyedAttrName = "copyAndPastRig_copyed"
+
+    def getReplacedNode( sourceNode, sourceTransformsDicts ):
+        
+        addAttr( sourceNode, ln=copyedAttrName, dt='string' )
+        copyedObj = sourceNode.attr( copyedAttrName ).get()
+        if copyedObj and cmds.objExists( copyedObj ):
+            return pymel.core.ls( copyedObj )[0]
+        
+        destTarget = None
+        if sourceTransformsDicts.has_key( sourceNode.shortName() ):
+            destTarget = sourceTransformsDicts[ sourceNode.shortName() ]
+
+        print "dest target : ", destTarget
+        if destTarget and cmds.objExists( destTarget ):
+            return pymel.core.ls( destTarget )[0]
+        
+        if pymel.core.attributeQuery( 'worldMatrix', node = sourceNode, ex=1 ):
+            return sourceNode
+        
+        srcCons = sourceNode.listConnections( s=1, d=0, p=1, c=1 )
+        dstCons = sourceNode.listConnections( s=0, d=1, p=1, c=1 )
+        for origCon, srcCon in srcCons:
+            srcCon // origCon
+        for origCon, dstCon in dstCons:
+            origCon // dstCon
+        duObj = sourceNode.duplicate()[0]
+        for origCon, srcCon in srcCons:
+            srcCon >> origCon
+        for origCon, dstCon in dstCons:
+            origCon >> dstCon
+        if mirrorCopy: reverseVector( duObj )
+        sourceNode.attr( copyedAttrName ).set( duObj.name() )
+        return duObj
+
+    sourceNodes = getSourceList( copyTarget, [] )
+    if not sourceNodes: return None
+    
+    for sourceNode in sourceNodes:
+        replacedSourceNode = getReplacedNode( sourceNode, newDicts )
+        if not replacedSourceNode: continue
+        
+        srcCons = sourceNode.listConnections( s=1, d=0, p=1, c=1 )
+        dstCons = sourceNode.listConnections( s=0, d=1, p=1, c=1 )
+        srcCons = [[ second, first ] for first, second in srcCons ]
+        
+        for cons in [ srcCons, dstCons ]:
+            for start, dest in cons:
+                destNode = dest.node()
+                startNode = start.node()
+                destAttrName = dest.longName()
+                startAttrName = start.longName()
+                
+                replacedDestNode = getReplacedNode( destNode, newDicts )
+                replacedStartNode = getReplacedNode( startNode, newDicts )
+                
+                if not replacedDestNode or not replacedStartNode: continue
+                if not replacedDestNode.attr( destAttrName ).listConnections( s=1, d=0 ):
+                    replacedStartNode.attr( startAttrName ) >> replacedDestNode.attr( destAttrName )
+    
+    targets = pymel.core.ls( '*.' + copyedAttrName )
+    for target in targets:
+        target.node().deleteAttr( copyedAttrName )
+
+
+
+def copyRigH( inputSource, inputTarget, mirrorCopy=False ):
+    
+    source = pymel.core.ls( inputSource )[0]
+    target = pymel.core.ls( inputTarget )[0]
+    
+    sourceName = source.shortName()
+    targetName = target.shortName()
+    
+    replaceStrList = getNameReplaceList(sourceName, targetName)
+    
+    #copyChildren( source, target )
+
+    sourceChildren = source.listRelatives( c=1, ad=1, type='transform' )
+    sourceChildren.append( source )
+    
+    def reverseVector( inputNode ):
+        node = pymel.core.ls( inputNode )[0]
+        if node.nodeType() == 'angleBetween':
+            vec1 = node.vector1.get()
+            node.vector1.set( -vec1[0], -vec1[1], -vec1[2] )
+            vec2 = node.vector2.get()
+            node.vector2.set( -vec2[0], -vec2[1], -vec2[2] )
+
+
+    def getReplacedNode( source, replaceStrList ):
+        
+        sourceName = source.name()
+        for srcStr, dstStr in replaceStrList:
+            sourceName = sourceName.replace( srcStr, dstStr )
+        if sourceName == source.name():
+            sourceName = source.name() + '_rigCopyed'
+        else:
+            if cmds.objExists( sourceName ):
+                return pymel.core.ls( sourceName )[0]
+        if cmds.objExists( sourceName ): 
+            return pymel.core.ls( sourceName )[0]
+        
+        if pymel.core.attributeQuery( 'worldMatrix', node = source, ex=1 ):
+            return source
+        
+        srcCons = source.listConnections( s=1, d=0, p=1, c=1 )
+        dstCons = source.listConnections( s=0, d=1, p=1, c=1 )
+        for origCon, srcCon in srcCons:
+            try:srcCon // origCon
+            except:pass
+        for origCon, dstCon in dstCons:
+            try:origCon // dstCon
+            except:pass
+        try:duObjs = source.duplicate( n=sourceName )
+        except:duObjs = [source]
+        for origCon, srcCon in srcCons:
+            try:srcCon >> origCon
+            except:pass
+        for origCon, dstCon in dstCons:
+            try:origCon >> dstCon
+            except:pass
+        if mirrorCopy: reverseVector( duObjs[0] )
+        return duObjs[0]
+    
+    for i in range( len( sourceChildren ) ):
+        sourceNodes = getSourceList( sourceChildren[i], [] )
+        if not sourceNodes: continue
+        for sourceNode in sourceNodes:
+            replacedSourceNode = getReplacedNode( sourceNode, replaceStrList )
+            if not replacedSourceNode: continue
+            
+            srcCons = sourceNode.listConnections( s=1, d=0, p=1, c=1 )
+            dstCons = sourceNode.listConnections( s=0, d=1, p=1, c=1 )
+            srcCons = [[ second, first ] for first, second in srcCons ]
+
+            for cons in [ srcCons, dstCons ]:
+                for start, dest in cons:
+                    destNode = dest.node()
+                    startNode = start.node()
+                    destAttrName = dest.longName()
+                    startAttrName = start.longName()
+                    replacedDestNode  = getReplacedNode( destNode, replaceStrList )
+                    replacedStartNode = getReplacedNode( startNode, replaceStrList )
+                    if not replacedDestNode or not replacedStartNode: continue
+                    try:
+                        if not replacedDestNode.attr( destAttrName ).listConnections( s=1, d=0 ):
+                            replacedStartNode.attr( startAttrName ) >> replacedDestNode.attr( destAttrName )
+                    except:pass
+    
+    duNodes = cmds.ls( '*_rigCopyed' )
+    for duNode in duNodes:
+        cmds.rename( duNode, duNode.replace( '_rigCopyed', '' ) )
+
+
+
+
+
+def convertDestinationConnectionsToReverse( inputAttr ):
+    
+    tagetAttr = pymel.core.ls( inputAttr )[0]
+    
+    def getReverseOutputAttr( pymelAttr ):
+        try: 
+            pymelAttr.getChildren()
+            mdNodes = pymelAttr.listConnections( s=0, d=1, type='multiplyDivide' )
+            targetMdNode = None
+            if mdNodes:
+                targetMdNodes = [ mdNode for mdNode in mdNodes if list(mdNode.input2.get()) == [-1,-1,-1] ]
+                if targetMdNodes: targetMdNode = targetMdNodes[0]
+            if not targetMdNode:
+                targetMdNode = pymel.core.createNode( 'multiplyDivide' )
+                pymelAttr >> targetMdNode.input1
+                targetMdNode.input2.set( -1,-1,-1 )
+            return targetMdNode.output
+        except:
+            multNodes = pymelAttr.listConnections( s=0, d=1, type='multDoubleLinear' )
+            targetMultNode = None
+            if multNodes:
+                targetMultNodes = [ multNode for multNode in multNodes if multNode.input2.get() == -1 ]
+                if targetMultNodes: targetMultNode = targetMultNodes[0]
+            if not targetMultNode:
+                targetMultNode = pymel.core.createNode( 'multDoubleLinear' )
+                pymelAttr >> targetMultNode.input1
+                targetMultNode.input2.set( -1 )
+            return targetMultNode.output
+
+    dstAttrs = tagetAttr.listConnections( s=0, d=1, p=1 )
+    if not dstAttrs: return None
+    reverseOutputAttr = getReverseOutputAttr( tagetAttr )
+    targetDstAttrs = [ dstAttr for dstAttr in dstAttrs if dstAttr.node() != reverseOutputAttr.node() ]
+    for targetDstAttr in targetDstAttrs:
+        reverseOutputAttr >> targetDstAttr
+
+
+
+def getAngleNode( inputVectorAttr, baseVector = None ):
+    
+    vectorAttr = pymel.core.ls( inputVectorAttr )[0]
+    if not baseVector:
+        dirIndex = getDirectionIndex( vectorAttr.get() )
+        baseVector = getVectorList()[ dirIndex ]
+    
+    angleNode = pymel.core.createNode( 'angleBetween' )
+    angleNode.vector1.set( baseVector )
+    vectorAttr >> angleNode.vector2
+    
+    return angleNode
+    
+
+
+def getLocalAngleNode( inputTr, inputParentTr ):
+    
+    tr = pymel.core.ls( inputTr )[0]
+    parentTr = pymel.core.ls( inputParentTr )[0]
+    dcmp = getLocalDecomposeMatrix( tr.wm, parentTr.wim )
+    return getAngleNode( dcmp.ot )
     
     
     

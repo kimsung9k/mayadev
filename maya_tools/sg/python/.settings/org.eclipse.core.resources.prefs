@@ -8,5 +8,7 @@ encoding//sgUIs/pingowms/ui_Dialog_upload.py=utf8
 encoding//sgUIs/pingowms/ui_Window_manageProject.py=utf8
 encoding//sgUIs/pingowms/ui_copyFileList.py=utf8
 encoding//sgUIs/shaderCleanup/__init__.py=utf-8
+encoding//sgUIs/ui_copyAndPastRig.py=utf8
+encoding//sgUIs/ui_renameBySourceObject.py=utf8
 encoding//sgUIs/ui_setMirrorType.py=utf8
 encoding//sgUIs/ui_visibilityConnect.py=utf8

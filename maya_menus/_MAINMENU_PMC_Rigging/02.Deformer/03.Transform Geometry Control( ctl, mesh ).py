@@ -1,9 +1,10 @@
-from sgModules import sgcommands
+from sgMaya import sgCmds
+import pymel.core
 
-sels = sgcommands.listNodes( sl=1 )
+sels = pymel.core.ls( sl=1 )
 
 ctl = sels[0]
 meshs = sels[1:]
 
 for mesh in meshs:
-    sgcommands.transformGeometryControl( ctl, mesh )
+    sgCmds.transformGeometryControl( ctl, mesh )

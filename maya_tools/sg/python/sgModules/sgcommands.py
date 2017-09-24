@@ -1565,6 +1565,7 @@ def copyRig( source, target ):
 def setAngleReverse( rigedNode ):
     srcList = getSourceList( rigedNode, [] )
     for src in srcList:
+        src = pymel.core.ls( src )[0]
         if src.nodeType() == 'angleBetween':
             vector1Value = src.vector1.get()
             src.vector1.set( -vector1Value[0],-vector1Value[1],-vector1Value[2])
@@ -3351,10 +3352,11 @@ def getNearPointOnCurve( tr, curve ):
 def replaceShape( src, dst ):
     
     dstShapes = dst.listRelatives( s=1 )
-    srcShape = src.shape()
+    srcShapes = src.listRelatives( s=1 )
     
     delete( dstShapes )
-    parent( srcShape, dst, add=1, shape=1 )
+    for srcShape in srcShapes:
+        parent( srcShape, dst, add=1, shape=1 )
     
     
     
@@ -5808,13 +5810,11 @@ class DuplicateSourceObjectSet:
     
     @staticmethod
     def beforeDuplicate( *args ):
-        print "DuplicateSourceObjectSet message : before duplicate"
         DuplicateSourceObjectSet.duplicateBeforeObjects = DuplicateSourceObjectSet.getShapeListFromSelection()
     
     
     @staticmethod
     def afterDuplicate( *args ):
-        print "DuplicateSourceObjectSet message : after duplicate"
         beforeObjects  = DuplicateSourceObjectSet.duplicateBeforeObjects
         currentObjects = DuplicateSourceObjectSet.getShapeListFromSelection()
         for i in range( len( beforeObjects ) ):
