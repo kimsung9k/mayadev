@@ -464,10 +464,13 @@ def loadMenuPathEditor( evt=0 ):
     cmds.textScrollList( uiInstance.ui_folderLists[2].textList, e=1, dgc=drag, dpc=drop  )
     
     cmds.popupMenu( p=uiInstance.ui_folderLists[0].textList)
+    cmds.menuItem( l="Add", c=addMainMenuFolder )
     cmds.menuItem( l='Remove', c = removeMainMenuFolder )
     cmds.popupMenu( p=uiInstance.ui_folderLists[1].textList )
+    cmds.menuItem( l="Add", c=partial( addPopupMenuFolder, 'sa' ) )
     cmds.menuItem( l='Remove', c = partial( removePopupMenuFolder, 'sa' ) )
     cmds.popupMenu( p=uiInstance.ui_folderLists[2].textList )
+    cmds.menuItem( l="Add", c=partial( addPopupMenuFolder, 'ca' ) )
     cmds.menuItem( l='Remove', c = partial( removePopupMenuFolder, 'ca' ) )
     
     showMainMenuList()
