@@ -1,9 +1,0 @@
-import maya.cmds as cmds
-import sg.dag
-sels = cmds.ls( sl=1 )
-shapes = []
-for sel in sels:
-    shape = sg.dag.getShape( sel )
-    if not shape: continue
-    shapes.append( shape )
-cmds.select( shapes )

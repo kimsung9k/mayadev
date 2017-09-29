@@ -1,6 +1,7 @@
-from sgModules import sgcommands
+from sgMaya import sgCmds
+import pymel.core
 
-sels = sgcommands.listNodes( sl=1 )
+sels = pymel.core.ls( sl=1 )
 
 srcMesh = sels[0]
 others = sels[1:]
@@ -10,8 +11,8 @@ for other in others:
     children.append( other )
     trs = []
     for child in children:
-        shape = child.shape()
+        shape = child.getShape()
         if not shape: continue
         trs.append( child )
     for tr in trs:
-        sgcommands.autoCopyWeight( srcMesh, tr )
+        sgCmds.autoCopyWeight( srcMesh, tr )

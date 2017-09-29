@@ -1,6 +1,5 @@
 #coding=utf8
-
-from ui_ControlBase import *
+from commands import *
 
 
 class Dialog_addProject( QtGui.QDialog ):
@@ -67,7 +66,7 @@ class Dialog_addProject( QtGui.QDialog ):
 
     def getServerPath(self):
 
-        resultPath = ControlBase.getFolderFromBrowser( self, ControlBase.getDefaultProjectFolder() )
+        resultPath = FileControl.getFolderFromBrowser( self, FileControl.getDefaultProjectFolder() )
         if os.path.exists( resultPath ):
             self.serverPathEdit.setText( resultPath )
             f = open( ControlBase.defaultInfoPath, 'r' )
@@ -82,7 +81,7 @@ class Dialog_addProject( QtGui.QDialog ):
 
     def getLocalPath(self):
 
-        resultPath = ControlBase.getFolderFromBrowser( self, ControlBase.getDefaultLocalFolder() )
+        resultPath = FileControl.getFolderFromBrowser( self, FileControl.getDefaultLocalFolder() )
         if os.path.exists( resultPath ):
             self.localPathEdit.setText( resultPath )
             f = open( ControlBase.defaultInfoPath, 'r' )
@@ -101,7 +100,7 @@ class Dialog_addProject( QtGui.QDialog ):
         projPath = self.serverPathEdit.text()
         localPath = self.localPathEdit.text()
         
-        ControlBase.makeFile( ControlBase.projectListPath )
+        FileControl.makeFile( ControlBase.projectListPath )
         
         f = open( ControlBase.projectListPath, 'r' )
         try:data = json.load( f )
@@ -131,7 +130,7 @@ class Dialog_addProject( QtGui.QDialog ):
             if resultButton == QtGui.QMessageBox.Cancel: return
     
         data["%s" % projName] = { ControlBase.labelServerPath:"%s" % projPath, ControlBase.labelLocalPath:"%s" % localPath }
-        ControlBase.setProjectListData(data)
+        ProjectControl.setProjectListData(data)
         self.close()
         
         ControlBase.mainui.updateProjectList( projName )

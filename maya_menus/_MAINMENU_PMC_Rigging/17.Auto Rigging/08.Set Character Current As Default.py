@@ -1,0 +1,2 @@
+from sgModules import sgHumanRigCommands
+sgHumanRigCommands.setCharacterCurrentAsDefault()

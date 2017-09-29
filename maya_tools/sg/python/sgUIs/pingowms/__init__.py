@@ -1,10 +1,140 @@
 #coding=utf8
 
-from ui_ControlBase import *
+from commands import *
+import model
+from maya import OpenMayaUI
 
 from ui_Dialog_addProject import *
 from ui_Dialog_addTask import *
 from ui_Window_manageProject import *
+
+
+
+class Window_Login( QtGui.QDialog ):
+    
+    objectName = 'ui_pingowms_login'
+    title = 'Login'
+    defaultWidth = 350
+    defaultHeight = 150
+
+    
+    def __init__(self, *args, **kwargs ):
+        
+        QtGui.QDialog.__init__( self, *args, **kwargs )
+        self.setWindowFlags(QtCore.Qt.Drawer)
+        self.installEventFilter( self )
+        self.setObjectName( Window_Login.objectName )
+        self.setWindowTitle( Window_Login.title )
+        
+        hLayout = QtGui.QHBoxLayout( self )
+        
+        gridWidget = QtGui.QWidget()
+        gridWidget.setMaximumWidth( 250 )
+        grid = QtGui.QGridLayout(gridWidget)
+        label_id = QtGui.QLabel( "아이디".decode( 'utf-8' ) )
+        lineEdit_id = QtGui.QLineEdit()
+        label_pass = QtGui.QLabel( "비밀번호".decode( "utf-8" ) )
+        lineEdit_pass = QtGui.QLineEdit()
+        lineEdit_pass.setEchoMode( QtGui.QLineEdit.Password )
+        button_login = QtGui.QPushButton( "로그인".decode( "utf-8" ) )
+        label_makeId = QtGui.QPushButton( "아이디 만들기".decode("utf-8") )
+        grid.addWidget( label_id, 0, 0 )
+        grid.addWidget( lineEdit_id, 0, 1 )
+        grid.addWidget( label_pass, 1, 0 )
+        grid.addWidget( lineEdit_pass, 1, 1 )
+        grid.addWidget( button_login, 2, 0, 1, 2 )
+        grid.addWidget( label_makeId, 3, 0, 1, 2 )
+        
+        hLayout.addWidget( gridWidget )
+        
+        self.setMinimumSize( Window_Login.defaultWidth, Window_Login.defaultHeight )
+
+        QtCore.QObject.connect( label_makeId, QtCore.SIGNAL('clicked()'),  self.createAcount )
+    
+    
+    
+    def createAcount(self):
+        
+        cmds.deleteUI( Window_Login.objectName )
+        
+        if cmds.window( Window_CreateAcount.objectName, ex=1 ):
+            cmds.deleteUI( Window_CreateAcount.objectName )
+        
+        createAcount = Window_CreateAcount( ControlBase.mayawin )
+        createAcount.show()
+
+
+
+    def getIdAndPass(self):
+        
+        if False:
+            if cmds.window( Window.objectName, ex=1 ):
+                cmds.deleteUI( Window.objectName )
+            
+            ControlBase.mainui = Window( ControlBase.mayawin )
+            ControlBase.mainui.show()
+        
+
+
+
+
+class Window_CreateAcount( QtGui.QDialog ):
+    
+    objectName = 'ui_pingowms_createAcount'
+    title = 'Create Acount'
+    defaultWidth = 350
+    defaultHeight = 150
+
+    
+    def __init__(self, *args, **kwargs ):
+
+        QtGui.QDialog.__init__( self, *args, **kwargs )
+        self.setWindowFlags(QtCore.Qt.Drawer)
+        self.installEventFilter( self )
+        self.setObjectName( Window_CreateAcount.objectName )
+        self.setWindowTitle( Window_CreateAcount.title )
+        
+        label_name = QtGui.QLabel( "사용자명".decode( 'utf-8' ) )
+        lineEdit_name = QtGui.QLineEdit()
+        label_company = QtGui.QLabel( "회사코드".decode( 'utf-8' ) )
+        lineEdit_company = QtGui.QLineEdit()
+        grid = QtGui.QGridLayout( self )
+        label_id = QtGui.QLabel( "아이디".decode( 'utf-8' ) )
+        lineEdit_id = QtGui.QLineEdit()
+        label_pass = QtGui.QLabel( "비밀번호".decode( 'utf-8' ) )
+        lineEdit_pass = QtGui.QLineEdit()
+        lineEdit_pass.setEchoMode( QtGui.QLineEdit.Password )
+        label_passConfirm = QtGui.QLabel( "비밀번호 확인".decode( 'utf-8' ) )
+        lineEdit_passConfirm = QtGui.QLineEdit()
+        lineEdit_passConfirm.setEchoMode( QtGui.QLineEdit.Password )
+        label_email = QtGui.QLabel( "이메일 주소".decode( 'utf-8' ) )
+        lineEdit_email = QtGui.QLineEdit()
+        button_request = QtGui.QPushButton( "인증코드요청".decode('utf-8') )
+        label_code = QtGui.QLabel( "인증코드입력".decode( 'utf-8' ) )
+        lineEdit_code = QtGui.QLineEdit()
+        button_create = QtGui.QPushButton( "아이디 생성".decode( 'utf-8' ) )
+        
+        grid.addWidget( label_name, 0,0 )
+        grid.addWidget( lineEdit_name, 0,1,1,2 )
+        grid.addWidget( label_company, 1,0 )
+        grid.addWidget( lineEdit_company, 1,1,1,2 )
+        grid.addWidget( label_id, 2,0 )
+        grid.addWidget( lineEdit_id, 2,1,1,2 )
+        grid.addWidget( label_pass, 3,0 )
+        grid.addWidget( lineEdit_pass, 3,1,1,2 )
+        grid.addWidget( label_passConfirm, 4,0 )
+        grid.addWidget( lineEdit_passConfirm, 4,1,1,2 )
+        grid.addWidget( label_email, 5,0 )
+        grid.addWidget( lineEdit_email, 5,1 )
+        grid.addWidget( button_request, 5,2 )
+        grid.addWidget( label_code,6,0 )
+        grid.addWidget( lineEdit_code, 6,1,1,2 )
+        grid.addWidget( button_create, 7,0,1,3)
+        
+        self.setMinimumWidth( Window_CreateAcount.defaultWidth )
+        
+        
+
 
 
 class Window( QtGui.QMainWindow ):
@@ -21,7 +151,7 @@ class Window( QtGui.QMainWindow ):
         self.installEventFilter( self )
         self.setObjectName( Window.objectName )
         self.setWindowTitle( Window.title )
-
+        
         baseWidget = QtGui.QWidget()
         self.setCentralWidget( baseWidget )
         
@@ -53,7 +183,7 @@ class Window( QtGui.QMainWindow ):
         layout_localPath.addWidget( button_localPath )
         
         layoutWorkArea = QtGui.QVBoxLayout()
-        treeWidget = WorkTreeWidget()
+        treeWidget = model.WorkTreeWidget()
         addTaskArea_button = QtGui.QPushButton( '작업영역 추가'.decode('utf-8') )
         layoutWorkArea.addWidget( treeWidget )
         layoutWorkArea.addWidget( addTaskArea_button )
@@ -76,12 +206,12 @@ class Window( QtGui.QMainWindow ):
         
         treeWidget.itemExpanded.connect( TreeWidgetCmds.updateTaskHierarchy )
         treeWidget.itemCollapsed.connect( TreeWidgetCmds.updateTaskHierarchy )
-        button_serverPath.clicked.connect( ControlBase.resetServerPath )
-        button_localPath.clicked.connect( ControlBase.resetLocalPath )
+        button_serverPath.clicked.connect( ProjectControl.resetServerPath )
+        button_localPath.clicked.connect( ProjectControl.resetLocalPath )
         
         treeWidget.setFont( QtGui.QFont( "", 9, QtGui.QFont.Light ) )
         
-        if ControlBase.getCurrentProjectName():
+        if ProjectControl.getCurrentProjectName():
             addTaskArea_button.setEnabled( True )
         else:
             addTaskArea_button.setEnabled( False )
@@ -95,14 +225,15 @@ class Window( QtGui.QMainWindow ):
         self.button_localPath   = button_localPath
         
         self.updateProjectList()
-            
+
 
     
-    def show( self, *args, **kwargs):
+    def show(self, *args, **kwangs ):
         
-        self.loadProject()
-        QtGui.QMainWindow.show( self, *args, **kwargs )
-
+        self.loadUIInfo()
+        QtGui.QMainWindow.show( self, *args, **kwangs )
+        
+    
 
 
     def loadContextMenu(self, *args ):
@@ -112,26 +243,24 @@ class Window( QtGui.QMainWindow ):
         selItem = selItems[0]
         elsePath = selItem.taskPath + selItem.unitPath
         
-        serverPath = ControlBase.getCurrentServerPath()
-        localPath  = ControlBase.getCurrentLocalPath()
+        serverPath = FileControl.getCurrentServerProjectPath()
+        localPath  = FileControl.getCurrentLocalProjectPath()
         targetPath_inServer = serverPath + elsePath
         targetPath_inLocal  = localPath  + elsePath
         
         menu = QtGui.QMenu( ControlBase.uiTreeWidget )
         
-        downloadRequired = control.isDownloadRequired( targetPath_inServer, targetPath_inLocal )
-        uploadRequired   = control.isUploadRequired( targetPath_inServer, targetPath_inLocal )
+        enableOpenFile = QueryCmds.isEnableOpen( targetPath_inServer, targetPath_inLocal )
+        enableUpload   = QueryCmds.isEnableUpload( targetPath_inLocal )
         
-        if os.path.isfile( targetPath_inServer ) or os.path.isfile( targetPath_inLocal ):menu.addAction("파일열기".decode( 'utf-8'), ContextMenuCmds.loadFile_local )
+        if enableOpenFile: menu.addAction("파일열기".decode( 'utf-8'), ContextMenuCmds.loadFile_local )
         menu.addAction("폴더열기".decode( 'utf-8'), ContextMenuCmds.openFileBrowser_local )
-        if uploadRequired:
-            separator = QtGui.QAction( self ); separator.setSeparator( True );menu.addAction( separator )
-            menu.addAction("업로드".decode( 'utf-8'), ContextMenuCmds.upload )
         separator = QtGui.QAction( self ); separator.setSeparator( True );menu.addAction( separator )
-        if os.path.isfile( targetPath_inServer ):menu.addAction("파일열기( 서버 )".decode( 'utf-8'), ContextMenuCmds.loadFile_server )
+        if enableUpload: menu.addAction("업로드".decode( 'utf-8'), ContextMenuCmds.upload )
+        separator = QtGui.QAction( self ); separator.setSeparator( True );menu.addAction( separator )
+        if enableOpenFile: menu.addAction("파일열기( 서버 )".decode( 'utf-8'), ContextMenuCmds.loadFile_server )
         menu.addAction("폴더열기( 서버 )".decode( 'utf-8'), ContextMenuCmds.openFileBrowser_server )
         separator = QtGui.QAction( self ); separator.setSeparator( True );menu.addAction( separator )
-        menu.addAction("리로드".decode( "utf-8"), ContextMenuCmds.setTreeItemsCondition )
 
         pos = QtGui.QCursor.pos()
         point = QtCore.QPoint( pos.x()+10, pos.y() )
@@ -142,7 +271,7 @@ class Window( QtGui.QMainWindow ):
 
     def loadProject(self):
         
-        ControlBase.makeFile( ControlBase.defaultInfoPath )
+        FileControl.makeFile( ControlBase.defaultInfoPath )
         
         f = open( ControlBase.defaultInfoPath, 'r' )
         data = json.load( f )
@@ -156,11 +285,11 @@ class Window( QtGui.QMainWindow ):
         json.dump( data, f )
         f.close()
         
-        self.lineEdit_serverPath.setText( ControlBase.getCurrentServerPath() )
-        self.lineEdit_localPath.setText( ControlBase.getCurrentLocalPath() )
+        self.lineEdit_serverPath.setText( FileControl.getCurrentServerProjectPath() )
+        self.lineEdit_localPath.setText( FileControl.getCurrentLocalProjectPath() )
         
         TreeWidgetCmds.updateTaskList()
-    
+
 
 
 
@@ -207,8 +336,9 @@ class Window( QtGui.QMainWindow ):
 
 
 
+
     def updateProjectList( self, selectProjectName='' ):
-        ControlBase.makeFile( ControlBase.projectListPath )
+        FileControl.makeFile( ControlBase.projectListPath )
         f = open( ControlBase.projectListPath, 'r' )
         try:data = json.load( f )
         except:data = {}
@@ -222,7 +352,7 @@ class Window( QtGui.QMainWindow ):
             self.comboBox.addItems( keys )
         
         if not selectProjectName:
-            selectProjectName = ControlBase.getCurrentProjectName()
+            selectProjectName = ProjectControl.getCurrentProjectName()
         
         if selectProjectName in keys:
             self.comboBox.setCurrentIndex( keys.index( selectProjectName ) )
@@ -232,15 +362,17 @@ class Window( QtGui.QMainWindow ):
         except:
             pass
         
-        if ControlBase.getCurrentProjectName():
+        if ProjectControl.getCurrentProjectName():
             self.addTaskArea_button.setEnabled( True )
         else:
             self.addTaskArea_button.setEnabled( False )
 
 
     
+    
     def saveUIInfo( self ):
-        ControlBase.makeFile( ControlBase.uiInfoPath )
+        
+        FileControl.makeFile( ControlBase.uiInfoPath )
         f = open( ControlBase.uiInfoPath, 'r' )
         try:data = json.load( f )
         except:data = {}
@@ -258,9 +390,10 @@ class Window( QtGui.QMainWindow ):
         
 
 
+
     def loadUIInfo( self ):
         
-        ControlBase.makeFile( ControlBase.uiInfoPath )
+        FileControl.makeFile( ControlBase.uiInfoPath )
         f = open( ControlBase.uiInfoPath, 'r' )
         try:data = json.load( f )
         except:data = {}
@@ -291,10 +424,8 @@ def show( evt=0 ):
     
     if cmds.window( Window.objectName, ex=1 ):
         cmds.deleteUI( Window.objectName )
-    
+
     ControlBase.mainui = Window( ControlBase.mayawin )
-    
-    ControlBase.mainui.loadUIInfo()
     ControlBase.mainui.show()
 
 

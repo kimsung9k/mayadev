@@ -1,3 +1,0 @@
-import sgHumanRig.export
-sels = cmds.ls( sl=1 )
-sgHumanRig.export.bake( sels[0] )

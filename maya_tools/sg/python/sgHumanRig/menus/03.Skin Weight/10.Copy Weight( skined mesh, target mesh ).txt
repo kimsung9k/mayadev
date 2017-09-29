@@ -1,3 +1,0 @@
-import sgHumanRig.skinCluster
-sels = cmds.ls( sl=1 )
-sgHumanRig.skinCluster.autoCopyWeight( sels[0], sels[1] )

@@ -1,7 +1,6 @@
-from maya import cmds
+from maya import cmds, OpenMaya
 import pymel.core
 from functools import partial
-from sgMaya import sgCmds
 
 
 class Win_Global:
@@ -10,6 +9,53 @@ class Win_Global:
     title = "UI - Component Keeper"
     width = 400
     height = 50
+
+
+
+class sgCmds:
+    
+    @staticmethod
+    def getDigitStrs( inputStr ):
+    
+        digitStr = ''
+        digitStrs = []
+        
+        for i in range( len( inputStr ) ):
+            if inputStr[i].isdigit():
+                digitStr += inputStr[i]
+            else:
+                if digitStr:
+                    digitStrs.append( digitStr )
+                digitStr = ''
+        
+        if digitStr:
+            digitStrs.append( digitStr )
+            
+        return digitStrs
+    
+    
+    @staticmethod
+    def getDagPath( inputTarget ):
+        target = pymel.core.ls( inputTarget )[0]
+        dagPath = OpenMaya.MDagPath()
+        selList = OpenMaya.MSelectionList()
+        selList.add( target.name() )
+        try:
+            selList.getDagPath( 0, dagPath )
+            return dagPath
+        except:
+            return None
+
+
+    @staticmethod
+    def getShape( inputTarget ):
+    
+        target = pymel.core.ls( inputTarget )[0]
+        if target.nodeType() == 'transform':
+            return target.getShape()
+        else:
+            return target
+
 
 
 
@@ -41,6 +87,7 @@ class Win_Cmd:
         compList = cmds.textField( Win_Global.textField, q=1, tx=1 ).split( ',' )
         
         targetComps = []
+        
         for sel in sels:
             if sel.find( '.' ) != -1: continue
             for comp in compList:
@@ -49,6 +96,50 @@ class Win_Cmd:
                 targetComps.append( targetComp )
         
         pymel.core.select( targetComps )
+    
+    
+    @staticmethod
+    def selectComponent2( *args ):
+        
+        sels = pymel.core.ls( sl=1 )
+        
+        compList = cmds.textField( Win_Global.textField, q=1, tx=1 ).split( ',' )
+        selList = OpenMaya.MSelectionList()
+        
+        for sel in sels:
+            if sel.find( '.' ) != -1: continue
+            
+            dagPath = sgCmds.getDagPath( sgCmds.getShape( sel ) )
+            if not dagPath: continue
+            
+            fnFaceComp = OpenMaya.MFnSingleIndexedComponent()
+            fnVtxComp = OpenMaya.MFnSingleIndexedComponent()
+            fnEdgeComp = OpenMaya.MFnSingleIndexedComponent()
+            oFace = fnFaceComp.create( OpenMaya.MFn.kMeshPolygonComponent )
+            oVtx  = fnVtxComp.create( OpenMaya.MFn.kMeshVertComponent )
+            oEdge = fnEdgeComp.create( OpenMaya.MFn.kMeshEdgeComponent )
+
+            faceIndices = OpenMaya.MIntArray()
+            edgeIndices = OpenMaya.MIntArray()
+            vtxIndices = OpenMaya.MIntArray()
+            for comp in compList:
+                if comp[0] == 'f':
+                    faceIndices.append( int( sgCmds.getDigitStrs(comp)[0]) )
+                elif comp[:3] == 'vtx':
+                    vtxIndices.append( int( sgCmds.getDigitStrs(comp)[0]) )
+                elif comp[:3] == 'e':
+                    edgeIndices.append( int( sgCmds.getDigitStrs(comp)[0]) )
+            
+            fnFaceComp.addElements( faceIndices )
+            fnVtxComp.addElements( vtxIndices )
+            fnEdgeComp.addElements( edgeIndices )
+                    
+            selList.add( dagPath, oFace )
+            selList.add( dagPath, oVtx )
+            selList.add( dagPath, oEdge )
+        
+        pymel.core.select( d=1 )
+        OpenMaya.MGlobal.setActiveSelectionList( selList )
     
 
 
@@ -93,7 +184,7 @@ class UI_SelectComponent:
         
         form = cmds.formLayout()
         #text = cmds.text( l="Select Shape Objects", h=30, bgc=[0.5,0.5,0.5], al='center' )
-        button = cmds.button( l='Select Component', h=25, c= Win_Cmd.selectComponent )
+        button = cmds.button( l='Select Component', h=25, c= Win_Cmd.selectComponent2 )
         cmds.setParent( '..' )
         
         cmds.formLayout( form, e=1,

@@ -1,2 +1,0 @@
-import sgHumanRig.skinCluster
-sgHumanRig.skinCluster.weightToR( cmds.ls( sl=1 )[0] )

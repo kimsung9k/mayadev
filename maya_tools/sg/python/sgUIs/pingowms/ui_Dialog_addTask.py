@@ -1,6 +1,7 @@
 #coding=utf8
 
-from ui_ControlBase import *
+from commands import *
+
 
 class Dialog_addTask( QtGui.QDialog ):
     
@@ -15,7 +16,7 @@ class Dialog_addTask( QtGui.QDialog ):
         
         QtGui.QDialog.__init__( self, *args, **kwargs )
         self.installEventFilter( self )
-        self.setWindowTitle( Dialog_addTask.title + ' - ' + ControlBase.getCurrentProjectName() )
+        self.setWindowTitle( Dialog_addTask.title + ' - ' + ProjectControl.getCurrentProjectName() )
         self.resize( Dialog_addTask.defaultWidth, Dialog_addTask.defaultHeight )
         
         self.setModal( True )
@@ -66,7 +67,7 @@ class Dialog_addTask( QtGui.QDialog ):
 
 
     def setTaskType(self):
-        ControlBase.makeFile( ControlBase.defaultInfoPath )
+        FileControl.makeFile( ControlBase.defaultInfoPath )
         f = open( ControlBase.defaultInfoPath, 'r' )
         try:data = json.load( f )
         except:data = {}
@@ -80,7 +81,7 @@ class Dialog_addTask( QtGui.QDialog ):
         
 
     def loadDefaultTaskType(self):
-        ControlBase.makeFile( ControlBase.defaultInfoPath )
+        FileControl.makeFile( ControlBase.defaultInfoPath )
         f = open( ControlBase.defaultInfoPath, 'r' )
         try: data = json.load( f )
         except: data = {}
@@ -93,9 +94,9 @@ class Dialog_addTask( QtGui.QDialog ):
     def loadTaskPath(self):
         
         if self.typeComboBox.currentIndex() == 0:
-            resultPath = ControlBase.getFileFromBrowser( self, ControlBase.getDefaultTaskFolder() )
+            resultPath = FileControl.getFileFromBrowser( self, FileControl.getDefaultTaskFolder() )
         else:
-            resultPath = ControlBase.getFolderFromBrowser( self, ControlBase.getDefaultTaskFolder() )
+            resultPath = FileControl.getFolderFromBrowser( self, FileControl.getDefaultTaskFolder() )
 
         if os.path.exists( resultPath ):
             self.pathLineEdit.setText( resultPath )
@@ -112,8 +113,8 @@ class Dialog_addTask( QtGui.QDialog ):
 
     def createTask(self):
         
-        currentProject = ControlBase.getCurrentProjectName()
-        projectListData = ControlBase.getProjectListData()
+        currentProject = ProjectControl.getCurrentProjectName()
+        projectListData = ProjectControl.getProjectListData()
         if not projectListData.has_key( currentProject ):
             cmds.warning( "프로젝트가 존제하지 않습니다.".decode( 'utf-8') )
             return
@@ -143,7 +144,7 @@ class Dialog_addTask( QtGui.QDialog ):
         addTaskPath = pathTask.replace( serverPath, '' )
         taskDict[nameTask] = { ControlBase.labelTaskType : typeTask, ControlBase.labelTaskPath : addTaskPath }
         
-        ControlBase.setProjectListData(projectListData)
+        ProjectControl.setProjectListData(projectListData)
         self.close()
         TreeWidgetCmds.updateTaskList()
 

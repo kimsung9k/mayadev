@@ -1,3 +1,0 @@
-import sgHumanRig.animation
-sels = cmds.ls( sl=1 )
-sgHumanRig.animation.selectBakedCtls( sels[0] )

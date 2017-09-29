@@ -1,2 +1,0 @@
-import sgHumanRig.skinCluster
-sgHumanRig.skinCluster.setBindPreDefault( cmds.ls( sl=1 ) )
