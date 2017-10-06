@@ -6,10 +6,24 @@ from PySide import QtGui, QtCore
 import shiboken
 import os, sys
 import json
-import model, ntpath
+import ntpath, ctypes
 
-from ControlBase import *
-from sgUIs.pingowms.model import CompairTwoPath
+from Models import *
+from ui_Dialog_updateFileList import Dialog_downloadFileList, Dialog_uploadFileList
+
+
+
+class UICmds:
+    
+    @staticmethod
+    def getStyleSheetFromColor( qcolor ):
+        
+        rValue = qcolor.red()
+        gValue = qcolor.green()
+        bValue = qcolor.blue()
+        aValue = qcolor.alpha()
+        
+        return "color:rgba( %d, %d, %d, %d );" %( rValue, gValue, bValue, aValue )
 
 
 
@@ -22,32 +36,43 @@ class TreeWidgetCmds:
         cuLocalUnitPath  = FileControl.getCurrentLocalProjectPath() + targetItem.taskPath + targetItem.unitPath
         cuServerUnitPath = FileControl.getCurrentServerProjectPath() + targetItem.taskPath + targetItem.unitPath
         
-        compairTwoPath = model.CompairTwoPath( cuServerUnitPath, cuLocalUnitPath )
+        compairTwoPath = CompairTwoPath( cuServerUnitPath, cuLocalUnitPath )
         compairResult  = compairTwoPath.getCompairResult()
         
         if compairResult == compairTwoPath.targetOnly:
-            brush = QtGui.QBrush( QtGui.QColor("LightBlue") )
+            brush = QtGui.QBrush( Colors.localOnly )
         elif compairResult == compairTwoPath.baseOnly:
-            brush = QtGui.QBrush( QtGui.QColor("Gray") )
+            brush = QtGui.QBrush( Colors.serverOnly )
         elif compairResult == compairTwoPath.targetIsNew:
-            brush = QtGui.QBrush( QtGui.QColor("LightBlue") )
+            brush = QtGui.QBrush( Colors.localModified )
         elif compairResult == compairTwoPath.baseIsNew:
-            brush = QtGui.QBrush( QtGui.QColor("Pink") )
-        elif compairResult == compairTwoPath.baseIsNew:
-            brush = QtGui.QBrush( QtGui.QColor("lightGray") )
+            brush = QtGui.QBrush( Colors.serverModified )
         else:
-            brush = QtGui.QBrush( QtGui.QColor( 'lightGray' ) )
+            brush = QtGui.QBrush( Colors.equar )
         
         targetItem.setForeground( 0, brush )
         
         cuLocalUnitPath  = FileControl.getArrangedPathString( cuLocalUnitPath )
         currentScenePath = cmds.file( q=1, sceneName=1 )
+        
+        currentScenePath = FileControl.getArrangedPathString( currentScenePath )
+        localFullPath = FileControl.getArrangedPathString( cuLocalUnitPath )
+        
+        if currentScenePath and currentScenePath.find( localFullPath ) != -1:
+            targetItem.setText( 1, "Opened".decode( 'utf-8' ) )
+            cuColor = brush.color()
+            cuColor.setAlpha( 100 )
+            targetItem.setForeground( 1, QtGui.QBrush( cuColor ) )
+        else:
+            targetItem.setText( 1, "" )
 
 
 
     @staticmethod
-    def setTreeItemsCondition( treeWidget ):
+    def setTreeItemsCondition( treeWidget=None ):
         
+        if not treeWidget:
+            treeWidget = ControlBase.uiTreeWidget
         def getAllChildItems( targetItem ):
             children = [targetItem]
             for k in range( targetItem.childCount() ):
@@ -77,7 +102,7 @@ class TreeWidgetCmds:
         if not projectData.has_key( ControlBase.labelTasks ): return
         tasksData = projectData[ControlBase.labelTasks]
         keys = tasksData.keys()
-        #model = QtGui.QStandardItemModel( 0, 5, self )
+        #classes = QtGui.QStandardItemModel( 0, 5, self )
 
         def addHierarchy( parent ):
             itemDir = QtGui.QTreeWidgetItem()
@@ -126,19 +151,22 @@ class TreeWidgetCmds:
             for root, dirs, names in os.walk( serverFullPath ):
                 for directory in dirs:
                     unitDirs.append( root.replace( serverPath, '' ) + '/' + directory )
-                for name in names:
+                for name in [ name for name in names if os.path.splitext( name )[-1] != '.' + ControlBase.editorInfoExtension]:
                     unitFiles.append( root.replace( serverPath, '' ) + '/' + name )
                 break
             
             for root, dirs, names in os.walk( localFullPath ):
                 for directory in dirs:
                     unitDirs.append( root.replace( localPath, '' ) + '/' + directory )
-                for name in names:
+                for name in [ name for name in names if os.path.splitext( name )[-1] != '.' + ControlBase.editorInfoExtension ]:
                     unitFiles.append( root.replace( localPath, '' ) + '/' + name )
                 break
             
             unitDirs  = list( set( unitDirs ) )
             unitFiles = list( set( unitFiles ) )
+
+            unitDirs.sort()
+            unitFiles.sort()
 
             for unitDir in unitDirs:
                 newItem = QtGui.QTreeWidgetItem( expandedItem )
@@ -149,7 +177,6 @@ class TreeWidgetCmds:
                 numTasks += 1
             for unitFile in unitFiles:
                 newItem = QtGui.QTreeWidgetItem( expandedItem )
-                newItem.text
                 newItem.setText( 0, unitFile.split( '/' )[-1] )
                 newItem.taskPath = expandedItem.taskPath
                 newItem.unitPath = unitFile.replace( expandedItem.taskPath, '' )
@@ -194,6 +221,36 @@ class QueryCmds:
         sceneName = FileControl.getArrangedPathString( cmds.file( q=1, sceneName=1 ) )
         targetPath = FileControl.getArrangedPathString( targetPath )
         if sceneName != targetPath: return False
+        return True
+    
+    
+    
+    @staticmethod
+    def isEnableReference( targetPath_inServer, targetPath_inLocal ):
+        
+        existPath = None
+        if os.path.exists( targetPath_inServer ):
+            existPath = targetPath_inServer
+        elif os.path.exists( targetPath_inLocal ):
+            existPath = targetPath_inLocal
+        
+        if not existPath: return False
+        if not os.path.isfile( existPath ): return False
+        
+        extension = os.path.splitext( existPath )[-1]
+        if not extension in ['.mb', '.ma', '.fbx', '.obj']: return False
+        return True
+        
+        
+    
+    @staticmethod
+    def isEnableExportReferneceInfo( targetPath ):
+        
+        scenePath = FileControl.getArrangedPathString( cmds.file( q=1, sceneName=1 ) )
+        targetPath = FileControl.getArrangedPathString( targetPath )
+        
+        if scenePath != targetPath: return False
+        if not cmds.ls( type='reference' ): return False
         return True
 
 
@@ -265,7 +322,7 @@ class ProjectControl:
         data[editedProjectName] = cuProjectData
         
         f = open( ControlBase.projectListPath, 'w' )
-        json.dump( data, f )
+        json.dump( data, f, indent=2 )
         f.close()
         
         currentProjectName = ProjectControl.getCurrentProjectName()
@@ -292,7 +349,7 @@ class ProjectControl:
         f.close()
         data[ControlBase.labelDefaultServerPath] = '/'.join( resultPath.split( '/' )[:-1] )
         f = open( ControlBase.defaultInfoPath, 'w' )
-        json.dump( data, f )
+        json.dump( data, f, indent=2 )
         f.close()
 
 
@@ -316,7 +373,7 @@ class ProjectControl:
         f.close()
         data[ControlBase.labelDefaultLocalPath] = '/'.join( resultPath.split( '/' )[:-1] )
         f = open( ControlBase.defaultInfoPath, 'w' )
-        json.dump( data, f )
+        json.dump( data, f, indent=2 )
         f.close()
 
 
@@ -327,25 +384,15 @@ class FileControl:
 
     @staticmethod
     def getArrangedPathString( path ):
-        return path.replace( '\\', '/' ).replace( '//', '/' ).replace( '//', '/' )
+        return path[:2] + path[2:].replace( '\\', '/' ).replace( '//', '/' ).replace( '//', '/' )
 
 
 
     @staticmethod
     def makeFolder( pathName ):
         
-        pathName = pathName.replace( '\\', '/' )
-        splitPaths = pathName.split( '/' )
-        cuPath = splitPaths[0]
-        folderExist = True
-        for i in range( 1, len( splitPaths ) ):
-            checkPath = cuPath+'/'+splitPaths[i]
-            if not os.path.exists( checkPath ):
-                os.chdir( cuPath )
-                os.mkdir( splitPaths[i] )
-                folderExist = False
-            cuPath = checkPath
-        if folderExist: return None
+        if os.path.exists( pathName ):return None
+        os.makedirs( pathName )
         return pathName
 
 
@@ -357,9 +404,9 @@ class FileControl:
         filePath = filePath.replace( "\\", "/" )
         splits = filePath.split( '/' )
         folder = '/'.join( splits[:-1] )
-        ControlBase.makeFolder( folder )
+        FileControl.makeFolder( folder )
         f = open( filePath, "w" )
-        json.dump( {}, f )
+        json.dump( {}, f, indent=2 )
         f.close()
     
 
@@ -429,7 +476,7 @@ class FileControl:
                 if not data: return
                 data.pop( cuProject )
                 f = open( ControlBase.projectListPath, 'w' )
-                json.dump( data, f )
+                json.dump( data, f, indent=2 )
                 f.close()
                 try:ControlBase.mainui.updateProjectList()
                 except:pass
@@ -467,12 +514,35 @@ class FileControl:
         return FileControl.getCurrentServerProjectPath()
     
     
+    
+    @staticmethod
+    def getBackupPath( filePath ):
+        
+        filename = ntpath.split( filePath )[-1]
+        dirpath = os.path.dirname( filePath ) + '/' + ControlBase.backupDirName + '/' + filename
+        FileControl.makeFolder( dirpath )
+        stringtime = FileTime( filePath ).stringTime()
+        ext = os.path.splitext( filePath )[-1]
+        return dirpath + '/' + ControlBase.backupFileName + '_' + stringtime + ext
+    
+    
+    @staticmethod
+    def isBackupFile( filePath ):
+        
+        filename = ntpath.split( filePath )[-1]
+        if len( filename ) <= len( ControlBase.backupFileName ): return False
+        if filename[:len( ControlBase.backupFileName )] == ControlBase.backupFileName: return True
+        return False
+    
+    
+    
     @staticmethod
     def downloadFile( srcFullPath, dstFullPath ):
         
         import shutil
         FileControl.makeFolder( os.path.dirname( dstFullPath ) )
         shutil.copy2( srcFullPath, dstFullPath )
+        shutil.copy2( srcFullPath, FileControl.getBackupPath( dstFullPath ) )
     
 
 
@@ -480,9 +550,9 @@ class FileControl:
     def uploadFile( srcFullPath, dstFullPath ):
         
         import shutil
-        try:FileControl.makeFolder( os.path.dirname( dstFullPath ) )
-        except:pass
+        FileControl.makeFolder( os.path.dirname( dstFullPath ) )
         shutil.copy2( srcFullPath, dstFullPath )
+        shutil.copy2( srcFullPath, FileControl.getBackupPath( srcFullPath ) )
     
 
     
@@ -498,6 +568,19 @@ class FileControl:
             elif extension == ".ma":
                 cmds.file( fullPath, f=1, options = "v=0;",  typ = "mayaAscii", o=1 )
                 mel.eval( 'addRecentFile("%s", "mayaAscii");' % fullPath )
+        except:
+            pass
+    
+    
+    @staticmethod
+    def referenceFile( fullPath ):
+        filename = ntpath.split( fullPath )[-1]
+        filename, extension = os.path.splitext( filename )
+        try:
+            if extension == '.mb':
+                cmds.file( fullPath, r=1, type='mayaBinary', ignoreVersion=1, gl=1, mergeNamespacesOnClash=False, ns=filename, options='v=0' )
+            elif extension == ".ma":
+                cmds.file( fullPath, r=1, type='mayaAscii', ignoreVersion=1, gl=1, mergeNamespacesOnClash=False, ns=filename, options='v=0' )
         except:
             pass
     
@@ -520,35 +603,96 @@ class FileControl:
 
 
 class EditorCmds:
+    
+    
+    @staticmethod
+    def getEditorInfoFromFile( filePath ):
+        
+        if not os.path.exists( filePath ):
+            return EditorInfo(filePath)
+        
+        import ntpath
+        filename = ntpath.split( filePath )[-1]
+        editorInfoPath = EditorInfo.getEditorInfoPath( filePath )
+        FileControl.makeFile( editorInfoPath )
+        #ctypes.windll.kernel32.SetFileAttributesW(editorInfoPath, 0)
+        newInstance = EditorInfo(filePath)
+        f = open( editorInfoPath, 'r' )
+        data = json.load( f )
+        f.close()
+        if data.has_key( filename ):
+            newInstance.setDict( data[filename] )
+        else:
+            data[filename] = newInstance.getDict()
+            f = open( editorInfoPath, 'w' )
+            json.dump( data, f, indent=2 )
+            f.close()
+        #ctypes.windll.kernel32.SetFileAttributesW(editorInfoPath, 2)
+        return newInstance
 
 
     @staticmethod
-    def getEditorInfoPath( filePath ):
+    def setEditorInfoToFile( editorInfo, filePath ):
         
-        dirPath, fileName = ntpath.split( filePath )
-        onlyFileName, extension = os.path.splitext( fileName )
-        return dirPath + '/' + onlyFileName + '.' + ControlBase.fileInfoExtension
+        import ntpath
+        fileName = ntpath.split( filePath )[-1]
+        editorInfoPath = EditorInfo.getEditorInfoPath( filePath )
+        FileControl.makeFile( editorInfoPath )
+        #ctypes.windll.kernel32.SetFileAttributesW(editorInfoPath, 0)
+        
+        f = open( editorInfoPath, 'r' )
+        data = json.load( f )
+        f.close()
+        data[fileName] = editorInfo.getDict()
+        f = open( editorInfoPath, 'w' )
+        json.dump( data, f, indent=2 )
+        f.close()
+        #ctypes.windll.kernel32.SetFileAttributesW(editorInfoPath, 2)
     
     
     
     @staticmethod
     def getMyEditorInfo( localPath ):
-        return model.EditorInfo.getMyInfo(localPath)
-    
-    
+        return EditorInfo.getMyInfo(localPath)
+
+
     @staticmethod
-    def getEditorInfo( serverPath ):
+    def fixEditorInfo( filePath ):
         
-        editorInfoPath = EditorCmds.getEditorInfoPath( serverPath )
-        return model.EditorInfo.getFromFile( serverPath, editorInfoPath )
-    
-    
-    @staticmethod
-    def setEditorInfo( editorInst, dstPath ):
+        if os.path.isfile(filePath):
+            dirpath = os.path.dirname( filePath )
+        else:
+            dirpath = filePath
         
-        editorInfoPath= EditorCmds.getEditorInfoPath( dstPath )
-        model.EditorInfo.setToFile( editorInst, editorInfoPath )
+        editorInfoPath = EditorInfo.getEditorInfoPath( filePath )
+        #ctypes.windll.kernel32.SetFileAttributesW(editorInfoPath, 0)
+        
+        data = {}
+        if not os.path.exists( editorInfoPath ):
+            for root, dirs, names in os.walk( dirpath ):
+                for name in names:
+                    if os.path.splitext( name )[-1] == '.' + ControlBase.editorInfoExtension: continue
+                    data[ name ] = EditorInfo( root + '/' + name ).getDict()
+                break
+        else:
+            f = open( editorInfoPath, 'r' )
+            data = json.load( f )
+            f.close()
             
+            for root, dirs, names in os.walk( dirpath ):
+                for name in names:
+                    if os.path.splitext( name )[-1] == '.' + ControlBase.editorInfoExtension: continue
+                    if data.has_key( name ):
+                        data[ name ][ 'mtime' ] = FileTime( root + '/' + name ).mtime()
+                    else:
+                        data[ name ] = EditorInfo( root + '/' + name ).getDict()
+                break
+            
+            f = open( editorInfoPath, 'w' )
+            json.dump( data, f, indent=2 )
+            f.close()
+        #ctypes.windll.kernel32.SetFileAttributesW(editorInfoPath, 2)
+
 
 
 
@@ -559,36 +703,69 @@ class SceneControl:
         
         import pymel.core
         from maya import mel
-        from ui_Dialog_updateFileList import *
+        from functools import partial
         
         fileNodes = pymel.core.ls( type='file' )
         
-        serverTaskFullPath = serverUnit.projectPath + serverUnit.taskPath
-        localTaskFullPath  = FileControl.getArrangedPathString( localUnit.projectPath + localUnit.taskPath )
+        serverProjectPath = serverUnit.projectPath
+        localProjectPath  = FileControl.getArrangedPathString( localUnit.projectPath )
         
         elsePaths = []
         for fileNode in fileNodes:
             textureLocalPath  = FileControl.getArrangedPathString( fileNode.fileTextureName.get() )
-            if textureLocalPath.lower().find( localTaskFullPath.lower() ) != -1:
-                textureServerPath = serverTaskFullPath + textureLocalPath[len(localTaskFullPath):]
+            if textureLocalPath.lower().find( localProjectPath.lower() ) != -1:
+                textureServerPath = serverProjectPath + textureLocalPath[len(localProjectPath):]
             else:
                 continue
             if not os.path.exists( textureServerPath ): continue
             
             if FileControl.isUpdateRequired( textureServerPath, textureLocalPath ):
-                elsePaths.append( textureLocalPath[ len( localTaskFullPath ): ] )
+                elsePaths.append( textureLocalPath[ len( localProjectPath ): ] )
         
         if elsePaths:
             elsePaths = list( set( elsePaths ) )
-            ui_updateFileList = Dialog_updateFileList()
-            ui_updateFileList.setServerPath( serverTaskFullPath )
-            ui_updateFileList.setLocalPath( localTaskFullPath )
+            ui_updateFileList = Dialog_downloadFileList( ControlBase.mayawin )
+            ui_updateFileList.setServerPath( serverProjectPath )
+            ui_updateFileList.setLocalPath( localProjectPath )
             for elsePath in elsePaths:
                 ui_updateFileList.appendFilePath( elsePath )
             ui_updateFileList.updateUI()
             ui_updateFileList.show()
+
+
+    @staticmethod
+    def getNeedDownloadReferenceFileList( serverUnit, localUnit, afterCmd ):
+        
+        serverProjectPath = serverUnit.projectPath
+        localProjectPath  = FileControl.getArrangedPathString( localUnit.projectPath )
+        
+        editorInfo = EditorCmds.getEditorInfoFromFile( localUnit.fullPath() )
+        
+        referenceFilePaths = editorInfo.getDict()['references']
+        
+        elsePaths = []
+        for referecePath_local in [ FileControl.getArrangedPathString( filePath ) for filePath in referenceFilePaths ]:
+            if referecePath_local.lower().find( localProjectPath.lower() ) != -1:
+                referencePath_server = serverProjectPath + referecePath_local[len(localProjectPath):]
+            else:
+                continue
+            if not os.path.exists( referencePath_server ): continue
+            
+            if FileControl.isUpdateRequired( referencePath_server, referecePath_local ):
+                elsePaths.append( referecePath_local[ len( localProjectPath ): ] )
+        
+        if elsePaths:
+            elsePaths = list( set( elsePaths ) )
+            ui_updateFileList = Dialog_downloadFileList( ControlBase.mayawin )
+            ui_updateFileList.setServerPath( serverProjectPath )
+            ui_updateFileList.setLocalPath( localProjectPath )
+            for elsePath in elsePaths:
+                ui_updateFileList.appendFilePath( elsePath )
+            ui_updateFileList.updateUI()
+            ui_updateFileList.addDownloadCmd( afterCmd )
+            ui_updateFileList.show()
     
-    
+
 
 
 class ContextMenuCmds:
@@ -600,8 +777,8 @@ class ContextMenuCmds:
         if not selItems: return
         selItem  = selItems[0]
 
-        serverUnitInst = model.FileUnit( FileControl.getCurrentServerProjectPath(), selItem.taskPath, selItem.unitPath )
-        localUnitInst  = model.FileUnit( FileControl.getCurrentLocalProjectPath(), selItem.taskPath, selItem.unitPath )
+        serverUnitInst = FileUnit( FileControl.getCurrentServerProjectPath(), selItem.taskPath, selItem.unitPath )
+        localUnitInst  = FileUnit( FileControl.getCurrentLocalProjectPath(), selItem.taskPath, selItem.unitPath )
 
         if cmds.file( modified=1, q=1 ):
             txSaveAndOpen = '저장하고 열기'.decode( 'utf-8' )
@@ -621,10 +798,12 @@ class ContextMenuCmds:
         if not os.path.exists( serverFullPath ) and os.path.exists( localFullPath ):
             pass
         elif os.path.exists( serverFullPath ) and not os.path.exists( localFullPath ):
+            serverEditor = EditorCmds.getEditorInfoFromFile( serverFullPath )
             FileControl.downloadFile( serverFullPath, localFullPath )
+            EditorCmds.setEditorInfoToFile( serverEditor, localFullPath )
         else:
-            serverEditor = EditorCmds.getEditorInfo( serverFullPath )
-            localEditor  = EditorCmds.getEditorInfo( localFullPath )
+            serverEditor = EditorCmds.getEditorInfoFromFile( serverFullPath )
+            localEditor  = EditorCmds.getEditorInfoFromFile( localFullPath )
             
             if serverEditor == localEditor:
                 if serverEditor.mtime > localEditor.mtime:
@@ -640,18 +819,70 @@ class ContextMenuCmds:
             else:
                 txDownload = "다운받고 열기".decode( "utf-8" )
                 txJustOpen = "그냥열기".decode( "utf-8" )
-                confirmResult = cmds.confirmDialog( title='Confirm', message='%s에 의해 %s에 변경되었습니다.\n다운받으시겠습니까?'.decode( 'utf-8' ) % (serverEditor.host, model.FileTime.getStrFromMTime( serverEditor.mtime )), 
+                confirmResult = cmds.confirmDialog( title='Confirm', message='%s에 의해 %s에 변경되었습니다.\n다운받으시겠습니까?'.decode( 'utf-8' ) % (serverEditor.host, FileTime.getStrFromMTime( serverEditor.mtime )), 
                                                         button=[txDownload,txJustOpen], 
                                                         defaultButton=txJustOpen, 
                                                         parent= ControlBase.mainui.objectName )
                 if confirmResult == txDownload:
                     FileControl.downloadFile( serverFullPath, localFullPath )
-                    EditorCmds.setEditorInfo( serverEditor, localFullPath )
+                    EditorCmds.setEditorInfoToFile( serverEditor, localFullPath )
         
-        FileControl.loadFile( localFullPath )
+        def afterCmd():
+            FileControl.loadFile( localFullPath )
+            SceneControl.getNeedDownloadTextureFileList( serverUnitInst, localUnitInst )
+            TreeWidgetCmds.setTreeItemsCondition( ControlBase.uiTreeWidget )
+        
+        SceneControl.getNeedDownloadReferenceFileList( serverUnitInst, localUnitInst, afterCmd )
+
+    
+    @staticmethod
+    def reference():
+        
+        selItems = ControlBase.uiTreeWidget.selectedItems()
+        if not selItems: return
+        selItem  = selItems[0]
+
+        serverUnitInst = FileUnit( FileControl.getCurrentServerProjectPath(), selItem.taskPath, selItem.unitPath )
+        localUnitInst  = FileUnit( FileControl.getCurrentLocalProjectPath(), selItem.taskPath, selItem.unitPath )
+
+        if cmds.file( modified=1, q=1 ):
+            txSaveAndOpen = '저장하고 불러오기'.decode( 'utf-8' )
+            txJustOpen = '그냥 불러오기'.decode( 'utf-8' )
+            txCancel = '취소'.decode( 'utf-8' )
+            confirmResult = cmds.confirmDialog( title='Confirm', message='레퍼런스를 불러오기 전에 씬을 저장하시겠습니까?'.decode( 'utf-8' ), 
+                                                button=[txSaveAndOpen,txJustOpen,txCancel], 
+                                                defaultButton=txCancel, parent= ControlBase.mainui.objectName )
+            if confirmResult == txSaveAndOpen:
+                cmds.file( save=1 )
+            elif confirmResult == txCancel:
+                return
+        
+        serverFullPath = serverUnitInst.fullPath()
+        localFullPath  = localUnitInst.fullPath()
+        
+        if not os.path.exists( serverFullPath ) and os.path.exists( localFullPath ):
+            pass
+        elif os.path.exists( serverFullPath ) and not os.path.exists( localFullPath ):
+            serverEditor = EditorCmds.getEditorInfoFromFile( serverFullPath )
+            EditorCmds.setEditorInfoToFile( serverEditor, localFullPath )
+            FileControl.downloadFile( serverFullPath, localFullPath )
+        else:
+            serverEditor = EditorCmds.getEditorInfoFromFile( serverFullPath )
+            localEditor  = EditorCmds.getEditorInfoFromFile( localFullPath )
+            
+            if serverEditor > localEditor:
+                FileControl.downloadFile( serverFullPath, localFullPath )
+                EditorCmds.setEditorInfo( serverEditor, localFullPath )
+        
+        FileControl.referenceFile( localFullPath )
         SceneControl.getNeedDownloadTextureFileList( serverUnitInst, localUnitInst )
         TreeWidgetCmds.setTreeItemsCondition( ControlBase.uiTreeWidget )
-
+    
+    
+    @staticmethod
+    def exportReferenceInfo():
+        
+        pass
 
 
     @staticmethod
@@ -661,7 +892,7 @@ class ContextMenuCmds:
         if not selItems: return
         selItem  = selItems[0]
         
-        serverUnitInst = model.FileUnit( FileControl.getCurrentServerProjectPath(), selItem.taskPath, selItem.unitPath )
+        serverUnitInst = FileUnit( FileControl.getCurrentServerProjectPath(), selItem.taskPath, selItem.unitPath )
 
         if cmds.file( modified=1, q=1 ):
             txSaveAndOpen = '저장하고 열기'.decode( 'utf-8' )
@@ -692,7 +923,9 @@ class ContextMenuCmds:
             targetDir = cuServerUnitPath
             
         if not os.path.exists( targetDir ):
-            cmds.error( "%s Path is not exists" % cuServerUnitPath )
+            cmds.confirmDialog( title='Confirm', message='해댱 폴더가 존재하지 않습니다.'.decode( 'utf-8' ),
+                                                        button=["확인".decode('utf-8')], parent= ControlBase.mainui.objectName )
+            return
             
         import subprocess
         subprocess.call( 'explorer /object, "%s"' % targetDir.replace( '/', '\\' ) )
@@ -715,7 +948,9 @@ class ContextMenuCmds:
             targetDir = cuLocalUnitPath
 
         if not os.path.exists( targetDir ):
-            FileControl.makeFolder( targetDir )
+            cmds.confirmDialog( title='Confirm', message='해댱 폴더가 존재하지 않습니다.'.decode( 'utf-8' ),
+                                                        button=["확인".decode('utf-8')], parent= ControlBase.mainui.objectName )
+            return
         
         import subprocess
         subprocess.call( 'explorer /object, "%s"' % targetDir.replace( '/', '\\' ) )
@@ -726,30 +961,59 @@ class ContextMenuCmds:
     def upload():
         
         selItems   = ControlBase.uiTreeWidget.selectedItems()
-        serverUnit = model.FileUnit( FileControl.getCurrentServerProjectPath(), selItems[0].taskPath, selItems[0].unitPath )
-        localUnit  = model.FileUnit( FileControl.getCurrentLocalProjectPath(),  selItems[0].taskPath, selItems[0].unitPath )
+        serverUnit = FileUnit( FileControl.getCurrentServerProjectPath(), selItems[0].taskPath, selItems[0].unitPath )
+        localUnit  = FileUnit( FileControl.getCurrentLocalProjectPath(),  selItems[0].taskPath, selItems[0].unitPath )
         
-        txUpload = '덮어 씌우기'.decode( 'utf-8' )
-        txCancel = '취소'.decode( 'utf-8' )
-        
-        if not os.path.exists( serverUnit.fullPath() ):
-            FileControl.makeFolder( os.path.dirname( serverUnit.fullPath()) )
-            FileControl.uploadFile( localUnit.fullPath(), serverUnit.fullPath() )
-        else:
-            recentEditor = EditorCmds.getEditorInfo( serverUnit.fullPath() )
-            myEditor     = EditorCmds.getEditorInfo( localUnit.fullPath() )
-            if recentEditor == myEditor:
-                confirmResult = txUpload
-            else:
-                #print recentEditor.host, model.FileTime.getStrFromMTime( recentEditor.mtime )
-                confirmResult = cmds.confirmDialog( title='Confirm', message='%s에 의해 %s에 변경되었습니다. 덮어씌울까요?'.decode( 'utf-8' ) % (recentEditor.host, model.FileTime.getStrFromMTime( recentEditor.mtime ) ),
-                                                    button=[txUpload,txCancel],
-                                                    defaultButton=txCancel, parent= ControlBase.mainui.objectName )
-        
-            if confirmResult == txUpload:
-                try:FileControl.makeFolder( os.path.dirname(serverUnit.fullPath()) )
-                except:pass
+        if os.path.isfile( localUnit.fullPath() ):
+            txUpload = '덮어 씌우기'.decode( 'utf-8' )
+            txCancel = '취소'.decode( 'utf-8' )
+            
+            if not os.path.exists( serverUnit.fullPath() ):
+                myEditor = EditorCmds.getMyEditorInfo( localUnit.fullPath() )
                 FileControl.uploadFile( localUnit.fullPath(), serverUnit.fullPath() )
+                EditorCmds.setEditorInfoToFile( myEditor, localUnit.fullPath() )
+                EditorCmds.setEditorInfoToFile( myEditor, serverUnit.fullPath() )
+            else:
+                recentEditor = EditorCmds.getEditorInfoFromFile( serverUnit.fullPath() )
+                myEditor     = EditorCmds.getMyEditorInfo( localUnit.fullPath() )
+                if recentEditor == myEditor:
+                    confirmResult = txUpload
+                else:
+                    filename = ntpath.split( localUnit.fullPath() )[-1]
+                    confirmResult = cmds.confirmDialog( title='Confirm', message='%s는 %s에 의해 %s에 변경되었습니다. 덮어씌울까요?'.decode( 'utf-8' ) % (filename, recentEditor.host, FileTime.getStrFromMTime( recentEditor.mtime ) ),
+                                                        button=[txUpload,txCancel],
+                                                        defaultButton=txCancel, parent= ControlBase.mainui.objectName )
+
+                if confirmResult == txUpload:
+                    FileControl.uploadFile( localUnit.fullPath(), serverUnit.fullPath() )
+                    EditorCmds.setEditorInfoToFile( myEditor, serverUnit.fullPath() )
+                    EditorCmds.setEditorInfoToFile( myEditor, localUnit.fullPath() )
+        elif os.path.isdir( localUnit.fullPath() ):
+            EditorCmds.fixEditorInfo( localUnit.fullPath() )
+            EditorCmds.fixEditorInfo( serverUnit.fullPath() )
+            targetPaths = []
+            for root, dirs, names in os.walk( localUnit.fullPath() ):
+                for name in names:
+                    targetPath = FileControl.getArrangedPathString( root + '/' + name )[ len( localUnit.projectPath ): ]
+                    if FileControl.isBackupFile( targetPath ): continue
+                    if os.path.splitext( targetPath )[-1] == '.' + ControlBase.editorInfoExtension: continue
+                    serverEditorInfo = EditorCmds.getEditorInfoFromFile( serverUnit.projectPath + targetPath )
+                    localEditorInfo  = EditorCmds.getEditorInfoFromFile( localUnit.projectPath + targetPath )
+                    if serverEditorInfo >= localEditorInfo: continue
+                    targetPaths.append( targetPath )
+            
+            if not targetPaths:
+                cmds.confirmDialog( title='Notice', message='업로드할 파일이 없습니다.'.decode( 'utf-8' ),
+                                    button=["확인".decode( 'utf-8' )], parent= ControlBase.mainui.objectName )
+                return
+            
+            ui_updateFileList = Dialog_uploadFileList( ControlBase.mayawin )
+            ui_updateFileList.setServerPath( serverUnit.projectPath )
+            ui_updateFileList.setLocalPath( localUnit.projectPath )
+            for targetPath in targetPaths:
+                ui_updateFileList.appendFilePath( targetPath )
+            ui_updateFileList.updateUI()
+            ui_updateFileList.show()
 
         TreeWidgetCmds.setTreeItemsCondition( ControlBase.uiTreeWidget )
 

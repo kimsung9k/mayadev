@@ -1,7 +1,6 @@
 #coding=utf8
 
 from commands import *
-import model
 
 
 class Window_manageProject( QtGui.QMainWindow ):
@@ -36,7 +35,7 @@ class Window_manageProject( QtGui.QMainWindow ):
         
         WorkAreaGroupBox = QtGui.QGroupBox( '작업 리스트'.decode('utf-8') )
         WorkAreaGroupLayout = QtGui.QVBoxLayout()
-        workTreeWidget = model.WorkTreeWidget()
+        workTreeWidget = WorkTreeWidget()
         buttonDelWork = QtGui.QPushButton( "작업삭제".decode( 'utf-8' ) )
         WorkAreaGroupLayout.addWidget( workTreeWidget )
         WorkAreaGroupLayout.addWidget( buttonDelWork )

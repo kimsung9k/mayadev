@@ -1,9 +1,8 @@
 eclipse.preferences.version=1
 encoding//sgUIs/convertImage.py=utf-8
-encoding//sgUIs/pingowms/ControlBase.py=utf8
+encoding//sgUIs/pingowms/Models.py=utf8
 encoding//sgUIs/pingowms/__init__.py=utf8
 encoding//sgUIs/pingowms/commands.py=utf8
-encoding//sgUIs/pingowms/model.py=utf8
 encoding//sgUIs/pingowms/ui_Dialog_addProject.py=utf8
 encoding//sgUIs/pingowms/ui_Dialog_addTask.py=utf8
 encoding//sgUIs/pingowms/ui_Dialog_updateFileList.py=utf8

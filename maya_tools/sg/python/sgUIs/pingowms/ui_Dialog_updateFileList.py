@@ -1,28 +1,12 @@
 #coding=utf8
 
-from ControlBase import *
+from sgUIs.pingowms.Models import *
+from PySide import QtCore
+import commands
 
 
 
-def makeFolder( pathName ):
-        
-    pathName = pathName.replace( '\\', '/' )
-    splitPaths = pathName.split( '/' )
-    cuPath = splitPaths[0]
-    folderExist = True
-    for i in range( 1, len( splitPaths ) ):
-        checkPath = cuPath+'/'+splitPaths[i]
-        if not os.path.exists( checkPath ):
-            os.chdir( cuPath )
-            os.mkdir( splitPaths[i] )
-            folderExist = False
-        cuPath = checkPath
-    if folderExist: return None
-    return pathName
-
-
-
-class Dialog_updateFileList( QtGui.QDialog ):
+class Dialog_downloadFileList( QtGui.QDialog ):
     
     objectName = 'ui_pingowms_updateFileList'
     title = "다운로드 리스트".decode('utf-8')
@@ -33,14 +17,14 @@ class Dialog_updateFileList( QtGui.QDialog ):
         
         if not args: args = tuple( [ControlBase.mayawin] )
         
-        if cmds.window( Dialog_updateFileList.objectName, ex=1 ):
-            cmds.deleteUI( Dialog_updateFileList.objectName, wnd=1 )
+        if cmds.window( Dialog_downloadFileList.objectName, ex=1 ):
+            cmds.deleteUI( Dialog_downloadFileList.objectName, wnd=1 )
         
         QtGui.QDialog.__init__( self, *args, **kwargs )
         self.installEventFilter( self )
-        self.setObjectName( Dialog_updateFileList.objectName )
-        self.setWindowTitle( Dialog_updateFileList.title )
-        self.resize( Dialog_updateFileList.defaultWidth, Dialog_updateFileList.defaultHeight )
+        self.setObjectName( Dialog_downloadFileList.objectName )
+        self.setWindowTitle( Dialog_downloadFileList.title )
+        self.resize( Dialog_downloadFileList.defaultWidth, Dialog_downloadFileList.defaultHeight )
         
         self.setModal( True )
         
@@ -61,7 +45,7 @@ class Dialog_updateFileList( QtGui.QDialog ):
         self.serverPath = ""
         self.localPath   = ""
         self.files = []
-        self.cmds = []
+        self.downloadCmds = []
         
         QtCore.QObject.connect( buttonDownload, QtCore.SIGNAL('clicked()'),  self.cmd_download )
         QtCore.QObject.connect( buttonCanel, QtCore.SIGNAL('clicked()'),   self.cmd_deleteUI )
@@ -76,6 +60,10 @@ class Dialog_updateFileList( QtGui.QDialog ):
     def setLocalPath(self, localPath ):
         
         self.localPath = localPath
+
+
+    def addDownloadCmd(self, targetCmd ):
+        self.downloadCmds.append( targetCmd )
 
 
     def appendFilePath(self, path ):
@@ -95,30 +83,131 @@ class Dialog_updateFileList( QtGui.QDialog ):
     def cmd_download(self):
         
         import shutil
-        import pymel.core
+        import pymel.core, os
         from maya import mel
         
         for filePath in self.files:
             serverPath = self.serverPath + filePath
             localPath  = self.localPath + filePath
-            makeFolder( os.path.dirname(localPath) )
             
             if os.path.exists( serverPath ):
-                shutil.copy2( serverPath, localPath )
+                editorInfo = commands.EditorCmds.getEditorInfoFromFile( serverPath )
+                commands.EditorCmds.setEditorInfoToFile( editorInfo, localPath )
+                commands.FileControl.downloadFile( serverPath, localPath )
         
         for fileNode in pymel.core.ls( type='file' ):
             #print "AEfileTextureReloadCmd %s" % fileNode.fileTextureName.name()
             mel.eval( "AEfileTextureReloadCmd %s" % fileNode.fileTextureName.name() )
+        cmds.deleteUI( Dialog_downloadFileList.objectName, wnd=1 )
+        commands.TreeWidgetCmds.setTreeItemsCondition()
         
-        cmds.deleteUI( Dialog_updateFileList.objectName, wnd=1 )
-        
-                
+        for cmd in self.downloadCmds:
+            cmd()
+    
 
     def cmd_deleteUI(self):
         
-        cmds.deleteUI( Dialog_updateFileList.objectName, wnd=1 )
+        cmds.deleteUI( Dialog_downloadFileList.objectName, wnd=1 )
     
+
+
+
+class Dialog_uploadFileList( QtGui.QDialog ):
     
+    objectName = 'ui_pingowms_updateFileList'
+    title = "업로드 리스트".decode('utf-8')
+    defaultWidth= 300
+    defaultHeight = 300
+    
+    def __init__(self, *args, **kwargs ):
+        
+        if not args: args = tuple( [ControlBase.mayawin] )
+        
+        if cmds.window( Dialog_uploadFileList.objectName, ex=1 ):
+            cmds.deleteUI( Dialog_uploadFileList.objectName, wnd=1 )
+        
+        QtGui.QDialog.__init__( self, *args, **kwargs )
+        self.installEventFilter( self )
+        self.setObjectName( Dialog_uploadFileList.objectName )
+        self.setWindowTitle( Dialog_uploadFileList.title )
+        self.resize( Dialog_uploadFileList.defaultWidth, Dialog_uploadFileList.defaultHeight )
+        
+        self.setModal( True )
+        
+        vLayout = QtGui.QVBoxLayout( self )
+        label_download = QtGui.QLabel( "다음항목들이 로컬에서 서버로 업로드 됩니다.".decode( 'utf-8' ) )
+        label_download.setMaximumHeight( 30 )
+        label  = QtGui.QLabel( "" )
+        hLayout_buttons = QtGui.QHBoxLayout()
+        buttonUpload = QtGui.QPushButton( "업로드하기".decode( 'utf-8' ) )
+        buttonCanel    = QtGui.QPushButton( "업로드 하지 않기".decode( 'utf-8' ) )
+        hLayout_buttons.addWidget( buttonUpload )
+        hLayout_buttons.addWidget( buttonCanel )
+        vLayout.addWidget( label_download )
+        vLayout.addWidget( label )
+        vLayout.addLayout( hLayout_buttons )
+        
+        self.label = label
+        self.serverPath = ""
+        self.localPath   = ""
+        self.files = []
+        self.cmds = []
+        
+        QtCore.QObject.connect( buttonUpload, QtCore.SIGNAL('clicked()'),  self.cmd_upload )
+        QtCore.QObject.connect( buttonCanel, QtCore.SIGNAL('clicked()'),   self.cmd_deleteUI )
+        
+    
+
+    def setServerPath(self, serverPath ):
+        
+        self.serverPath = serverPath
+    
+
+
+    def setLocalPath(self, localPath ):
+        
+        self.localPath = localPath
+
+
+
+    def appendFilePath(self, path ):
+        
+        self.files.append( path )
+
+
+
+    def updateUI(self):
+        
+        labelString = "Local Work Area : \n    %s\n\nServer Work Area : \n    %s\n\nFiles:"
+        for i in range( len( self.files ) ):
+            labelString += "\n    " + self.files[i]
+        
+        self.label.setText( labelString %( self.localPath, self.serverPath ) )
+    
+
+
+    def cmd_upload(self):
+        
+        import shutil
+        import pymel.core, os
+        from maya import mel
+        
+        for filePath in self.files:
+            serverPath = self.serverPath + filePath
+            localPath  = self.localPath + filePath
+            
+            if os.path.exists( localPath ):
+                editorInfoLocal  = commands.EditorCmds.getEditorInfoFromFile( localPath )
+                commands.FileControl.uploadFile( localPath, serverPath )
+                commands.EditorCmds.setEditorInfoToFile( editorInfoLocal, serverPath )
+        cmds.deleteUI( Dialog_uploadFileList.objectName, wnd=1 )
+        commands.TreeWidgetCmds.setTreeItemsCondition()
+    
+
+
+    def cmd_deleteUI(self):
+        
+        cmds.deleteUI( Dialog_uploadFileList.objectName, wnd=1 )
 
 
 

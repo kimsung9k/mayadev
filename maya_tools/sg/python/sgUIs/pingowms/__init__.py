@@ -1,7 +1,6 @@
 #coding=utf8
 
 from commands import *
-import model
 from maya import OpenMayaUI
 
 from ui_Dialog_addProject import *
@@ -182,16 +181,14 @@ class Window( QtGui.QMainWindow ):
         layout_localPath.addWidget( lineEdit_localPath )
         layout_localPath.addWidget( button_localPath )
         
-        layoutWorkArea = QtGui.QVBoxLayout()
-        treeWidget = model.WorkTreeWidget()
+        treeWidget = WorkTreeWidget()
         addTaskArea_button = QtGui.QPushButton( '작업영역 추가'.decode('utf-8') )
-        layoutWorkArea.addWidget( treeWidget )
-        layoutWorkArea.addWidget( addTaskArea_button )
         
         vLayout.addLayout( layout_project )
         vLayout.addLayout( layout_serverPath )
         vLayout.addLayout( layout_localPath )
-        vLayout.addLayout( layoutWorkArea )
+        vLayout.addWidget( treeWidget )
+        vLayout.addWidget( addTaskArea_button )
         
         addProject_button.clicked.connect( self.show_addProject )
         manageProject_button.clicked.connect( self.show_manageProject )
@@ -251,12 +248,17 @@ class Window( QtGui.QMainWindow ):
         menu = QtGui.QMenu( ControlBase.uiTreeWidget )
         
         enableOpenFile = QueryCmds.isEnableOpen( targetPath_inServer, targetPath_inLocal )
-        enableUpload   = QueryCmds.isEnableUpload( targetPath_inLocal )
+        enableExportReferenceInfo = QueryCmds.isEnableExportReferneceInfo( targetPath_inLocal )
         
-        if enableOpenFile: menu.addAction("파일열기".decode( 'utf-8'), ContextMenuCmds.loadFile_local )
+        if enableOpenFile: 
+            menu.addAction("파일열기".decode( 'utf-8'), ContextMenuCmds.loadFile_local )
+            menu.addAction( "레퍼런스".decode( "utf-8" ), ContextMenuCmds.reference )
         menu.addAction("폴더열기".decode( 'utf-8'), ContextMenuCmds.openFileBrowser_local )
         separator = QtGui.QAction( self ); separator.setSeparator( True );menu.addAction( separator )
-        if enableUpload: menu.addAction("업로드".decode( 'utf-8'), ContextMenuCmds.upload )
+        if enableExportReferenceInfo:
+            menu.addAction("업로드( +레퍼런스 정보 )".decode( 'utf-8'), ContextMenuCmds.upload )
+        else:
+            menu.addAction("업로드".decode( 'utf-8'), ContextMenuCmds.upload )
         separator = QtGui.QAction( self ); separator.setSeparator( True );menu.addAction( separator )
         if enableOpenFile: menu.addAction("파일열기( 서버 )".decode( 'utf-8'), ContextMenuCmds.loadFile_server )
         menu.addAction("폴더열기( 서버 )".decode( 'utf-8'), ContextMenuCmds.openFileBrowser_server )
