@@ -7,23 +7,8 @@ import os, json
 
 
 def makeFolder( pathName ):
-    
-    pathName = pathName.replace( '\\', '/' )
-    splitPaths = pathName.split( '/' )
-    
-    cuPath = splitPaths[0]
-    
-    folderExist = True
-    for i in range( 1, len( splitPaths ) ):
-        checkPath = cuPath+'/'+splitPaths[i]
-        if not os.path.exists( checkPath ):
-            os.chdir( cuPath )
-            os.mkdir( splitPaths[i] )
-            folderExist = False
-        cuPath = checkPath
-        
-    if folderExist: return None
-        
+    if os.path.exists( pathName ):return None
+    os.makedirs( pathName )
     return pathName
 
 

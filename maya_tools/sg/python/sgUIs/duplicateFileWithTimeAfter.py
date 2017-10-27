@@ -1,7 +1,6 @@
 import maya.cmds as cmds
 import maya.OpenMayaUI
-from PySide import QtGui, QtCore
-import shiboken as shiboken
+from __qtImprot import *
 import os, sys
 import json
 from functools import partial
@@ -9,23 +8,8 @@ from functools import partial
 
 
 def makeFolder( pathName ):
-    
-    pathName = pathName.replace( '\\', '/' )
-    splitPaths = pathName.split( '/' )
-    
-    cuPath = splitPaths[0]
-    
-    folderExist = True
-    for i in range( 1, len( splitPaths ) ):
-        checkPath = cuPath+'/'+splitPaths[i]
-        if not os.path.exists( checkPath ):
-            os.chdir( cuPath )
-            os.mkdir( splitPaths[i] )
-            folderExist = False
-        cuPath = checkPath
-        
-    if folderExist: return None
-        
+    if os.path.exists( pathName ):return None
+    os.makedirs( pathName )
     return pathName
 
 
@@ -45,7 +29,7 @@ def makeFile( filePath ):
 
 class Window_global:
     
-    mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QtGui.QWidget )
+    mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QWidget )
     objectName = "sgui_duplicateFileWithTimeAfter"
     title = "Get Image From Object"
     width = 300
@@ -61,15 +45,15 @@ class Functions:
         
         
 
-class Window( QtGui.QMainWindow ):
+class Window( QMainWindow ):
     
     def __init__(self, *args, **kwargs ):
         
-        QtGui.QMainWindow.__init__( self, *args, **kwargs )
+        QMainWindow.__init__( self, *args, **kwargs )
         self.installEventFilter( self )
         self.setWindowTitle( Window_global.title )
         
-        self.mainWidget = QtGui.QWidget()
+        self.mainWidget = QWidget()
         self.setCentralWidget( self.mainWidget )
         
         

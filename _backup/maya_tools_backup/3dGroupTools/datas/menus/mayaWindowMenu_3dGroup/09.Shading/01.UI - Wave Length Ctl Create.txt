@@ -1,2 +1,0 @@
-import shading.waveLengthCtlCreate.view
-shading.waveLengthCtlCreate.view.Window().create()

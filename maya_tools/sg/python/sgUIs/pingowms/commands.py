@@ -2,8 +2,9 @@
 
 import maya.cmds as cmds
 from maya import OpenMayaUI
-from PySide import QtGui, QtCore
-import shiboken
+
+from sgUIs.__qtImprot import *
+
 import os, sys
 import json
 import ntpath, ctypes
@@ -27,32 +28,32 @@ class UICmds:
 
 
 
-class TreeWidgetCmds:
 
+class TreeWidgetCmds:
 
     @staticmethod
     def setTreeItemCondition( targetItem ):
         
-        cuLocalUnitPath  = FileControl.getCurrentLocalProjectPath() + targetItem.taskPath + targetItem.unitPath
-        cuServerUnitPath = FileControl.getCurrentServerProjectPath() + targetItem.taskPath + targetItem.unitPath
+        cuLocalFullPath  = FileControl.getCurrentLocalProjectPath() + targetItem.taskPath + targetItem.unitPath
+        cuServerFullPath = FileControl.getCurrentServerProjectPath() + targetItem.taskPath + targetItem.unitPath
         
-        compairTwoPath = CompairTwoPath( cuServerUnitPath, cuLocalUnitPath )
+        compairTwoPath = CompairTwoPath( cuServerFullPath, cuLocalFullPath )
         compairResult  = compairTwoPath.getCompairResult()
         
         if compairResult == compairTwoPath.targetOnly:
-            brush = QtGui.QBrush( Colors.localOnly )
+            brush = QBrush( Colors.localOnly )
         elif compairResult == compairTwoPath.baseOnly:
-            brush = QtGui.QBrush( Colors.serverOnly )
+            brush = QBrush( Colors.serverOnly )
         elif compairResult == compairTwoPath.targetIsNew:
-            brush = QtGui.QBrush( Colors.localModified )
+            brush = QBrush( Colors.localModified )
         elif compairResult == compairTwoPath.baseIsNew:
-            brush = QtGui.QBrush( Colors.serverModified )
+            brush = QBrush( Colors.serverModified )
         else:
-            brush = QtGui.QBrush( Colors.equar )
+            brush = QBrush( Colors.equar )
         
         targetItem.setForeground( 0, brush )
         
-        cuLocalUnitPath  = FileControl.getArrangedPathString( cuLocalUnitPath )
+        cuLocalUnitPath  = FileControl.getArrangedPathString( cuLocalFullPath )
         currentScenePath = cmds.file( q=1, sceneName=1 )
         
         currentScenePath = FileControl.getArrangedPathString( currentScenePath )
@@ -62,7 +63,7 @@ class TreeWidgetCmds:
             targetItem.setText( 1, "Opened".decode( 'utf-8' ) )
             cuColor = brush.color()
             cuColor.setAlpha( 100 )
-            targetItem.setForeground( 1, QtGui.QBrush( cuColor ) )
+            targetItem.setForeground( 1, QBrush( cuColor ) )
         else:
             targetItem.setText( 1, "" )
 
@@ -102,10 +103,10 @@ class TreeWidgetCmds:
         if not projectData.has_key( ControlBase.labelTasks ): return
         tasksData = projectData[ControlBase.labelTasks]
         keys = tasksData.keys()
-        #classes = QtGui.QStandardItemModel( 0, 5, self )
+        #classes = QStandardItemModel( 0, 5, self )
 
         def addHierarchy( parent ):
-            itemDir = QtGui.QTreeWidgetItem()
+            itemDir = QTreeWidgetItem()
             parent.addChild( itemDir )
 
         keys.sort()
@@ -113,7 +114,7 @@ class TreeWidgetCmds:
             taskName = keys[i]
             taskData = tasksData[ taskName ]
             taskPath = taskData[ ControlBase.labelTaskPath ]
-            itemWidget = QtGui.QTreeWidgetItem( targetTreeWidget )
+            itemWidget = QTreeWidgetItem( targetTreeWidget )
             itemWidget.setText( 0, taskName )
             itemWidget.taskPath = taskPath
             itemWidget.unitPath = ""
@@ -140,9 +141,7 @@ class TreeWidgetCmds:
             serverFullPath = serverPath + path
             localFullPath  = localPath  + path
             if not os.path.exists( serverFullPath ) and not os.path.exists( localFullPath ): return
-            
-            enableFont  = QtGui.QFont( "", 9, QtGui.QFont.Bold )
-            disableFont = QtGui.QFont( "", 9, QtGui.QFont.Light )
+
             numTasks = 0
             
             unitDirs  = []
@@ -150,39 +149,39 @@ class TreeWidgetCmds:
             
             for root, dirs, names in os.walk( serverFullPath ):
                 for directory in dirs:
-                    unitDirs.append( root.replace( serverPath, '' ) + '/' + directory )
+                    unitDirs.append( root[len(serverPath):] + '/' + directory )
                 for name in [ name for name in names if os.path.splitext( name )[-1] != '.' + ControlBase.editorInfoExtension]:
-                    unitFiles.append( root.replace( serverPath, '' ) + '/' + name )
+                    unitFiles.append( root[len(serverPath):] + '/' + name )
                 break
             
             for root, dirs, names in os.walk( localFullPath ):
                 for directory in dirs:
-                    unitDirs.append( root.replace( localPath, '' ) + '/' + directory )
+                    unitDirs.append( root[len(localPath):] + '/' + directory )
                 for name in [ name for name in names if os.path.splitext( name )[-1] != '.' + ControlBase.editorInfoExtension ]:
-                    unitFiles.append( root.replace( localPath, '' ) + '/' + name )
+                    unitFiles.append( root[len(localPath):] + '/' + name )
                 break
             
             unitDirs  = list( set( unitDirs ) )
             unitFiles = list( set( unitFiles ) )
-
+            
             unitDirs.sort()
             unitFiles.sort()
-
+        
             for unitDir in unitDirs:
-                newItem = QtGui.QTreeWidgetItem( expandedItem )
+                newItem = QTreeWidgetItem( expandedItem )
                 newItem.setText( 0, unitDir.split( '/' )[-1] )
                 newItem.taskPath = expandedItem.taskPath
-                newItem.unitPath = unitDir.replace( expandedItem.taskPath, '' )
-                emptyChild = QtGui.QTreeWidgetItem( newItem )
+                newItem.unitPath = unitDir[ len( expandedItem.taskPath ): ]
+                emptyChild = QTreeWidgetItem( newItem )
                 numTasks += 1
             for unitFile in unitFiles:
-                newItem = QtGui.QTreeWidgetItem( expandedItem )
+                newItem = QTreeWidgetItem( expandedItem )
                 newItem.setText( 0, unitFile.split( '/' )[-1] )
                 newItem.taskPath = expandedItem.taskPath
-                newItem.unitPath = unitFile.replace( expandedItem.taskPath, '' )
+                newItem.unitPath = unitFile[ len( expandedItem.taskPath ): ]
                 numTasks += 1
         else:
-            QtGui.QTreeWidgetItem( expandedItem )
+            QTreeWidgetItem( expandedItem )
         
         treeWidget = expandedItem.treeWidget()
         
@@ -205,26 +204,18 @@ class QueryCmds:
 
         if not existPath: return False
         if not os.path.isfile( existPath ): return False 
-        
-        extension = os.path.splitext( existPath )[-1]
-        if not extension in ['.mb', '.ma', '.fbx', '.obj' ]: return False
         return True
         
-        
-    
-    
+
+
     @staticmethod
-    def isEnableUpload( targetPath ):
-    
-        if not os.path.exists( targetPath ): return False
-        if os.path.isdir( targetPath ): return False
-        sceneName = FileControl.getArrangedPathString( cmds.file( q=1, sceneName=1 ) )
-        targetPath = FileControl.getArrangedPathString( targetPath )
-        if sceneName != targetPath: return False
+    def isEnableFileDownload( serverPath ):
+        if not os.path.exists( serverPath ): return False
+        if os.path.isdir( serverPath ): return True
         return True
-    
-    
-    
+
+
+
     @staticmethod
     def isEnableReference( targetPath_inServer, targetPath_inLocal ):
         
@@ -284,6 +275,22 @@ class ProjectControl:
         try:currentProject = data[ControlBase.labelCurrentProject]
         except:return
         return currentProject
+    
+    
+    
+    @staticmethod
+    def setCurrentProjectName( projectName ):
+        
+        FileControl.makeFile( ControlBase.defaultInfoPath )
+        f = open( ControlBase.defaultInfoPath, 'r' )
+        data = json.load( f )
+        f.close()
+        
+        if not data: data = {}
+        data[ ControlBase.labelCurrentProject ] = projectName
+        f = open( ControlBase.defaultInfoPath, 'w' )
+        json.dump( data, f )
+        f.close()
 
     
     
@@ -381,6 +388,15 @@ class ProjectControl:
 
 
 class FileControl:
+    
+    @staticmethod
+    def isMayaFile( targetPath ):
+        
+        extension = os.path.splitext( targetPath )[-1]
+        if not extension in ['.mb', '.ma', '.fbx', '.obj']: 
+            return False
+        return True
+    
 
     @staticmethod
     def getArrangedPathString( path ):
@@ -414,7 +430,7 @@ class FileControl:
     @staticmethod
     def getFileFromBrowser( parent, defaultPath = '' ):
         
-        dialog = QtGui.QFileDialog( parent )
+        dialog = QFileDialog( parent )
         dialog.setDirectory( defaultPath )
         fileName = dialog.getOpenFileName()[0]
         return fileName.replace( '\\', '/' )
@@ -424,7 +440,7 @@ class FileControl:
     @staticmethod
     def getFolderFromBrowser( parent, defaultPath = '' ):
         
-        dialog = QtGui.QFileDialog( parent )
+        dialog = QFileDialog( parent )
         dialog.setDirectory( defaultPath )
         choosedFolder = dialog.getExistingDirectory()
         return choosedFolder.replace( '\\', '/' )
@@ -523,16 +539,19 @@ class FileControl:
         FileControl.makeFolder( dirpath )
         stringtime = FileTime( filePath ).stringTime()
         ext = os.path.splitext( filePath )[-1]
-        return dirpath + '/' + ControlBase.backupFileName + '_' + stringtime + ext
+        editorInfo = EditorCmds.getEditorInfoFromFile(filePath)
+        return dirpath + '/' + stringtime + '_' + editorInfo.host + ext
     
     
     @staticmethod
     def isBackupFile( filePath ):
-        
-        filename = ntpath.split( filePath )[-1]
-        if len( filename ) <= len( ControlBase.backupFileName ): return False
-        if filename[:len( ControlBase.backupFileName )] == ControlBase.backupFileName: return True
-        return False
+        return ControlBase.backupDirName in FileControl.getArrangedPathString( filePath ).split( '/' )
+    
+    
+    
+    @staticmethod
+    def isEditorInfoFile( filePath ):
+        return os.path.splitext( filePath )[-1] == '.' + ControlBase.editorInfoExtension
     
     
     
@@ -563,10 +582,10 @@ class FileControl:
         extension = os.path.splitext( fullPath )[-1]
         try:
             if extension == '.mb':
-                cmds.file( fullPath, f=1, options = "v=0;",  typ = "mayaBinary", o=1 )
+                mel.eval( 'file -f -options "v=0;p=17;f=0"  -ignoreVersion  -typ "mayaBinary" -o "%s";' % fullPath )
                 mel.eval( 'addRecentFile("%s", "mayaBinary");' % fullPath )
             elif extension == ".ma":
-                cmds.file( fullPath, f=1, options = "v=0;",  typ = "mayaAscii", o=1 )
+                mel.eval( 'file -f -options "v=0;p=17;f=0"  -ignoreVersion  -typ "mayaAscii" -o "%s";' % fullPath )
                 mel.eval( 'addRecentFile("%s", "mayaAscii");' % fullPath )
         except:
             pass
@@ -616,19 +635,20 @@ class EditorCmds:
         editorInfoPath = EditorInfo.getEditorInfoPath( filePath )
         FileControl.makeFile( editorInfoPath )
         #ctypes.windll.kernel32.SetFileAttributesW(editorInfoPath, 0)
-        newInstance = EditorInfo(filePath)
         f = open( editorInfoPath, 'r' )
         data = json.load( f )
         f.close()
+        newInstance = EditorInfo(filePath)
         if data.has_key( filename ):
             newInstance.setDict( data[filename] )
         else:
-            data[filename] = newInstance.getDict()
+            data[filename] = EditorInfo.getMyInfo(filePath).getDict()
+            newInstance.setDict( data[filename] )
             f = open( editorInfoPath, 'w' )
             json.dump( data, f, indent=2 )
             f.close()
-        #ctypes.windll.kernel32.SetFileAttributesW(editorInfoPath, 2)
         return newInstance
+        #ctypes.windll.kernel32.SetFileAttributesW(editorInfoPath, 2)
 
 
     @staticmethod
@@ -764,11 +784,13 @@ class SceneControl:
             ui_updateFileList.updateUI()
             ui_updateFileList.addDownloadCmd( afterCmd )
             ui_updateFileList.show()
-    
+        else:
+            afterCmd()
 
 
 
 class ContextMenuCmds:
+    
 
     @staticmethod
     def loadFile_local():
@@ -779,8 +801,16 @@ class ContextMenuCmds:
 
         serverUnitInst = FileUnit( FileControl.getCurrentServerProjectPath(), selItem.taskPath, selItem.unitPath )
         localUnitInst  = FileUnit( FileControl.getCurrentLocalProjectPath(), selItem.taskPath, selItem.unitPath )
+        
+        serverFullPath = serverUnitInst.fullPath()
+        localFullPath  = localUnitInst.fullPath()
+        
+        isMayaFile = True
+        for path in [serverFullPath, localFullPath]:
+            if not os.path.exists( path ): continue
+            if not FileControl.isMayaFile( path ): isMayaFile = False
 
-        if cmds.file( modified=1, q=1 ):
+        if isMayaFile and cmds.file( modified=1, q=1 ):
             txSaveAndOpen = '저장하고 열기'.decode( 'utf-8' )
             txJustOpen = '그냥열기'.decode( 'utf-8' )
             txCancel = '취소'.decode( 'utf-8' )
@@ -792,15 +822,13 @@ class ContextMenuCmds:
             elif confirmResult == txCancel:
                 return
         
-        serverFullPath = serverUnitInst.fullPath()
-        localFullPath  = localUnitInst.fullPath()
-        
         if not os.path.exists( serverFullPath ) and os.path.exists( localFullPath ):
             pass
         elif os.path.exists( serverFullPath ) and not os.path.exists( localFullPath ):
             serverEditor = EditorCmds.getEditorInfoFromFile( serverFullPath )
             FileControl.downloadFile( serverFullPath, localFullPath )
             EditorCmds.setEditorInfoToFile( serverEditor, localFullPath )
+            EditorCmds.setEditorInfoToFile( serverEditor, serverFullPath )
         else:
             serverEditor = EditorCmds.getEditorInfoFromFile( serverFullPath )
             localEditor  = EditorCmds.getEditorInfoFromFile( localFullPath )
@@ -828,9 +856,14 @@ class ContextMenuCmds:
                     EditorCmds.setEditorInfoToFile( serverEditor, localFullPath )
         
         def afterCmd():
-            FileControl.loadFile( localFullPath )
-            SceneControl.getNeedDownloadTextureFileList( serverUnitInst, localUnitInst )
-            TreeWidgetCmds.setTreeItemsCondition( ControlBase.uiTreeWidget )
+            if isMayaFile:
+                print "is maya file", localFullPath
+                FileControl.loadFile( localFullPath )
+                SceneControl.getNeedDownloadTextureFileList( serverUnitInst, localUnitInst )
+                TreeWidgetCmds.setTreeItemsCondition( ControlBase.uiTreeWidget )
+            else:
+                os.startfile( localFullPath )
+                TreeWidgetCmds.setTreeItemsCondition( ControlBase.uiTreeWidget )
         
         SceneControl.getNeedDownloadReferenceFileList( serverUnitInst, localUnitInst, afterCmd )
 
@@ -928,7 +961,7 @@ class ContextMenuCmds:
             return
             
         import subprocess
-        subprocess.call( 'explorer /object, "%s"' % targetDir.replace( '/', '\\' ) )
+        subprocess.call( 'explorer /object, "%s"' % targetDir.replace( '/', '\\' ).encode( 'cp949' ) )
 
 
 
@@ -953,10 +986,86 @@ class ContextMenuCmds:
             return
         
         import subprocess
-        subprocess.call( 'explorer /object, "%s"' % targetDir.replace( '/', '\\' ) )
+        subprocess.call( 'explorer /object, "%s"' % targetDir.replace( '/', '\\' ).encode( 'cp949' ) )
 
     
     
+    @staticmethod
+    def download():
+        
+        selItems = ControlBase.uiTreeWidget.selectedItems()
+        serverUnit = FileUnit( FileControl.getCurrentServerProjectPath(), selItems[0].taskPath, selItems[0].unitPath )
+        localUnit  = FileUnit( FileControl.getCurrentLocalProjectPath(),  selItems[0].taskPath, selItems[0].unitPath )
+        
+        if os.path.isfile( serverUnit.fullPath() ):
+            txDownload = '덮어 씌우기'.decode( 'utf-8' )
+            txCancel = '취소'.decode( 'utf-8' )
+            
+            if not os.path.exists( localUnit.fullPath() ):
+                serverEditorInfo = EditorCmds.getEditorInfoFromFile( serverUnit.fullPath() )
+                FileControl.downloadFile( serverUnit.fullPath(), localUnit.fullPath() )
+                EditorCmds.setEditorInfoToFile( serverEditorInfo, localUnit.fullPath() )
+                EditorCmds.setEditorInfoToFile( serverEditorInfo, serverUnit.fullPath() )
+            else:
+                recentEditor = EditorCmds.getEditorInfoFromFile( serverUnit.fullPath() )
+                myEditor     = EditorCmds.getEditorInfoFromFile( localUnit.fullPath() )
+                
+                serverFileTime = FileTime( serverUnit.fullPath() )
+                localFileTime  = FileTime( localUnit.fullPath() )
+                
+                if serverFileTime < localFileTime:
+                    filename = ntpath.split( localUnit.fullPath() )[-1]
+                    confirmResult = cmds.confirmDialog( title='Confirm', 
+                                                        message='로컬에 있는 파일이 더 최신입니다.\n 로컬에 덮어씌울까요?'.decode( 'utf-8' ),
+                                                        button=[txDownload,txCancel],
+                                                        defaultButton=txCancel, parent=ControlBase.mainui.objectName )
+                else:
+                    if recentEditor == myEditor:
+                        confirmResult = txDownload
+                    else:
+                        filename = ntpath.split( localUnit.fullPath() )[-1]
+                        confirmResult = cmds.confirmDialog( title='Confirm', 
+                                                            message='%s는 %s에 의해 %s에 변경된 파일입니다.\n 로컬에 덮어씌울까요?'.decode( 'utf-8' ) % (filename, 
+                                                                                                                                          recentEditor.host, 
+                                                                                                                                          FileTime.getStrFromMTime( recentEditor.mtime ) ),
+                                                            button=[txDownload,txCancel],
+                                                            defaultButton=txCancel, parent=ControlBase.mainui.objectName )
+
+                if confirmResult == txDownload:
+                    FileControl.downloadFile( serverUnit.fullPath(), localUnit.fullPath() )
+                    EditorCmds.setEditorInfoToFile( recentEditor, serverUnit.fullPath() )
+                    EditorCmds.setEditorInfoToFile( recentEditor, localUnit.fullPath() )
+        elif os.path.isdir( serverUnit.fullPath() ):
+            EditorCmds.fixEditorInfo( localUnit.fullPath()  )
+            EditorCmds.fixEditorInfo( serverUnit.fullPath() )
+            targetPaths = []
+            for root, dirs, names in os.walk( localUnit.fullPath() ):
+                for name in names:
+                    targetPath = FileControl.getArrangedPathString( root + '/' + name )[ len( localUnit.projectPath ): ]
+                    if FileControl.isBackupFile( targetPath ): continue
+                    if FileControl.isEditorInfoFile( targetPath ): continue
+                    serverEditorInfo = EditorCmds.getEditorInfoFromFile( serverUnit.projectPath + targetPath )
+                    localEditorInfo  = EditorCmds.getEditorInfoFromFile( localUnit.projectPath  + targetPath )
+                    if serverEditorInfo <= localEditorInfo: continue
+                    targetPaths.append( targetPath )
+            
+            if not targetPaths:
+                cmds.confirmDialog( title='Notice', message='다운로드할 파일이 없습니다.'.decode( 'utf-8' ),
+                                    button=["확인".decode( 'utf-8' )], parent= ControlBase.mainui.objectName )
+                return
+
+            ui_downloadFileList = Dialog_downloadFileList( ControlBase.mayawin )
+            ui_downloadFileList.setServerPath( serverUnit.projectPath )
+            ui_downloadFileList.setLocalPath( localUnit.projectPath )
+            for targetPath in targetPaths:
+                ui_downloadFileList.appendFilePath( targetPath )
+            ui_downloadFileList.updateUI()
+            ui_downloadFileList.show()
+            
+        TreeWidgetCmds.setTreeItemsCondition( ControlBase.uiTreeWidget )
+
+
+
     @staticmethod
     def upload():
         
@@ -989,16 +1098,16 @@ class ContextMenuCmds:
                     EditorCmds.setEditorInfoToFile( myEditor, serverUnit.fullPath() )
                     EditorCmds.setEditorInfoToFile( myEditor, localUnit.fullPath() )
         elif os.path.isdir( localUnit.fullPath() ):
-            EditorCmds.fixEditorInfo( localUnit.fullPath() )
+            EditorCmds.fixEditorInfo( localUnit.fullPath()  )
             EditorCmds.fixEditorInfo( serverUnit.fullPath() )
             targetPaths = []
             for root, dirs, names in os.walk( localUnit.fullPath() ):
                 for name in names:
                     targetPath = FileControl.getArrangedPathString( root + '/' + name )[ len( localUnit.projectPath ): ]
                     if FileControl.isBackupFile( targetPath ): continue
-                    if os.path.splitext( targetPath )[-1] == '.' + ControlBase.editorInfoExtension: continue
+                    if FileControl.isEditorInfoFile( targetPath ): continue
                     serverEditorInfo = EditorCmds.getEditorInfoFromFile( serverUnit.projectPath + targetPath )
-                    localEditorInfo  = EditorCmds.getEditorInfoFromFile( localUnit.projectPath + targetPath )
+                    localEditorInfo  = EditorCmds.getEditorInfoFromFile( localUnit.projectPath  + targetPath )
                     if serverEditorInfo >= localEditorInfo: continue
                     targetPaths.append( targetPath )
             
@@ -1006,7 +1115,7 @@ class ContextMenuCmds:
                 cmds.confirmDialog( title='Notice', message='업로드할 파일이 없습니다.'.decode( 'utf-8' ),
                                     button=["확인".decode( 'utf-8' )], parent= ControlBase.mainui.objectName )
                 return
-            
+
             ui_updateFileList = Dialog_uploadFileList( ControlBase.mayawin )
             ui_updateFileList.setServerPath( serverUnit.projectPath )
             ui_updateFileList.setLocalPath( localUnit.projectPath )

@@ -1,8 +1,7 @@
 #coding=utf8
 
 from maya import OpenMayaUI, cmds
-from PySide import QtGui, QtCore
-import shiboken
+from __qtImprot import *
 import os, json
 
 
@@ -11,18 +10,8 @@ class Commands:
     
     @staticmethod
     def makeFolder( pathName ):
-        pathName = pathName.replace( '\\', '/' )
-        splitPaths = pathName.split( '/' )
-        cuPath = splitPaths[0]
-        folderExist = True
-        for i in range( 1, len( splitPaths ) ):
-            checkPath = cuPath+'/'+splitPaths[i]
-            if not os.path.exists( checkPath ):
-                os.chdir( cuPath )
-                os.mkdir( splitPaths[i] )
-                folderExist = False
-            cuPath = checkPath
-        if folderExist: return None
+        if os.path.exists( pathName ):return None
+        os.makedirs( pathName )
         return pathName
 
 
@@ -40,45 +29,45 @@ class Commands:
 
 
 
-class Window( QtGui.QMainWindow ):
+class Window( QMainWindow ):
     
     objectName = 'ui_renameBySourceObject'
     title = "UI - Rename By Source Object"
     defaultWidth = 400
     defaultHeight = 50
     
-    infoBaseDir = cmds.about( pd=1 ) + "/pingo/ui_renameBySourceObject"
+    infoBaseDir = cmds.about( pd=1 ) + "/sg/ui_renameBySourceObject"
     uiInfoPath = infoBaseDir + '/uiInfo.json'
     
     def __init__(self, *args, **kwargs ):
         
-        QtGui.QMainWindow.__init__( self, *args, **kwargs )
+        QMainWindow.__init__( self, *args, **kwargs )
         self.installEventFilter( self )
         self.setObjectName( Window.objectName )
         self.setWindowTitle( Window.title )
         
         #-----------ui setting-----------------
-        baseWidget = QtGui.QWidget()
+        baseWidget = QWidget()
         self.setCentralWidget( baseWidget )
-        vLayout = QtGui.QVBoxLayout( baseWidget )
+        vLayout = QVBoxLayout( baseWidget )
         
-        layout_labels = QtGui.QHBoxLayout()
-        lineEdit_src = QtGui.QLabel("Source Str")
-        lineEdit_dst = QtGui.QLabel("Replace Str")
+        layout_labels = QHBoxLayout()
+        lineEdit_src = QLabel("Source Str")
+        lineEdit_dst = QLabel("Replace Str")
         lineEdit_src.setAlignment( QtCore.Qt.AlignCenter )
         lineEdit_dst.setAlignment( QtCore.Qt.AlignCenter )
         layout_labels.addWidget( lineEdit_src )
         layout_labels.addWidget( lineEdit_dst )
         
-        layout_lineEdits = QtGui.QHBoxLayout()
-        lineEdit_src = QtGui.QLineEdit()
-        lineEdit_dst = QtGui.QLineEdit()
+        layout_lineEdits = QHBoxLayout()
+        lineEdit_src = QLineEdit()
+        lineEdit_dst = QLineEdit()
         layout_lineEdits.addWidget( lineEdit_src )
         layout_lineEdits.addWidget( lineEdit_dst )
         
-        layout_buttons = QtGui.QHBoxLayout()
-        button_rename = QtGui.QPushButton( "Rename" )
-        button_close  = QtGui.QPushButton( "Close" )
+        layout_buttons = QHBoxLayout()
+        button_rename = QPushButton( "Rename" )
+        button_close  = QPushButton( "Close" )
         layout_buttons.addWidget( button_rename )
         layout_buttons.addWidget( button_close )
         
@@ -117,7 +106,7 @@ class Window( QtGui.QMainWindow ):
     def show( self, *args, **kwargs):
         
         self.loadUIInfo()
-        QtGui.QMainWindow.show( self, *args, **kwargs )
+        QMainWindow.show( self, *args, **kwargs )
     
     
     
@@ -162,7 +151,7 @@ class Window( QtGui.QMainWindow ):
             width, height = data['mainWindow']['size']
         except:
             return
-        desktop = QtGui.QApplication.desktop()
+        desktop = QApplication.desktop()
         desktopWidth = desktop.width()
         desktopHeight = desktop.height()
         
@@ -180,6 +169,6 @@ def show():
     if cmds.window( Window.objectName, ex=1 ):
         cmds.deleteUI( Window.objectName )
     
-    mayawin = shiboken.wrapInstance( long( OpenMayaUI.MQtUtil.mainWindow() ), QtGui.QWidget )
+    mayawin = shiboken.wrapInstance( long( OpenMayaUI.MQtUtil.mainWindow() ), QWidget )
     win = Window( mayawin )
     win.show()

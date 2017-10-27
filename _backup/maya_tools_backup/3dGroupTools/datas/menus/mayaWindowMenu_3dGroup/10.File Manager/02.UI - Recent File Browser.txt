@@ -1,2 +1,0 @@
-import fileManager.recentFileBrowser.view
-fileManager.recentFileBrowser.view.Window().create()

@@ -1,4 +1,0 @@
-import maya.cmds as cmds
-import sg.skinCluster
-sels = cmds.ls( sl=1 )
-sg.skinCluster.bindSkin( sels[0], sels[1] )

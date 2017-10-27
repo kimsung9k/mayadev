@@ -1,0 +1,2 @@
+import pingosync
+pingosync.show()

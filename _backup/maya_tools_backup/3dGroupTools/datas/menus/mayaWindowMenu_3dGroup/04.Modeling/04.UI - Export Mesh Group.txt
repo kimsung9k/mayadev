@@ -1,2 +1,0 @@
-import sgPWindow_file_mesh_exportGroup
-sgPWindow_file_mesh_exportGroup.WinA().create()

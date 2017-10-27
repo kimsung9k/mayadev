@@ -1,32 +1,15 @@
 import maya.cmds as cmds
 import maya.OpenMayaUI
-from PySide import QtGui, QtCore
-import shiboken as shiboken
+from __qtImprot import *
 import os, sys
 import json
 from functools import partial
-from PySide.QtGui import QFileDialog
 
 
 
 def makeFolder( pathName ):
-    
-    pathName = pathName.replace( '\\', '/' )
-    splitPaths = pathName.split( '/' )
-    
-    cuPath = splitPaths[0]
-    
-    folderExist = True
-    for i in range( 1, len( splitPaths ) ):
-        checkPath = cuPath+'/'+splitPaths[i]
-        if not os.path.exists( checkPath ):
-            os.chdir( cuPath )
-            os.mkdir( splitPaths[i] )
-            folderExist = False
-        cuPath = checkPath
-        
-    if folderExist: return None
-        
+    if os.path.exists( pathName ):return None
+    os.makedirs( pathName )
     return pathName
 
 
@@ -44,9 +27,9 @@ def makeFile( filePath ):
 
 class Window_global:
     
-    mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QtGui.QWidget )
+    mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QWidget )
     winName = 'test_fileDialog'
-    infoPath = cmds.about( pd=1 ) + "/" + __name__.replace( '.', '/' ) + '.info'
+    infoPath = cmds.about( pd=1 ) + "/sg/" + __name__.replace( '.', '/' ) + '.info'
     makeFile( infoPath )
     
     @staticmethod
@@ -73,7 +56,7 @@ def getDirectory( evt=0 ):
     
     if cmds.window( Window_global.winName, ex=1 ):
         cmds.deleteUI( Window_global.winName )
-    dialog = QtGui.QFileDialog(Window_global.mayaWin)
+    dialog = QFileDialog(Window_global.mayaWin)
     dialog.setObjectName( Window_global.winName )
     dialog.setDirectory( Window_global.getDefaultFolder() )
     choosedFolder = dialog.getExistingDirectory()

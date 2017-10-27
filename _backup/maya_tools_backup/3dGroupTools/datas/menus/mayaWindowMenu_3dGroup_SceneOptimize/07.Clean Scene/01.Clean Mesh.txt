@@ -1,2 +1,0 @@
-import sgBFunction_scene
-sgBFunction_scene.cleanMeshInScene()

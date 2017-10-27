@@ -1,2 +1,0 @@
-import sgUIMeshIntersect
-sgUIMeshIntersect.Window().show()

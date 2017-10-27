@@ -1,0 +1,2 @@
+import furDescriptionMapEditor
+furDescriptionMapEditor.show()

@@ -1,7 +1,0 @@
-global proc sgCurveDraw_contextProperties()
-{
-}
-
-global proc sgCurveDraw_contextValues( string $context )
-{
-}

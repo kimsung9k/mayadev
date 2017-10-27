@@ -1,2 +1,0 @@
-import sgPWindow_rig_aimConstraint
-sgPWindow_rig_aimConstraint.WinA().create()

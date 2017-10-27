@@ -1,2 +1,0 @@
-import sgBFunction_shader
-sgBFunction_shader.assigneRandomShader( cmds.ls( sl=1 ) )

@@ -1,9 +1,8 @@
 import maya.cmds as cmds
 import maya.OpenMaya as OpenMaya
-from PySide import QtGui
+from sgUIs.__qtImprot import *
 import os, json
 from pymel.core import nodetypes
-import shiboken
 import maya.OpenMayaUI
 
 
@@ -22,7 +21,7 @@ class Window_global:
     form_exportTarget = ''
     scriptJopIndex = None
     
-    mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QtGui.QWidget )
+    mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QWidget )
     txf_rootPath = ''
     txf_abcPath = ''
     txf_sceneInfoPath = ''
@@ -47,7 +46,7 @@ class Window_cmds:
     @staticmethod
     def getDirectory( evt=0 ):
     
-        dialog = QtGui.QFileDialog(Window_global.mayaWin )
+        dialog = QFileDialog(Window_global.mayaWin )
         dialog.setDirectory( Window_global.getDefaultFolder() )
         choosedFolder = dialog.getExistingDirectory()
         if not choosedFolder: choosedFolder = Window_global.getDefaultFolder()

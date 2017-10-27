@@ -1,7 +1,6 @@
 import maya.cmds as cmds
 import maya.OpenMayaUI
-from PySide import QtGui, QtCore
-import shiboken as shiboken
+from __qtImprot import *
 import os, sys
 import json
 from functools import partial
@@ -9,23 +8,8 @@ from functools import partial
 
 
 def makeFolder( pathName ):
-    
-    pathName = pathName.replace( '\\', '/' )
-    splitPaths = pathName.split( '/' )
-    
-    cuPath = splitPaths[0]
-    
-    folderExist = True
-    for i in range( 1, len( splitPaths ) ):
-        checkPath = cuPath+'/'+splitPaths[i]
-        if not os.path.exists( checkPath ):
-            os.chdir( cuPath )
-            os.mkdir( splitPaths[i] )
-            folderExist = False
-        cuPath = checkPath
-        
-    if folderExist: return None
-        
+    if os.path.exists( pathName ):return None
+    os.makedirs( pathName )
     return pathName
 
 
@@ -45,7 +29,7 @@ def makeFile( filePath ):
 
 class Window_global:
     
-    mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QtGui.QWidget )
+    mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QWidget )
     objectName = "sgui_getImageFromObject"
     title = "Get Image From Object"
     width = 300
@@ -56,7 +40,7 @@ class Window_global:
     makeFile( infoPath )
     makeFile( infoPath2 )
     
-    mainGui = QtGui.QMainWindow()
+    mainGui = QMainWindow()
     listItems = []
     
     lineEditObjectName = 'sgui_getImageFromObject_lineEdit'
@@ -79,7 +63,7 @@ class Window_global:
         selIndex = Window_global.tabWidget.currentIndex()
         for i in range( numTab ):
             tabElement = Window_global.tabWidget.widget( i )
-            targetLineEdit = tabElement.findChild( QtGui.QLineEdit, Window_global.lineEditObjectName )
+            targetLineEdit = tabElement.findChild( QLineEdit, Window_global.lineEditObjectName )
             lineEditTextList.append( targetLineEdit.text() )
         
         f = open( filePath, 'w' )
@@ -111,7 +95,7 @@ class Window_global:
         
         for i in range( len( lineEditTextList ) ):
             Window_global.tabWidget.addTab( 'newTab' )
-            addedLineEdit = Window_global.tabWidget.widget(i).findChild( QtGui.QLineEdit, Window_global.lineEditObjectName )
+            addedLineEdit = Window_global.tabWidget.widget(i).findChild( QLineEdit, Window_global.lineEditObjectName )
             addedLineEdit.setText( lineEditTextList[i] )
             Window_global.tabWidget.setCurrentIndex( i )
             Functions.updateList()  
@@ -155,7 +139,7 @@ class Window_global:
             
             Window_global.mainGui.resize( width, height )
             
-            desktop = QtGui.QApplication.desktop()
+            desktop = QApplication.desktop()
             desktopWidth = desktop.width()
             desktopHeight = desktop.height()
             if posX + width > desktopWidth: posX = desktopWidth - width
@@ -258,7 +242,7 @@ class ImageBaseTranslateInfo():
         
         elif self.dragMode == 2:
             moveX = x - self.pressX
-            rect = QtGui.QApplication.desktop().screenGeometry();
+            rect = QApplication.desktop().screenGeometry();
             height = rect.height()/4
             self.scale = self.bScale * (2**(float(moveX)/height))
             scaledValue = self.scale/  self.bScale
@@ -269,7 +253,7 @@ class ImageBaseTranslateInfo():
 
 
 
-class ImageBase(QtGui.QLabel):
+class ImageBase(QLabel):
 
     def __init__(self, *args, **kwargs):
         
@@ -278,9 +262,9 @@ class ImageBase(QtGui.QLabel):
         super(ImageBase, self).__init__(*args, **kwargs)
         self.installEventFilter(self)
         
-        self.image            = QtGui.QImage()
-        self.pixmap = QtGui.QPixmap()
-        self.label = QtGui.QLabel(self)
+        self.image            = QImage()
+        self.pixmap = QPixmap()
+        self.label = QLabel(self)
         self.imagePath = ""
         self.aspect = 1
         self.imageClean = True
@@ -314,21 +298,21 @@ class ImageBase(QtGui.QLabel):
         
         if self.imageClean: return None
         
-        trValue = QtGui.QTransform().scale( self.transInfo.scaleX(), self.transInfo.scaleY() )
-        trValue *= QtGui.QTransform().rotate( self.transInfo.rotValue )
+        trValue = QTransform().scale( self.transInfo.scaleX(), self.transInfo.scaleY() )
+        trValue *= QTransform().rotate( self.transInfo.rotValue )
         imageTransformed = self.image.transformed(trValue)
         
         imageWidth  = imageTransformed.width()
         imageHeight = imageTransformed.height()
         
-        self.pixmap = QtGui.QPixmap.fromImage( imageTransformed )
+        self.pixmap = QPixmap.fromImage( imageTransformed )
         self.label.setPixmap( self.pixmap )
         
         marginLeft = (self.width() - imageWidth)/2.0
         marginTop  = (self.height() - imageHeight)/2.0
         
         self.label.setGeometry( marginLeft + self.transInfo.x,marginTop + self.transInfo.y, imageWidth, imageHeight )
-        self.label.paintEvent(QtGui.QPaintEvent(QtCore.QRect( 0,0,self.width(), self.height() )))
+        self.label.paintEvent(QPaintEvent(QtCore.QRect( 0,0,self.width(), self.height() )))
         
         
     def flip(self, pressX ):
@@ -385,12 +369,12 @@ class Functions:
     @staticmethod
     def currentLineEdit():
         currentTabWidget = Window_global.tabWidget.widget( Window_global.tabWidget.currentIndex() )
-        return currentTabWidget.findChild( QtGui.QLineEdit, Window_global.lineEditObjectName )
+        return currentTabWidget.findChild( QLineEdit, Window_global.lineEditObjectName )
     
     @staticmethod
     def currentTextList():
         currentTabWidget = Window_global.tabWidget.widget( Window_global.tabWidget.currentIndex() )
-        return currentTabWidget.findChild( QtGui.QListWidget, Window_global.listWidgetObjectName )
+        return currentTabWidget.findChild( QListWidget, Window_global.listWidgetObjectName )
     
     
     @staticmethod
@@ -668,7 +652,7 @@ class SplitterEventFilter( QtCore.QObject ):
 
 
 
-class Tab( QtGui.QTabWidget ):
+class Tab( QTabWidget ):
     
     def __init__(self, *args, **kwargs ):
         super( Tab, self ).__init__( *args, **kwargs )
@@ -677,18 +661,18 @@ class Tab( QtGui.QTabWidget ):
 
     def addTab(self, label ):
         
-        layoutWidget = QtGui.QWidget()
-        vLayout = QtGui.QVBoxLayout(layoutWidget)
+        layoutWidget = QWidget()
+        vLayout = QVBoxLayout(layoutWidget)
         vLayout.setContentsMargins(5,5,5,5)
         
-        setFolderLayout = QtGui.QHBoxLayout()
-        listWidget = QtGui.QListWidget()
-        listWidget.setSelectionMode( QtGui.QAbstractItemView.ExtendedSelection )
+        setFolderLayout = QHBoxLayout()
+        listWidget = QListWidget()
+        listWidget.setSelectionMode( QAbstractItemView.ExtendedSelection )
         vLayout.addLayout( setFolderLayout )
         vLayout.addWidget( listWidget )
         
-        lineEdit = QtGui.QLineEdit()
-        setFolderButton = QtGui.QPushButton( 'Set Folder' )
+        lineEdit = QLineEdit()
+        setFolderButton = QPushButton( 'Set Folder' )
         
         setFolderLayout.addWidget( lineEdit )
         setFolderLayout.addWidget( setFolderButton )
@@ -708,29 +692,29 @@ class Tab( QtGui.QTabWidget ):
         
         
 
-class Window( QtGui.QMainWindow ):
+class Window( QMainWindow ):
     
     def __init__(self, *args, **kwargs ):
         
-        QtGui.QMainWindow.__init__( self, *args, **kwargs )
+        QMainWindow.__init__( self, *args, **kwargs )
         self.installEventFilter( self )
         #self.setWindowFlags( QtCore.Qt.Drawer )
         self.setWindowTitle( Window_global.title )
 
-        verticalSplitter = QtGui.QSplitter(QtCore.Qt.Vertical)
+        verticalSplitter = QSplitter(QtCore.Qt.Vertical)
         self.setCentralWidget( verticalSplitter )
         
-        horizonSplitter1 = QtGui.QSplitter(QtCore.Qt.Horizontal)
-        horizonSplitter2 = QtGui.QSplitter(QtCore.Qt.Horizontal)
+        horizonSplitter1 = QSplitter(QtCore.Qt.Horizontal)
+        horizonSplitter2 = QSplitter(QtCore.Qt.Horizontal)
         
         verticalSplitter.addWidget( horizonSplitter1 )
         verticalSplitter.addWidget( horizonSplitter2 )
         
-        widgetSelArea  = QtGui.QWidget()
-        layoutSelArea  = QtGui.QVBoxLayout(widgetSelArea)
-        labelSelTextList = QtGui.QLabel( 'Images from Selection' )
-        selTextureList = QtGui.QListWidget()
-        selTextureList.setSelectionMode( QtGui.QAbstractItemView.ExtendedSelection )
+        widgetSelArea  = QWidget()
+        layoutSelArea  = QVBoxLayout(widgetSelArea)
+        labelSelTextList = QLabel( 'Images from Selection' )
+        selTextureList = QListWidget()
+        selTextureList.setSelectionMode( QAbstractItemView.ExtendedSelection )
         layoutSelArea.addWidget( labelSelTextList )
         layoutSelArea.addWidget( selTextureList )
         imageBaseSelArea = ImageBase()
@@ -738,15 +722,15 @@ class Window( QtGui.QMainWindow ):
         horizonSplitter1.addWidget( widgetSelArea )
         horizonSplitter1.addWidget( imageBaseSelArea )        
         
-        widgetPathArea = QtGui.QWidget()
-        layoutPathArea = QtGui.QVBoxLayout( widgetPathArea )
-        layoutAddTab = QtGui.QHBoxLayout()
-        removeTabButton = QtGui.QPushButton( 'Remove Tab' )
-        addTabButton = QtGui.QPushButton( 'Add Tab' )
+        widgetPathArea = QWidget()
+        layoutPathArea = QVBoxLayout( widgetPathArea )
+        layoutAddTab = QHBoxLayout()
+        removeTabButton = QPushButton( 'Remove Tab' )
+        addTabButton = QPushButton( 'Add Tab' )
         self.tabWidget = Tab()
-        buttonLayout = QtGui.QHBoxLayout()
-        getImageButton = QtGui.QPushButton( 'Get Image' )
-        removeImageButton   = QtGui.QPushButton( 'Remove Image' )
+        buttonLayout = QHBoxLayout()
+        getImageButton = QPushButton( 'Get Image' )
+        removeImageButton   = QPushButton( 'Remove Image' )
         layoutPathArea.addLayout( layoutAddTab )
         layoutPathArea.addWidget( self.tabWidget )
         layoutPathArea.addLayout( buttonLayout )

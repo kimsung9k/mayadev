@@ -1,2 +1,0 @@
-import sgBFunction_rivet
-sgBFunction_rivet.createRivetFromCurves( cmds.ls( sl=1 ) )

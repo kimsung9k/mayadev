@@ -1,8 +1,7 @@
 import maya.cmds as cmds
 import maya.mel as mel
 import maya.OpenMayaUI
-from PySide import QtGui, QtCore
-import shiboken as shiboken
+from sgUIs.__qtImprot import *
 import os, sys
 import json
 from functools import partial
@@ -35,23 +34,8 @@ def appendPluginPath():
 
 
 def makeFolder( pathName ):
-    
-    pathName = pathName.replace( '\\', '/' )
-    splitPaths = pathName.split( '/' )
-    
-    cuPath = splitPaths[0]
-    
-    folderExist = True
-    for i in range( 1, len( splitPaths ) ):
-        checkPath = cuPath+'/'+splitPaths[i]
-        if not os.path.exists( checkPath ):
-            os.chdir( cuPath )
-            os.mkdir( splitPaths[i] )
-            folderExist = False
-        cuPath = checkPath
-        
-    if folderExist: return None
-        
+    if os.path.exists( pathName ):return None
+    os.makedirs( pathName )
     return pathName
 
 
@@ -71,7 +55,7 @@ def makeFile( filePath ):
 
 class Window_global:
     
-    mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QtGui.QWidget )
+    mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QWidget )
     title = "Put Object On Ground"
     width = 300
     height = 300
@@ -79,7 +63,7 @@ class Window_global:
     infoPath = cmds.about(pd=True) + "/sg/putObjectOnGround/uiInfo.txt"
     makeFile( infoPath )
     
-    mainGui = QtGui.QMainWindow()
+    mainGui = QMainWindow()
     listItems = []
 
     objectName = 'sgui_putObjectOnGround'
@@ -161,7 +145,7 @@ class Window_global:
             
             Window_global.mainGui.resize( width, height )
             
-            desktop = QtGui.QApplication.desktop()
+            desktop = QApplication.desktop()
             desktopWidth = desktop.width()
             desktopHeight = desktop.height()
             if posX + width > desktopWidth: posX = desktopWidth - width
@@ -232,19 +216,19 @@ class Window_cmd:
 
 
 
-class UI_objectList( QtGui.QWidget ):
+class UI_objectList( QWidget ):
     
     def __init__(self ):
         
-        QtGui.QWidget.__init__( self )
-        layout = QtGui.QVBoxLayout( self )
+        QWidget.__init__( self )
+        layout = QVBoxLayout( self )
         
-        label = QtGui.QLabel()
-        listWidget = QtGui.QListWidget()
-        listWidget.setSelectionMode( QtGui.QAbstractItemView.ExtendedSelection )
-        hLayout = QtGui.QHBoxLayout()
-        buttonLoad   = QtGui.QPushButton( "LOAD")
-        buttonRemove = QtGui.QPushButton( "REMOVE")
+        label = QLabel()
+        listWidget = QListWidget()
+        listWidget.setSelectionMode( QAbstractItemView.ExtendedSelection )
+        hLayout = QHBoxLayout()
+        buttonLoad   = QPushButton( "LOAD")
+        buttonRemove = QPushButton( "REMOVE")
         hLayout.addWidget( buttonLoad )
         hLayout.addWidget( buttonRemove )
         
@@ -288,20 +272,20 @@ class UI_objectList( QtGui.QWidget ):
 
 
 
-class UI_radomLabel( QtGui.QWidget ):
+class UI_radomLabel( QWidget ):
     
     def __init__(self):
         
-        QtGui.QWidget.__init__( self )
-        layout = QtGui.QHBoxLayout( self )
+        QWidget.__init__( self )
+        layout = QHBoxLayout( self )
         
-        label = QtGui.QLabel()
+        label = QLabel()
         label.setFixedWidth( 120 )
         
         layout.addWidget( label )
-        labelX = QtGui.QLabel( 'X Range' )
-        labelY = QtGui.QLabel( 'Y Range' )
-        labelZ = QtGui.QLabel( 'Z Range' )
+        labelX = QLabel( 'X Range' )
+        labelY = QLabel( 'Y Range' )
+        labelZ = QLabel( 'Z Range' )
         labelX.setAlignment( QtCore.Qt.AlignCenter )
         labelY.setAlignment( QtCore.Qt.AlignCenter )
         labelZ.setAlignment( QtCore.Qt.AlignCenter )
@@ -314,22 +298,22 @@ class UI_radomLabel( QtGui.QWidget ):
 
 
 
-class UI_randomOption( QtGui.QWidget ):
+class UI_randomOption( QWidget ):
     
     def __init__(self, text, validator, minValue, maxValue ):
     
-        QtGui.QWidget.__init__( self )
-        layout = QtGui.QHBoxLayout( self )
+        QWidget.__init__( self )
+        layout = QHBoxLayout( self )
         
-        checkBox = QtGui.QCheckBox()
+        checkBox = QCheckBox()
         checkBox.setFixedWidth( 115 )
         checkBox.setText( text )
         
         layout.addWidget( checkBox )
         
-        hLayoutX = QtGui.QHBoxLayout()
-        lineEditXMin = QtGui.QLineEdit()
-        lineEditXMax = QtGui.QLineEdit()
+        hLayoutX = QHBoxLayout()
+        lineEditXMin = QLineEdit()
+        lineEditXMax = QLineEdit()
         hLayoutX.addWidget( lineEditXMin )
         hLayoutX.addWidget( lineEditXMax )
         lineEditXMin.setValidator( validator )
@@ -360,7 +344,7 @@ class UI_randomOption( QtGui.QWidget ):
 
     def eventFilter(self, *args, **kwargs):
         
-        return QtGui.QWidget.eventFilter(self, *args, **kwargs)
+        return QWidget.eventFilter(self, *args, **kwargs)
     
 
 
@@ -368,22 +352,22 @@ class UI_randomOption( QtGui.QWidget ):
 
 
 
-class UI_randomOption2( QtGui.QWidget ):
+class UI_randomOption2( QWidget ):
     
     def __init__(self, text, validator, minValue, maxValue ):
         
-        QtGui.QWidget.__init__( self )
-        layout = QtGui.QHBoxLayout( self )
+        QWidget.__init__( self )
+        layout = QHBoxLayout( self )
         
-        checkBox = QtGui.QCheckBox()
+        checkBox = QCheckBox()
         checkBox.setFixedWidth( 115 )
         checkBox.setText( text )
         
         layout.addWidget( checkBox )
         
-        hLayoutX = QtGui.QHBoxLayout()
-        lineEditXMin = QtGui.QLineEdit()
-        lineEditXMax = QtGui.QLineEdit()
+        hLayoutX = QHBoxLayout()
+        lineEditXMin = QLineEdit()
+        lineEditXMax = QLineEdit()
         hLayoutX.addWidget( lineEditXMin )
         hLayoutX.addWidget( lineEditXMax )
         lineEditXMin.setValidator( validator )
@@ -391,9 +375,9 @@ class UI_randomOption2( QtGui.QWidget ):
         lineEditXMin.setText( str( minValue ) )
         lineEditXMax.setText( str( maxValue ) )
         
-        hLayoutY = QtGui.QHBoxLayout()
-        lineEditYMin = QtGui.QLineEdit()
-        lineEditYMax = QtGui.QLineEdit()
+        hLayoutY = QHBoxLayout()
+        lineEditYMin = QLineEdit()
+        lineEditYMax = QLineEdit()
         hLayoutY.addWidget( lineEditYMin )
         hLayoutY.addWidget( lineEditYMax )
         lineEditYMin.setValidator( validator )
@@ -401,9 +385,9 @@ class UI_randomOption2( QtGui.QWidget ):
         lineEditYMin.setText( str( minValue ) )
         lineEditYMax.setText( str( maxValue ) )
         
-        hLayoutZ = QtGui.QHBoxLayout()
-        lineEditZMin = QtGui.QLineEdit()
-        lineEditZMax = QtGui.QLineEdit()
+        hLayoutZ = QHBoxLayout()
+        lineEditZMin = QLineEdit()
+        lineEditZMax = QLineEdit()
         hLayoutZ.addWidget( lineEditZMin )
         hLayoutZ.addWidget( lineEditZMax )
         lineEditZMin.setValidator( validator )
@@ -440,31 +424,31 @@ class UI_randomOption2( QtGui.QWidget ):
 
     def eventFilter(self, *args, **kwargs):
         
-        return QtGui.QWidget.eventFilter(self, *args, **kwargs)
+        return QWidget.eventFilter(self, *args, **kwargs)
 
 
 
 
 
 
-class UI_OffsetSlider( QtGui.QWidget ):
+class UI_OffsetSlider( QWidget ):
     
     def __init__(self, text, minValue, maxValue, defaultValue ):
         
-        QtGui.QWidget.__init__( self )
+        QWidget.__init__( self )
         
-        validator = QtGui.QDoubleValidator(minValue, maxValue, 2, self )
-        mainLayout = QtGui.QHBoxLayout( self )
+        validator = QDoubleValidator(minValue, maxValue, 2, self )
+        mainLayout = QHBoxLayout( self )
         
-        checkBox = QtGui.QCheckBox()
+        checkBox = QCheckBox()
         checkBox.setFixedWidth( 115 )
         checkBox.setText( text )
         
-        lineEdit = QtGui.QLineEdit()
+        lineEdit = QLineEdit()
         lineEdit.setValidator( validator )
         lineEdit.setText( str(defaultValue) )
         
-        slider = QtGui.QSlider( QtCore.Qt.Horizontal )
+        slider = QSlider( QtCore.Qt.Horizontal )
         slider.setMinimum( minValue*100 )
         slider.setMaximum( maxValue*100 )
         slider.setValue( defaultValue )
@@ -509,47 +493,47 @@ class UI_OffsetSlider( QtGui.QWidget ):
 
 
     def eventFilter(self, *args, **kwargs):
-        return QtGui.QWidget.eventFilter(self, *args, **kwargs)
+        return QWidget.eventFilter(self, *args, **kwargs)
 
 
 
 
 
-class Window( QtGui.QMainWindow ):
+class Window( QMainWindow ):
     
     def __init__(self, *args, **kwargs ):
         
-        QtGui.QMainWindow.__init__( self, *args, **kwargs )
+        QMainWindow.__init__( self, *args, **kwargs )
         self.installEventFilter( self )
         self.setWindowTitle( Window_global.title )
         
-        mainWidget = QtGui.QWidget()
+        mainWidget = QWidget()
         self.setCentralWidget( mainWidget )
         
-        vLayout = QtGui.QVBoxLayout( mainWidget )
+        vLayout = QVBoxLayout( mainWidget )
         
-        hLayoutListWidget = QtGui.QHBoxLayout()
+        hLayoutListWidget = QHBoxLayout()
         widgetPutList  = UI_objectList()
         widgetBaseList = UI_objectList()
         widgetPutList.label.setText( 'Put Object List' )
         widgetBaseList.label.setText( 'Ground Object List' )
-        buttonPut = QtGui.QPushButton( 'Put Object' )
+        buttonPut = QPushButton( 'Put Object' )
         widgetPutList.listWidget.setObjectName( Window_global.listWidgetPutName )
         widgetBaseList.listWidget.setObjectName( Window_global.listWidgetGroundName )
         
         widgetGroupList = UI_objectList()
         widgetGroupList.label.setText( 'Duplicate Group List' )
         widgetGroupList.listWidget.setObjectName( Window_global.duGroupListName )
-        widgetGroupList.listWidget.setSelectionMode( QtGui.QAbstractItemView.SingleSelection )
+        widgetGroupList.listWidget.setSelectionMode( QAbstractItemView.SingleSelection )
         
         hLayoutListWidget.addWidget( widgetPutList )
         hLayoutListWidget.addWidget( widgetBaseList )
         
-        randomGroupBox = QtGui.QGroupBox( 'Random' )
-        vLayoutRandom = QtGui.QVBoxLayout( randomGroupBox )
+        randomGroupBox = QGroupBox( 'Random' )
+        vLayoutRandom = QVBoxLayout( randomGroupBox )
         
-        rotateValidator = QtGui.QDoubleValidator(-1000000, 1000000, 2, self )
-        scaleValidator  = QtGui.QDoubleValidator( 0.0, 100, 2, self )
+        rotateValidator = QDoubleValidator(-1000000, 1000000, 2, self )
+        scaleValidator  = QDoubleValidator( 0.0, 100, 2, self )
         
         randomOptionR = UI_randomOption2( 'Rotate', rotateValidator, -45, 45 )
         randomOptionS = UI_randomOption2( 'Scale', scaleValidator, 0.8, 1.2 )
@@ -565,10 +549,10 @@ class Window( QtGui.QMainWindow ):
         vLayoutRandom.addWidget( randomOptionRA )
         vLayoutRandom.addWidget( randomOptionSA )
         
-        offsetGroupBox = QtGui.QGroupBox( 'Offset' )
-        vLayoutOffset = QtGui.QVBoxLayout( offsetGroupBox )
+        offsetGroupBox = QGroupBox( 'Offset' )
+        vLayoutOffset = QVBoxLayout( offsetGroupBox )
         
-        componentCheck    = QtGui.QCheckBox( "Component check" )
+        componentCheck    = QCheckBox( "Component check" )
         offsetSlider1 = UI_OffsetSlider( "Offset By Object",  -1, 1, 0 )
         offsetSlider2 = UI_OffsetSlider( "Offset By Ground",  -100, 100, 0 )
         componentCheck.setObjectName( Window_global.componentCheckName )
@@ -579,12 +563,12 @@ class Window( QtGui.QMainWindow ):
         vLayoutOffset.addWidget( offsetSlider1 )
         vLayoutOffset.addWidget( offsetSlider2 )
         
-        orientGroupBox = QtGui.QGroupBox( 'Orient Option' )
-        vLayoutOrient = QtGui.QVBoxLayout( orientGroupBox )
-        orientNormalCheck  = QtGui.QCheckBox("Ground Normal Affects")
-        hLayoutCombobox = QtGui.QHBoxLayout()
-        orientTypeText = QtGui.QLabel( 'Orient Edit Type : ' )
-        orientTypeComboBox = QtGui.QComboBox()
+        orientGroupBox = QGroupBox( 'Orient Option' )
+        vLayoutOrient = QVBoxLayout( orientGroupBox )
+        orientNormalCheck  = QCheckBox("Ground Normal Affects")
+        hLayoutCombobox = QHBoxLayout()
+        orientTypeText = QLabel( 'Orient Edit Type : ' )
+        orientTypeComboBox = QComboBox()
         orientTypeComboBox.addItem( 'All' )
         orientTypeComboBox.addItem( 'Only Y' )
         hLayoutCombobox.addWidget( orientTypeText )

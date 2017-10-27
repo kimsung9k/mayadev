@@ -47,16 +47,9 @@ def makePath( pathName ):
 
 
 def makeFolder( pathName ):
-    splitPaths = pathName.split( '/' )
-    
-    cuPath = splitPaths[0]
-    
-    for i in range( 1, len( splitPaths ) ):
-        checkPath = cuPath+'/'+splitPaths[i]
-        if not os.path.exists( checkPath ):
-            os.chdir( cuPath )
-            os.mkdir( splitPaths[i] )
-        cuPath = checkPath
+    if os.path.exists( pathName ):return None
+    os.makedirs( pathName )
+    return pathName
         
         
         

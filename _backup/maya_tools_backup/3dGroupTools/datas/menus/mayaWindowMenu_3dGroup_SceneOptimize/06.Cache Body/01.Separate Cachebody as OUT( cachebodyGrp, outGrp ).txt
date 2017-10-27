@@ -1,3 +1,0 @@
-import sgBFunction_mesh
-cachebodyObj, outObj = cmds.ls( sl=1 )
-sgBFunction_mesh.separateCacheBodyObject2( cachebodyObj, outObj )

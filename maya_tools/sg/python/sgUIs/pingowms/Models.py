@@ -2,18 +2,17 @@
 
 import maya.cmds as cmds
 from maya import OpenMayaUI
-from PySide import QtGui, QtCore
-import shiboken as shiboken
+from sgUIs.__qtImprot import *
 import os
 
 
 class ControlBase:
     
-    mayawin = shiboken.wrapInstance( long( OpenMayaUI.MQtUtil.mainWindow() ), QtGui.QWidget )
+    mayawin = shiboken.wrapInstance( long( OpenMayaUI.MQtUtil.mainWindow() ), QWidget )
     
-    mainui = QtGui.QMainWindow()
-    manageui = QtGui.QMainWindow()
-    uiTreeWidget = QtGui.QWidget()
+    mainui = QMainWindow()
+    manageui = QMainWindow()
+    uiTreeWidget = QWidget()
     
     infoBaseDir = cmds.about( pd=1 ) + "/pingowms"
     uiInfoPath = infoBaseDir + '/uiInfo.json'
@@ -39,20 +38,21 @@ class ControlBase:
 
 class Colors:
     
-    localOnly = QtGui.QColor( 120, 180, 255 )
-    serverOnly = QtGui.QColor( 100, 100, 100 )
-    localModified = QtGui.QColor( 100, 255, 100 )
-    serverModified = QtGui.QColor( 255, 100, 100 )
-    equar = QtGui.QColor( 255, 255, 255 )
+    localOnly = QColor( 120, 180, 255 )
+    serverOnly = QColor( 100, 100, 100 )
+    localModified = QColor( 100, 255, 100 )
+    serverModified = QColor( 255, 100, 100 )
+    equar = QColor( 255, 255, 255 )
 
 
 
 
-class WorkTreeWidget( QtGui.QTreeWidget ):
+class WorkTreeWidget( QTreeWidget ):
     
     def __init__(self, *args, **kwargs ):
         
-        QtGui.QTreeWidget.__init__( self, *args, **kwargs )
+        QTreeWidget.__init__( self, *args, **kwargs )
+        self.installEventFilter( self )
         self.setColumnCount(2)
         headerItem = self.headerItem()
         headerItem.setText( 0, '작업이름'.decode('utf-8') )
@@ -97,7 +97,7 @@ class FileTime:
     
     def structTime(self):
         import time
-        return time.gmtime( self.mtime() )
+        return time.localtime( os.path.getmtime( self.filePath ) )
 
 
     def stringTime(self):
@@ -156,8 +156,8 @@ class FileTime:
     def getStrFromMTime( mtime ):
         
         import time
-        st = time.gmtime( mtime )
-        return "%d년 %d월 %d일 %d:%d:%d".decode( 'utf-8' ) % (st.tm_year, st.tm_mon, st.tm_mday, st.tm_hour, st.tm_min, st.tm_sec )        
+        st = time.localtime( mtime )
+        return "%04d년 %02d월 %02d일 %02d:%02d:%02d".decode( 'utf-8' ) % (st.tm_year, st.tm_mon, st.tm_mday, st.tm_hour, st.tm_min, st.tm_sec )
 
 
 
@@ -217,7 +217,8 @@ class EditorInfo:
         refList = []
         for refNode in refNodes:
             if pymel.core.referenceQuery( refNode, inr=1 ): continue
-            refList.append(  pymel.core.referenceQuery( refNode, filename=1 ) )
+            try:refList.append(  pymel.core.referenceQuery( refNode, filename=1 ) )
+            except:continue
         return refList
 
 
@@ -338,3 +339,5 @@ class CompairTwoPath:
             if self.baseIsNewer():
                 return CompairTwoPath.baseIsNew
             return CompairTwoPath.same
+
+

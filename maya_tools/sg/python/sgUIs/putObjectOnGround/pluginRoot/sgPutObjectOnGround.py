@@ -5,14 +5,28 @@ import maya.OpenMayaUI as OpenMayaUI
 import maya.OpenMayaMPx as OpenMayaMPx
 
 import maya.OpenMayaUI
-from PySide import QtGui, QtCore
-import shiboken
-
+if int( cmds.about( v=1 ) ) < 2017:
+    from PySide import QtGui, QtCore
+    import shiboken
+    from PySide.QtGui import QListWidgetItem, QDialog, QListWidget, QMainWindow, QWidget, QColor, QLabel,\
+    QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QAbstractItemView, QMenu,QCursor, QMessageBox, QBrush, QSplitter,\
+    QScrollArea, QSizePolicy, QTextEdit, QApplication, QFileDialog, QCheckBox, QDoubleValidator, QSlider, QIntValidator,\
+    QImage, QPixmap, QTransform, QPaintEvent, QTabWidget, QFrame, QTreeWidgetItem, QTreeWidget, QComboBox, QGroupBox
+else:
+    from PySide2 import QtGui, QtCore, QtWidgets
+    import shiboken2 as shiboken
+    from PySide2.QtWidgets import QListWidgetItem, QDialog, QListWidget, QMainWindow, QWidget, QVBoxLayout, QLabel,\
+    QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QAbstractItemView, QMenu, QMessageBox, QSplitter,\
+    QScrollArea, QSizePolicy, QTextEdit, QApplication, QFileDialog, QCheckBox, QSlider,\
+    QTabWidget, QFrame, QTreeWidgetItem, QTreeWidget, QComboBox, QGroupBox
+    
+    from PySide2.QtGui import QColor, QCursor, QBrush, QDoubleValidator, QIntValidator, QImage, QPixmap, QTransform,\
+    QPaintEvent
 
 
 class Window_global:
     
-    mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QtGui.QWidget )
+    mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QWidget )
 
     objectName = 'sgui_putObjectOnGround'
     listWidgetPutName      =  objectName + "_listPut"
@@ -44,19 +58,19 @@ class Window_global:
     
     @staticmethod
     def getUIObjects():        
-        windowObject          = Window_global.mayaWin.findChild( QtGui.QMainWindow, Window_global.objectName )
-        ui_listWidgetPut      = windowObject.findChild( QtGui.QWidget, Window_global.listWidgetPutName )
-        ui_listWidgetGround   = windowObject.findChild( QtGui.QWidget, Window_global.listWidgetGroundName )
-        ui_randomOptionRot    = windowObject.findChild( QtGui.QWidget, Window_global.randomOptionRotName )
-        ui_randomOptionScale  = windowObject.findChild( QtGui.QWidget, Window_global.randomOptionScaleName )
-        ui_randomOptionRotA   = windowObject.findChild( QtGui.QWidget, Window_global.randomOptionRotAName )
-        ui_randomOptionScaleA = windowObject.findChild( QtGui.QWidget, Window_global.randomOptionScaleAName )
-        ui_offsetByObject     = windowObject.findChild( QtGui.QWidget, Window_global.offsetByObjectName )
-        ui_offsetByGround     = windowObject.findChild( QtGui.QWidget, Window_global.offsetByGroundName )
-        ui_checkNormalOrient  = windowObject.findChild( QtGui.QWidget, Window_global.checkNormalOrientName )
-        ui_orientEditMode     = windowObject.findChild( QtGui.QWidget, Window_global.orientEditModeName )
-        ui_duGroupList        = windowObject.findChild( QtGui.QWidget, Window_global.duGroupListName )
-        ui_componentCheck         = windowObject.findChild( QtGui.QWidget, Window_global.componentCheckName)
+        windowObject          = Window_global.mayaWin.findChild( QMainWindow, Window_global.objectName )
+        ui_listWidgetPut      = windowObject.findChild( QWidget, Window_global.listWidgetPutName )
+        ui_listWidgetGround   = windowObject.findChild( QWidget, Window_global.listWidgetGroundName )
+        ui_randomOptionRot    = windowObject.findChild( QWidget, Window_global.randomOptionRotName )
+        ui_randomOptionScale  = windowObject.findChild( QWidget, Window_global.randomOptionScaleName )
+        ui_randomOptionRotA   = windowObject.findChild( QWidget, Window_global.randomOptionRotAName )
+        ui_randomOptionScaleA = windowObject.findChild( QWidget, Window_global.randomOptionScaleAName )
+        ui_offsetByObject     = windowObject.findChild( QWidget, Window_global.offsetByObjectName )
+        ui_offsetByGround     = windowObject.findChild( QWidget, Window_global.offsetByGroundName )
+        ui_checkNormalOrient  = windowObject.findChild( QWidget, Window_global.checkNormalOrientName )
+        ui_orientEditMode     = windowObject.findChild( QWidget, Window_global.orientEditModeName )
+        ui_duGroupList        = windowObject.findChild( QWidget, Window_global.duGroupListName )
+        ui_componentCheck         = windowObject.findChild( QWidget, Window_global.componentCheckName)
 
         Window_global.windowObject = windowObject
         Window_global.ui_listWidgetPut       = ui_listWidgetPut
@@ -231,7 +245,7 @@ class MainWindowEventFilter(QtCore.QObject):
 
     def eventFilter(self, obj, event): 
         
-        focusWidget = QtGui.QApplication.focusWidget()
+        focusWidget = QApplication.focusWidget()
 
         if not focusWidget:
             try:
@@ -791,7 +805,7 @@ class PutObjectContext( OpenMayaMPx.MPxSelectionContext ):
         cmds.undoInfo( swf=0 )
         
         if Tool_global.mousePressed: return None
-        modifiers = QtGui.QApplication.keyboardModifiers()
+        modifiers = QApplication.keyboardModifiers()
         
         if modifiers != QtCore.Qt.ShiftModifier:
             Tool_global.stilPressed_shift   = False
@@ -873,7 +887,7 @@ class PutObjectContext( OpenMayaMPx.MPxSelectionContext ):
         
         Tool_global.mousePressed = False
         
-        modifiers = QtGui.QApplication.keyboardModifiers()
+        modifiers = QApplication.keyboardModifiers()
         Tool_global.stilPressed_shift   = modifiers == QtCore.Qt.ShiftModifier
         Tool_global.stilPressed_control = modifiers == QtCore.Qt.ControlModifier
         

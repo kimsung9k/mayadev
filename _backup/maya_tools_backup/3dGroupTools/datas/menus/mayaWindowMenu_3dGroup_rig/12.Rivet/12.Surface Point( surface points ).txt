@@ -1,3 +1,0 @@
-import sgBFunction_rivet
-for sel in cmds.ls( sl=1, fl=1 ):
-    sgBFunction_rivet.createRivetOnSurfacePoint( sel )

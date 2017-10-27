@@ -1,2 +1,0 @@
-import sgPWindow_curve_rebuildByMinMaxSpans
-sgPWindow_curve_rebuildByMinMaxSpans.WinA().create()

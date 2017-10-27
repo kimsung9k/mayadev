@@ -1,7 +1,6 @@
 import maya.cmds as cmds
 import maya.OpenMayaUI
-from PySide import QtGui, QtCore
-import shiboken as shiboken
+from __qtImprot import *
 import os, sys
 import json
 from functools import partial
@@ -9,23 +8,8 @@ from functools import partial
 
 
 def makeFolder( pathName ):
-    
-    pathName = pathName.replace( '\\', '/' )
-    splitPaths = pathName.split( '/' )
-    
-    cuPath = splitPaths[0]
-    
-    folderExist = True
-    for i in range( 1, len( splitPaths ) ):
-        checkPath = cuPath+'/'+splitPaths[i]
-        if not os.path.exists( checkPath ):
-            os.chdir( cuPath )
-            os.mkdir( splitPaths[i] )
-            folderExist = False
-        cuPath = checkPath
-        
-    if folderExist: return None
-        
+    if os.path.exists( pathName ):return None
+    os.makedirs( pathName )
     return pathName
 
 
@@ -42,7 +26,7 @@ def makeFile( filePath ):
 
 class Window_global:
     
-    mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QtGui.QWidget )
+    mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QWidget )
     objectName = "SGMTool_imageLoader"
     title = "SGMTool Image Loader"
     width = 300
@@ -51,8 +35,7 @@ class Window_global:
     infoPath = cmds.about(pd=True) + "/sg_toolInfo/imageLoader.txt"
     makeFile( infoPath )
     
-    mainGui = QtGui.QMainWindow()
-    
+    mainGui = QMainWindow()
     
     @staticmethod
     def saveInfo( filePath = None ):
@@ -91,7 +74,7 @@ class Window_global:
             
             Window_global.mainGui.resize( width, height )
             
-            desktop = QtGui.QApplication.desktop()
+            desktop = QApplication.desktop()
             desktopWidth = desktop.width()
             desktopHeight = desktop.height()
             if posX + width > desktopWidth: posX = desktopWidth - width
@@ -214,7 +197,7 @@ class ImageBaseTranslateInfo():
         
         elif self.dragMode == 2:
             moveX = x - self.pressX
-            rect = QtGui.QApplication.desktop().screenGeometry();
+            rect = QApplication.desktop().screenGeometry();
             height = rect.height()/4
             self.scale = self.bScale * (2**(float(moveX)/height))
             scaledValue = self.scale/  self.bScale
@@ -224,7 +207,7 @@ class ImageBaseTranslateInfo():
 
 
 
-class ImageBase(QtGui.QLabel):
+class ImageBase(QLabel):
 
     def __init__(self, *args, **kwargs):
         
@@ -233,10 +216,10 @@ class ImageBase(QtGui.QLabel):
         super(ImageBase, self).__init__(*args, **kwargs)
         self.installEventFilter(self)
         
-        self.image            = QtGui.QImage()
-        self.imageTransformed = QtGui.QImage()
-        self.pixmap = QtGui.QPixmap()
-        self.label = QtGui.QLabel(self)
+        self.image            = QImage()
+        self.imageTransformed = QImage()
+        self.pixmap = QPixmap()
+        self.label = QLabel(self)
         self.imagePath = ""
         self.aspect = 1
         
@@ -253,14 +236,14 @@ class ImageBase(QtGui.QLabel):
 
     def resize(self):
         
-        trValue = QtGui.QTransform().scale( self.transInfo.scaleX(), self.transInfo.scaleY() )
-        trValue *= QtGui.QTransform().rotate( self.transInfo.rotValue )
+        trValue = QTransform().scale( self.transInfo.scaleX(), self.transInfo.scaleY() )
+        trValue *= QTransform().rotate( self.transInfo.rotValue )
         imageTransformed = self.image.transformed(trValue)
         
         imageWidth = imageTransformed.width()
         imageHeight = imageTransformed.height()
         
-        self.pixmap = QtGui.QPixmap.fromImage( imageTransformed )
+        self.pixmap = QPixmap.fromImage( imageTransformed )
         self.label.setPixmap( self.pixmap )
         
         marginLeft = (self.width() - imageWidth)/2.0
@@ -318,7 +301,7 @@ class ImageBase(QtGui.QLabel):
 
 
 
-class FilePathLine( QtGui.QLineEdit ):
+class FilePathLine( QLineEdit ):
     def __init__(self, *args, **kwargs ):
         super( FilePathLine, self ).__init__(*args, **kwargs)
         self.installEventFilter(self)
@@ -344,7 +327,7 @@ class FilePathLine( QtGui.QLineEdit ):
 
 
 
-class Tab( QtGui.QTabWidget ):
+class Tab( QTabWidget ):
     
     def __init__(self, *args, **kwargs ):
         super( Tab, self ).__init__( *args, **kwargs )
@@ -354,10 +337,10 @@ class Tab( QtGui.QTabWidget ):
         imageBase = ImageBase()
         textField = FilePathLine()
         textField.setImageBase( imageBase )
-        button = QtGui.QPushButton("Close Tab")
+        button = QPushButton("Close Tab")
         
-        layoutWidget = QtGui.QWidget()
-        vLayout = QtGui.QVBoxLayout(layoutWidget)
+        layoutWidget = QWidget()
+        vLayout = QVBoxLayout(layoutWidget)
         vLayout.setContentsMargins(5,5,5,5)
         
         vLayout.addWidget( textField )
@@ -394,10 +377,10 @@ class Tab( QtGui.QTabWidget ):
 
 
 
-class AddTabButton( QtGui.QPushButton ):
+class AddTabButton( QPushButton ):
     
     def __init__(self, *args, **kwargs ):
-        QtGui.QPushButton.__init__( self, *args, **kwargs )
+        QPushButton.__init__( self, *args, **kwargs )
         self.installEventFilter( self )
         self.clickedX = 0
         self.clickedY= 0
@@ -410,23 +393,23 @@ class AddTabButton( QtGui.QPushButton ):
 
 
 
-class Window( QtGui.QMainWindow ):
+class Window( QMainWindow ):
     
     def __init__(self, *args, **kwargs ):
-        QtGui.QMainWindow.__init__( self, *args, **kwargs )
+        QMainWindow.__init__( self, *args, **kwargs )
         self.installEventFilter( self )
         self.setWindowFlags(QtCore.Qt.Drawer)
     
-        self.layoutWidget = QtGui.QWidget()
+        self.layoutWidget = QWidget()
         self.setCentralWidget( self.layoutWidget )
         
-        self.layout = QtGui.QVBoxLayout( self.layoutWidget )
+        self.layout = QVBoxLayout( self.layoutWidget )
         self.layout.setContentsMargins( 5,5,5,5 )
         
-        hLayoutWidget = QtGui.QWidget()
+        hLayoutWidget = QWidget()
         self.addTabButton = AddTabButton("Add Tab")
         self.duplicateButton = AddTabButton("Duplicate Tab")
-        hLayout = QtGui.QHBoxLayout(hLayoutWidget)
+        hLayout = QHBoxLayout(hLayoutWidget)
         hLayout.setContentsMargins( 5,5,5,5 )
         hLayout.addWidget( self.addTabButton )
         hLayout.addWidget( self.duplicateButton )
@@ -454,31 +437,31 @@ class Window( QtGui.QMainWindow ):
         if cmds.window( objectName, ex=1 ):
             cmds.deleteUI( objectName )
         
-        dialog = QtGui.QMainWindow( self )
+        dialog = QMainWindow( self )
         dialog.setWindowFlags( QtCore.Qt.Dialog )
         dialog.setObjectName( objectName )
         dialog.resize( 200, 100 )
         dialog.move( self.addTabButton.clickedX + mainPos.x()+10, self.addTabButton.clickedY + mainPos.y() + 40 )
         dialog.show()
         
-        vWidget = QtGui.QWidget( dialog )
-        vLayout = QtGui.QVBoxLayout( vWidget )
+        vWidget = QWidget( dialog )
+        vLayout = QVBoxLayout( vWidget )
         dialog.setCentralWidget( vWidget )
         
-        hEditLayout = QtGui.QHBoxLayout()
-        hButtonLayout = QtGui.QHBoxLayout()
+        hEditLayout = QHBoxLayout()
+        hButtonLayout = QHBoxLayout()
         
         vLayout.addLayout( hEditLayout )
         vLayout.addLayout( hButtonLayout )
         
-        textWidget = QtGui.QLabel( "Tab Name : " )
-        editWidget = QtGui.QLineEdit()
+        textWidget = QLabel( "Tab Name : " )
+        editWidget = QLineEdit()
         
         hEditLayout.addWidget( textWidget )
         hEditLayout.addWidget( editWidget )
         
-        okButtonWidget = QtGui.QPushButton("OK")
-        cancelButtonWidget = QtGui.QPushButton( "Cancel" )
+        okButtonWidget = QPushButton("OK")
+        cancelButtonWidget = QPushButton( "Cancel" )
         
         hButtonLayout.addWidget( okButtonWidget )
         hButtonLayout.addWidget( cancelButtonWidget )

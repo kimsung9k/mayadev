@@ -1,12 +1,11 @@
 import maya.cmds as cmds
 import maya.OpenMayaUI
-from PySide import QtGui, QtCore
-import shiboken as shiboken
+from __qtImprot import *
 
 
-class Window( QtGui.QMainWindow ):
+class Window( QMainWindow ):
     
-    mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QtGui.QWidget )
+    mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QWidget )
     objectName = "sg_menuEditor"
     title = "UI - Menu Editor"
     width = 600
@@ -14,34 +13,33 @@ class Window( QtGui.QMainWindow ):
 
     def __init__(self, *args, **kwargs ):
         
-        QtGui.QMainWindow.__init__( self, *args, **kwargs )
+        QMainWindow.__init__( self, *args, **kwargs )
         self.installEventFilter( self )
         
-        self.centralWidget = QtGui.QWidget()
+        self.centralWidget = QWidget()
         self.setCentralWidget( self.centralWidget )
         
-        self.layoutBase = QtGui.QVBoxLayout( self.centralWidget )
+        self.layoutBase = QVBoxLayout( self.centralWidget )
         
-        layout_menuPath   = QtGui.QHBoxLayout()
-        label_menuPath    = QtGui.QLabel( "Menu path" )
-        lineEdit_menuPath = QtGui.QLineEdit()
-        button_menuPath = QtGui.QPushButton( '...' )
+        layout_menuPath   = QHBoxLayout()
+        label_menuPath    = QLabel( "Menu path" )
+        lineEdit_menuPath = QLineEdit()
+        button_menuPath = QPushButton( '...' )
         [ layout_menuPath.addWidget( widget ) for widget in [label_menuPath,lineEdit_menuPath,button_menuPath] ]
-        scrollArea = QtGui.QScrollArea()
+        scrollArea = QScrollArea()
         
-        listWidgetSizePolicy = QtGui.QSizePolicy()
-        listWidgetSizePolicy.setVerticalPolicy( QtGui.QSizePolicy.Preferred )
-        listWidgetSizePolicy.setHorizontalPolicy( QtGui.QSizePolicy.Maximum )
+        listWidgetSizePolicy = QSizePolicy()
+        listWidgetSizePolicy.setVerticalPolicy( QSizePolicy.Preferred )
+        listWidgetSizePolicy.setHorizontalPolicy( QSizePolicy.Maximum )
         
-        layoutSpliterWidget = QtGui.QWidget()
-        layoutSpliter = QtGui.QHBoxLayout(layoutSpliterWidget)
+        layoutSpliterWidget = QWidget()
+        layoutSpliter = QHBoxLayout(layoutSpliterWidget)
         layoutSpliter.setContentsMargins(1,1,1,1)
-        listWidgetBase  = QtGui.QListWidget();listWidgetBase.setSizePolicy( listWidgetSizePolicy )
-        toolButton = QtGui.QPushButton('||')
-        listWidgetBase2 = QtGui.QListWidget();listWidgetBase2.setSizePolicy( listWidgetSizePolicy )
-        label_empty = QtGui.QLabel()
+        listWidgetBase  = QListWidget();listWidgetBase.setSizePolicy( listWidgetSizePolicy )
+        toolButton = QPushButton('||')
+        listWidgetBase2 = QListWidget();listWidgetBase2.setSizePolicy( listWidgetSizePolicy )
+        label_empty = QLabel()
         layoutSpliter.addWidget( listWidgetBase )
-        layoutSpliter.addWidget( toolButton )
         layoutSpliter.addWidget( listWidgetBase2 )
         layoutSpliter.addWidget( label_empty )
         

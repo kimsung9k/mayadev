@@ -194,33 +194,33 @@ class sgCmds:
         ioShape = sgCmds.addIOShape( jnt )
         ioShape = pymel.core.ls( ioShape )[0]
         
-        jnt.addAttr( 'shape_tx', dv=0 ); jnt.shape_tx.set( e=1, cb=1 )
-        jnt.addAttr( 'shape_ty', dv=0); jnt.shape_ty.set( e=1, cb=1 )
-        jnt.addAttr( 'shape_tz', dv=0); jnt.shape_tz.set( e=1, cb=1 )
-        jnt.addAttr( 'shape_rx', dv=0, at='doubleAngle' ); jnt.shape_rx.set( e=1, cb=1 )
-        jnt.addAttr( 'shape_ry', dv=0, at='doubleAngle' ); jnt.shape_ry.set( e=1, cb=1 )
-        jnt.addAttr( 'shape_rz', dv=0, at='doubleAngle' ); jnt.shape_rz.set( e=1, cb=1 )
-        jnt.addAttr( 'shape_sx', dv=1 ); jnt.shape_sx.set( e=1, cb=1 )
-        jnt.addAttr( 'shape_sy', dv=1 ); jnt.shape_sy.set( e=1, cb=1 )
-        jnt.addAttr( 'shape_sz', dv=1 ); jnt.shape_sz.set( e=1, cb=1 )
-        jnt.addAttr( 'scaleMult', dv=defaultScaleMult, min=0 ); jnt.scaleMult.set( e=1, cb=1 )
+        crvShape.addAttr( 'shape_tx', dv=0 ); crvShape.shape_tx.set( e=1, cb=1 )
+        crvShape.addAttr( 'shape_ty', dv=0); crvShape.shape_ty.set( e=1, cb=1 )
+        crvShape.addAttr( 'shape_tz', dv=0); crvShape.shape_tz.set( e=1, cb=1 )
+        crvShape.addAttr( 'shape_rx', dv=0, at='doubleAngle' ); crvShape.shape_rx.set( e=1, cb=1 )
+        crvShape.addAttr( 'shape_ry', dv=0, at='doubleAngle' ); crvShape.shape_ry.set( e=1, cb=1 )
+        crvShape.addAttr( 'shape_rz', dv=0, at='doubleAngle' ); crvShape.shape_rz.set( e=1, cb=1 )
+        crvShape.addAttr( 'shape_sx', dv=1 ); crvShape.shape_sx.set( e=1, cb=1 )
+        crvShape.addAttr( 'shape_sy', dv=1 ); crvShape.shape_sy.set( e=1, cb=1 )
+        crvShape.addAttr( 'shape_sz', dv=1 ); crvShape.shape_sz.set( e=1, cb=1 )
+        crvShape.addAttr( 'scaleMult', dv=defaultScaleMult, min=0 ); crvShape.scaleMult.set( e=1, cb=1 )
         composeMatrix = pymel.core.createNode( 'composeMatrix' )
         composeMatrix2 = pymel.core.createNode( 'composeMatrix' )
         multMatrix = pymel.core.createNode( 'multMatrix' )
         composeMatrix.outputMatrix >> multMatrix.i[0]
         composeMatrix2.outputMatrix >> multMatrix.i[1]
-        jnt.shape_tx >> composeMatrix.inputTranslateX
-        jnt.shape_ty >> composeMatrix.inputTranslateY
-        jnt.shape_tz >> composeMatrix.inputTranslateZ
-        jnt.shape_rx >> composeMatrix.inputRotateX
-        jnt.shape_ry >> composeMatrix.inputRotateY
-        jnt.shape_rz >> composeMatrix.inputRotateZ
-        jnt.shape_sx >> composeMatrix.inputScaleX
-        jnt.shape_sy >> composeMatrix.inputScaleY
-        jnt.shape_sz >> composeMatrix.inputScaleZ
-        jnt.scaleMult >> composeMatrix2.inputScaleX
-        jnt.scaleMult >> composeMatrix2.inputScaleY
-        jnt.scaleMult >> composeMatrix2.inputScaleZ
+        crvShape.shape_tx >> composeMatrix.inputTranslateX
+        crvShape.shape_ty >> composeMatrix.inputTranslateY
+        crvShape.shape_tz >> composeMatrix.inputTranslateZ
+        crvShape.shape_rx >> composeMatrix.inputRotateX
+        crvShape.shape_ry >> composeMatrix.inputRotateY
+        crvShape.shape_rz >> composeMatrix.inputRotateZ
+        crvShape.shape_sx >> composeMatrix.inputScaleX
+        crvShape.shape_sy >> composeMatrix.inputScaleY
+        crvShape.shape_sz >> composeMatrix.inputScaleZ
+        crvShape.scaleMult >> composeMatrix2.inputScaleX
+        crvShape.scaleMult >> composeMatrix2.inputScaleY
+        crvShape.scaleMult >> composeMatrix2.inputScaleZ
         trGeo = pymel.core.createNode( 'transformGeometry' )
         try:jnt.attr( 'radius' ).set( 0 )
         except:pass

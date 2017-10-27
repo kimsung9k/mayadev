@@ -1,3 +1,0 @@
-import animation.modelPanel.view
-modelPanelWindow = animation.modelPanel.view.Window()
-modelPanelWindow.create()

@@ -42,7 +42,7 @@ class Win_Global:
     width = 300
     height = 100
     
-    data = cmds.about( pd=1 ) + '/sgUIs/replaceName.txt'
+    data = cmds.about( pd=1 ) + '/sg/sgUIs/replaceName.txt'
     makeFile( data )
     
 

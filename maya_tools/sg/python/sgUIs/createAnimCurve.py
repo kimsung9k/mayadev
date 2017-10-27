@@ -1,7 +1,6 @@
 import maya.cmds as cmds
 import maya.OpenMayaUI
-from PySide import QtGui, QtCore
-import shiboken as shiboken
+from __qtImprot import *
 import os, sys
 import json
 from functools import partial
@@ -9,23 +8,8 @@ from functools import partial
 
 
 def makeFolder( pathName ):
-    
-    pathName = pathName.replace( '\\', '/' )
-    splitPaths = pathName.split( '/' )
-    
-    cuPath = splitPaths[0]
-    
-    folderExist = True
-    for i in range( 1, len( splitPaths ) ):
-        checkPath = cuPath+'/'+splitPaths[i]
-        if not os.path.exists( checkPath ):
-            os.chdir( cuPath )
-            os.mkdir( splitPaths[i] )
-            folderExist = False
-        cuPath = checkPath
-        
-    if folderExist: return None
-        
+    if os.path.exists( pathName ):return None
+    os.makedirs( pathName )
     return pathName
 
 
@@ -42,7 +26,7 @@ def makeFile( filePath ):
 
 class Window_global:
     
-    mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QtGui.QWidget )
+    mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QWidget )
     objectName = "sg_Tool_createAnimCurve"
     title = "SG Tool Create AnimCurve"
     width = 300
@@ -51,7 +35,7 @@ class Window_global:
     infoPath = cmds.about(pd=True) + "/sg_toolInfo/createAnimCurve.txt"
     makeFile( infoPath )
     
-    mainGui = QtGui.QMainWindow()
+    mainGui = QMainWindow()
 
 
 
@@ -90,17 +74,17 @@ class Commands:
 
 
 
-class UI_labels( QtGui.QWidget ):
+class UI_labels( QWidget ):
     
     def __init__(self, *args, **kwargs):
-        QtGui.QWidget.__init__( self, *args, **kwargs )
+        QWidget.__init__( self, *args, **kwargs )
         self.installEventFilter( self )
         
-        self.layout = QtGui.QHBoxLayout( self )
+        self.layout = QHBoxLayout( self )
         self.layout.setContentsMargins( 0,0,0,0 )
         
-        self.text_key = QtGui.QLabel('Float')
-        self.text_value = QtGui.QLabel('Value')
+        self.text_key = QLabel('Float')
+        self.text_value = QLabel('Value')
         
         self.text_key.setAlignment( QtCore.Qt.AlignCenter )
         self.text_value.setAlignment( QtCore.Qt.AlignCenter )
@@ -117,17 +101,17 @@ class UI_labels( QtGui.QWidget ):
 
 
 
-class UI_attrlist( QtGui.QWidget ):
+class UI_attrlist( QWidget ):
     
     def __init__(self, *args, **kwargs):
-        QtGui.QWidget.__init__( self, *args, **kwargs )
+        QWidget.__init__( self, *args, **kwargs )
         self.installEventFilter( self )
         
-        self.layout = QtGui.QHBoxLayout( self )
+        self.layout = QHBoxLayout( self )
         self.layout.setContentsMargins( 0,0,0,0 )
         
-        self.lineEdit_key = QtGui.QLineEdit()
-        self.lineEdit_value = QtGui.QLineEdit()
+        self.lineEdit_key = QLineEdit()
+        self.lineEdit_value = QLineEdit()
         
         self.layout.addWidget( self.lineEdit_key )
         self.layout.addWidget( self.lineEdit_value )
@@ -140,18 +124,18 @@ class UI_attrlist( QtGui.QWidget ):
 
 
 
-class UI_buttons( QtGui.QWidget ):
+class UI_buttons( QWidget ):
     
     def __init__(self, *args, **kwargs):
-        QtGui.QWidget.__init__( self, *args, **kwargs )
+        QWidget.__init__( self, *args, **kwargs )
         self.installEventFilter( self )
         
-        self.layout = QtGui.QHBoxLayout( self )
+        self.layout = QHBoxLayout( self )
         self.layout.setContentsMargins( 0,0,0,0 )
         
-        self.button_connect = QtGui.QPushButton("Create")
-        self.button_addLine = QtGui.QPushButton("Add Line")
-        self.lineEdit_value = QtGui.QLineEdit()
+        self.button_connect = QPushButton("Create")
+        self.button_addLine = QPushButton("Add Line")
+        self.lineEdit_value = QLineEdit()
         self.layout.addWidget( self.button_connect )
         self.layout.addWidget( self.button_addLine )
         
@@ -164,17 +148,17 @@ class UI_buttons( QtGui.QWidget ):
 
 
 
-class Window( QtGui.QMainWindow ):
+class Window( QMainWindow ):
     
     def __init__(self, *args, **kwargs ):
-        QtGui.QMainWindow.__init__( self, *args, **kwargs )
+        QMainWindow.__init__( self, *args, **kwargs )
         self.installEventFilter( self )
         self.setWindowFlags(QtCore.Qt.Drawer)
     
-        self.layoutWidget = QtGui.QWidget()
+        self.layoutWidget = QWidget()
         self.setCentralWidget( self.layoutWidget )
         
-        self.layout = QtGui.QVBoxLayout( self.layoutWidget )
+        self.layout = QVBoxLayout( self.layoutWidget )
         self.layout.setContentsMargins( 5,5,5,5 )
         
         self.ui_labels     = UI_labels()

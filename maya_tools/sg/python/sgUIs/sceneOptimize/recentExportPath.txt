@@ -1,1 +1,1 @@
-{"abcPath": "animationTEst.abc", "sceneInfoPath": "animationTEst.sceneInfo", "rootPath": "D:/PRIVATE/TEMP/animationTEst"}
+{"abcPath": "EP107_S019.abc", "sceneInfoPath": "EP107_S019.sceneInfo", "rootPath": "Z:/KAD_Pipeline/04_Shot-Production/05_RenderScenes/EP107/EP107_S019/EP107_S019_cache"}

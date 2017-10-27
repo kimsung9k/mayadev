@@ -1,2 +1,0 @@
-
-targetWindowsClose_whenSceneUpdate = []

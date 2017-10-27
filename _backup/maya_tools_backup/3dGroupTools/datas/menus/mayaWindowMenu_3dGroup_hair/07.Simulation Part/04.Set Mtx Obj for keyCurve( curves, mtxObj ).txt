@@ -1,9 +1,0 @@
-import sgBFunction_dag
-import sgBFunction_curve
-
-sels = cmds.ls( sl=1 )
-curves = sels[:-1]
-mtxObj = sels[-1]
-
-curves = sgBFunction_dag.getChildrenCurveExists( curves )
-sgBFunction_curve.setKeyCurveMatrixObjects( curves, mtxObj )

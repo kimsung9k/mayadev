@@ -1,4 +1,0 @@
-import sgBFunction_rivet
-
-for sel in cmds.ls( sl=1 ):
-    sgBFunction_rivet.createRivetFromVertex_mirror( sel )

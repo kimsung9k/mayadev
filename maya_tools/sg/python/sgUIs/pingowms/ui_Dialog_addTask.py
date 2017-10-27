@@ -3,7 +3,7 @@
 from commands import *
 
 
-class Dialog_addTask( QtGui.QDialog ):
+class Dialog_addTask( QDialog ):
     
     objectName = 'ui_pingowms_addTask'
     title = "작업영역추가".decode('utf-8')
@@ -14,39 +14,39 @@ class Dialog_addTask( QtGui.QDialog ):
         
         if not args: args = tuple( [ControlBase.mayawin] )
         
-        QtGui.QDialog.__init__( self, *args, **kwargs )
+        QDialog.__init__( self, *args, **kwargs )
         self.installEventFilter( self )
         self.setWindowTitle( Dialog_addTask.title + ' - ' + ProjectControl.getCurrentProjectName() )
         self.resize( Dialog_addTask.defaultWidth, Dialog_addTask.defaultHeight )
         
         self.setModal( True )
         
-        vLayout       = QtGui.QVBoxLayout( self )
-        typeLayout    = QtGui.QHBoxLayout()
-        pathLayout    = QtGui.QHBoxLayout()
-        taskNameLayout = QtGui.QHBoxLayout()
-        buttonsLayout = QtGui.QHBoxLayout()
+        vLayout       = QVBoxLayout( self )
+        typeLayout    = QHBoxLayout()
+        pathLayout    = QHBoxLayout()
+        taskNameLayout = QHBoxLayout()
+        buttonsLayout = QHBoxLayout()
         
-        typeLabel = QtGui.QLabel( "영역 타입".decode( 'utf-8' ) )
-        typeComboBox = QtGui.QComboBox()
+        typeLabel = QLabel( "영역 타입".decode( 'utf-8' ) )
+        typeComboBox = QComboBox()
         typeComboBox.addItems( ['파일'.decode( 'utf-8' ),'폴더'.decode( 'utf-8' )] )
         typeLayout.addWidget( typeLabel )
         typeLayout.addWidget( typeComboBox )
         
-        pathLabel = QtGui.QLabel( "경로 : ".decode( "utf-8" ) )
-        pathLineEdit = QtGui.QLineEdit()
-        pathButton = QtGui.QPushButton( "..." )
+        pathLabel = QLabel( "경로 : ".decode( "utf-8" ) )
+        pathLineEdit = QLineEdit()
+        pathButton = QPushButton( "..." )
         pathLayout.addWidget( pathLabel )
         pathLayout.addWidget( pathLineEdit )
         pathLayout.addWidget( pathButton )
         
-        taskNameLabel = QtGui.QLabel( "작업영역이름 : ".decode( 'utf-8' ) )
-        taskNameLineEdit = QtGui.QLineEdit()
+        taskNameLabel = QLabel( "작업영역이름 : ".decode( 'utf-8' ) )
+        taskNameLineEdit = QLineEdit()
         taskNameLayout.addWidget( taskNameLabel )
         taskNameLayout.addWidget( taskNameLineEdit )
         
-        buttonCreate = QtGui.QPushButton( "생성".decode( 'utf-8' ) )
-        buttonClose  = QtGui.QPushButton( "닫기".decode( 'utf-8' ) )
+        buttonCreate = QPushButton( "생성".decode( 'utf-8' ) )
+        buttonClose  = QPushButton( "닫기".decode( 'utf-8' ) )
         buttonsLayout.addWidget( buttonCreate )
         buttonsLayout.addWidget( buttonClose )
         
@@ -93,10 +93,7 @@ class Dialog_addTask( QtGui.QDialog ):
 
     def loadTaskPath(self):
         
-        if self.typeComboBox.currentIndex() == 0:
-            resultPath = FileControl.getFileFromBrowser( self, FileControl.getDefaultTaskFolder() )
-        else:
-            resultPath = FileControl.getFolderFromBrowser( self, FileControl.getDefaultTaskFolder() )
+        resultPath = FileControl.getFolderFromBrowser( self, FileControl.getDefaultTaskFolder() )
 
         if os.path.exists( resultPath ):
             self.pathLineEdit.setText( resultPath )
@@ -129,10 +126,7 @@ class Dialog_addTask( QtGui.QDialog ):
         if not os.path.exists( pathTask ):
             cmds.warning( "%s 경로가 존재하지 않습니다.".decode( 'utf-8') % pathTask )
             return
-        if not os.path.isfile( pathTask ) and typeTask == 0:
-            cmds.warning( "'%s'는 파일이 아닙니다.".decode( 'utf-8') % pathTask )
-            return
-        if not os.path.isdir( pathTask ) and typeTask == 1:
+        if not os.path.isdir( pathTask ):
             cmds.warning( "'%s'는 폴더가 아닙니다.".decode( 'utf-8') % pathTask )
             return
         
@@ -147,6 +141,5 @@ class Dialog_addTask( QtGui.QDialog ):
         ProjectControl.setProjectListData(projectListData)
         self.close()
         TreeWidgetCmds.updateTaskList()
-
-
-
+    
+    

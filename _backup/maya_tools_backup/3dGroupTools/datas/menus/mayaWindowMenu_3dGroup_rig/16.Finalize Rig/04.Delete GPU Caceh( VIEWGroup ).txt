@@ -1,8 +1,0 @@
-import sgBFunction_dag
-
-sels = sgBFunction_dag.getChildrenShapeExists( cmds.ls( sl=1 ) )
-
-for sel in sels:
-    selShape = sgBFunction_dag.getShape( sel )
-    if cmds.nodeType( selShape ) != 'gpuCache': continue
-    cmds.delete( sel )

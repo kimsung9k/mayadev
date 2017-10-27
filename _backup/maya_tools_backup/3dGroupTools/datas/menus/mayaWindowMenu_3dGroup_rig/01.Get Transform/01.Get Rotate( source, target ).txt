@@ -1,9 +1,0 @@
-import maya.cmds as cmds
-
-sels = cmds.ls( sl=1 )
-
-first = sels[0]
-second = sels[1]
-
-rot = cmds.xform( first, q=1, ws=1, ro=1 )
-cmds.xform( second, ws=1, ro=rot )

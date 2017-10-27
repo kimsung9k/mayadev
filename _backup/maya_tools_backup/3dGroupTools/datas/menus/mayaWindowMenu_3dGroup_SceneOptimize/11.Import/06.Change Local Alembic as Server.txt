@@ -1,8 +1,0 @@
-import maya.cmds as cmds
-
-alembicNodes = cmds.ls( type='AlembicNode' )
-
-for alembicNode in alembicNodes:
-    abcFilePath = cmds.getAttr( alembicNode + '.abc_File' )
-    localPath = 'Z' + abcFilePath[1:]
-    cmds.setAttr( alembicNode + '.abc_File', localPath, type='string' )

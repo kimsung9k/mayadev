@@ -1,3 +1,0 @@
-import maya.cmds as cmds
-path = "Z:/project_2015/cm_03/26_SF_Project/dpt_cgi/assets/player/reference/player.mb"
-cmds.file( path, r=1, type="mayaBinary", ignoreVersion=1, gl=1, mergeNamespacesOnClash=True, namespace=":", options="v=0;" )

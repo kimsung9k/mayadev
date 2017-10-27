@@ -2,7 +2,7 @@
 from commands import *
 
 
-class Dialog_addProject( QtGui.QDialog ):
+class Dialog_addProject( QDialog ):
     
     objectName = 'ui_pingowms_addProject'
     title = "프로젝트 추가".decode('utf-8')
@@ -13,38 +13,38 @@ class Dialog_addProject( QtGui.QDialog ):
         
         if not args: args = tuple( [ControlBase.mayawin] )
         
-        QtGui.QDialog.__init__( self, *args, **kwargs )
+        QDialog.__init__( self, *args, **kwargs )
         self.installEventFilter( self )
         self.setWindowTitle( Dialog_addProject.title )
         self.resize( Dialog_addProject.defaultWidth, Dialog_addProject.defaultHeight )
         
-        vlayout = QtGui.QVBoxLayout( self )
-        projectNameLayout = QtGui.QHBoxLayout()
-        serverPathLayout = QtGui.QHBoxLayout()
-        localPathLayout   = QtGui.QHBoxLayout()
-        buttonsLayout     = QtGui.QHBoxLayout()
+        vlayout = QVBoxLayout( self )
+        projectNameLayout = QHBoxLayout()
+        serverPathLayout = QHBoxLayout()
+        localPathLayout   = QHBoxLayout()
+        buttonsLayout     = QHBoxLayout()
         
-        projectNameLabel = QtGui.QLabel( "프로젝트 명 : ".decode('utf-8') )
-        projectNameEdit  = QtGui.QLineEdit()
+        projectNameLabel = QLabel( "프로젝트 명 : ".decode('utf-8') )
+        projectNameEdit  = QLineEdit()
         projectNameLayout.addWidget( projectNameLabel )
         projectNameLayout.addWidget( projectNameEdit )
         
-        serverPathLabel = QtGui.QLabel( "프로젝트 경로 : ".decode('utf-8') )
-        serverPathEdit  = QtGui.QLineEdit()
-        serverPathButton = QtGui.QPushButton('...')
+        serverPathLabel = QLabel( "프로젝트 경로 : ".decode('utf-8') )
+        serverPathEdit  = QLineEdit()
+        serverPathButton = QPushButton('...')
         serverPathLayout.addWidget( serverPathLabel )
         serverPathLayout.addWidget( serverPathEdit )
         serverPathLayout.addWidget( serverPathButton )
         
-        localPathLocal = QtGui.QLabel( "로컬 경로 : ".decode('utf-8') )
-        localPathEdit  = QtGui.QLineEdit()
-        localPathButton = QtGui.QPushButton('...')
+        localPathLocal = QLabel( "로컬 경로 : ".decode('utf-8') )
+        localPathEdit  = QLineEdit()
+        localPathButton = QPushButton('...')
         localPathLayout.addWidget( localPathLocal )
         localPathLayout.addWidget( localPathEdit )
         localPathLayout.addWidget( localPathButton )
         
-        buttonsFirst = QtGui.QPushButton( "생성".decode('utf-8') )
-        buttonsSecond  = QtGui.QPushButton( "취소".decode('utf-8') )
+        buttonsFirst = QPushButton( "생성".decode('utf-8') )
+        buttonsSecond  = QPushButton( "취소".decode('utf-8') )
         buttonsLayout.addWidget( buttonsFirst )
         buttonsLayout.addWidget( buttonsSecond )
         
@@ -110,24 +110,24 @@ class Dialog_addProject( QtGui.QDialog ):
         keyList = data.keys()
         
         if not projName:
-            QtGui.QMessageBox.warning(self, self.tr("Warning"),"프로젝트 이름을 입력하세요.".decode( 'utf-8' ),
-                               QtGui.QMessageBox.Ok )
+            QMessageBox.warning(self, self.tr("Warning"),"프로젝트 이름을 입력하세요.".decode( 'utf-8' ),
+                               QMessageBox.Ok )
             return
         
         if not projPath or not os.path.exists( projPath ):
-            QtGui.QMessageBox.warning(self, self.tr("Warning"),'"%s"\n프로젝트 경로가 존재하지 않습니다.'.decode( 'utf-8' ) % projPath,
-                               QtGui.QMessageBox.Ok )
+            QMessageBox.warning(self, self.tr("Warning"),'"%s"\n프로젝트 경로가 존재하지 않습니다.'.decode( 'utf-8' ) % projPath,
+                               QMessageBox.Ok )
             return
         
         if not localPath or not os.path.exists( localPath ):
-            QtGui.QMessageBox.warning(self, self.tr("Warning"),'"%s"\n로컬 경로가 존재하지 않습니다.'.decode( 'utf-8' ) % localPath,
-                               QtGui.QMessageBox.Ok )
+            QMessageBox.warning(self, self.tr("Warning"),'"%s"\n로컬 경로가 존재하지 않습니다.'.decode( 'utf-8' ) % localPath,
+                               QMessageBox.Ok )
             return
         
         if projName in keyList:
-            resultButton = QtGui.QMessageBox.warning(self, self.tr("Warning"),'"%s" 프로젝트가 존재합니다.\n대치하시겠습니까?'.decode( 'utf-8' ) % projName,
-                               QtGui.QMessageBox.Ok|QtGui.QMessageBox.Cancel )
-            if resultButton == QtGui.QMessageBox.Cancel: return
+            resultButton = QMessageBox.warning(self, self.tr("Warning"),'"%s" 프로젝트가 존재합니다.\n대치하시겠습니까?'.decode( 'utf-8' ) % projName,
+                               QMessageBox.Ok|QMessageBox.Cancel )
+            if resultButton == QMessageBox.Cancel: return
     
         data["%s" % projName] = { ControlBase.labelServerPath:"%s" % projPath, ControlBase.labelLocalPath:"%s" % localPath }
         ProjectControl.setProjectListData(data)

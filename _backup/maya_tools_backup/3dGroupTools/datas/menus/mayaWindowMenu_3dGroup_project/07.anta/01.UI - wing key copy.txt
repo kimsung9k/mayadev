@@ -1,2 +1,0 @@
-import projectFunction.wingKeyCopy.view
-projectFunction.wingKeyCopy.view.Window().create()

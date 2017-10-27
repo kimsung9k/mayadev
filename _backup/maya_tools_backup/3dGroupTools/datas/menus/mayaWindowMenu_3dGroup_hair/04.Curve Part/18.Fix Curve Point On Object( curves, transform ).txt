@@ -1,7 +1,0 @@
-import sgBRig_hair
-import sgBFunction_dag
-sels = cmds.ls( sl=1 )
-curves = sgBFunction_dag.getChildrenCurveExists( sels[:-1] )
-mtxObj = sels[-1]
-for curve in curves:
-    sgBRig_hair.fixCurvePointOnMatrix( curve, mtxObj )

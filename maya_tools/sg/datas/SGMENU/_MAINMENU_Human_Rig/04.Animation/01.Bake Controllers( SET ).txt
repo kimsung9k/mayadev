@@ -1,3 +1,0 @@
-import sg.Function_autoRig.animation
-sels = cmds.ls( sl=1 )
-sg.Function_autoRig.animation.bakeController( sels[0] )

@@ -1,2 +1,0 @@
-import modeling.subTagging.view
-modeling.subTagging.view.showUI()

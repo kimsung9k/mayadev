@@ -1,4 +1,0 @@
-import sgBFunction_rivet
-
-curve = sgBFunction_rivet.createCurveFromSelPoints()
-cmds.select( curve )

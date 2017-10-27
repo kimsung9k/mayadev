@@ -1,31 +1,17 @@
 import maya.cmds as cmds
 import maya.OpenMaya as OpenMaya
-from PySide import QtGui
 import os, json
 from pymel.core import nodetypes
-import shiboken
+from sgUIs.__qtImprot import * 
 import maya.OpenMayaUI
+import ntpath
 
 
 
 def makeFolder( pathName ):
-    
-        pathName = pathName.replace( '\\', '/' )
-        splitPaths = pathName.split( '/' )
-        
-        cuPath = splitPaths[0]
-        
-        folderExist = True
-        for i in range( 1, len( splitPaths ) ):
-            checkPath = cuPath+'/'+splitPaths[i]
-            if not os.path.exists( checkPath ):
-                os.chdir( cuPath )
-                os.mkdir( splitPaths[i] )
-                folderExist = False
-            cuPath = checkPath
-            
-        if folderExist: return None
-        return pathName
+    if os.path.exists( pathName ):return None
+    os.makedirs( pathName )
+    return pathName
 
 
 
@@ -41,11 +27,13 @@ def exportAlembic( exportPath, minFrame, maxFrame ):
 
 
     def getTopTransformNodes():
-        sels = cmds.ls( l=1, type='transform' )
-        topNodes = []
-        for sel in sels:
-            if len( sel.split( '|' ) ) == 2:
-                topNodes.append( sel )
+        topNodes = cmds.ls( sl=1 )
+        if not topNodes:
+            sels = cmds.ls( l=1, type='transform' )
+            topNodes = []
+            for sel in sels:
+                if len( sel.split( '|' ) ) == 2:
+                    topNodes.append( sel )
         return topNodes
     
     makeFolder( os.path.dirname( exportPath ) )
@@ -133,27 +121,30 @@ class Window_global:
     import __init__
     recentInfoPath = __init__.recentInfoPath
     
-    mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QtGui.QWidget )
+    mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QWidget )
     txf_rootPath = ''
     txf_abcPath = ''
     txf_sceneInfoPath = ''
 
     @staticmethod
     def getDefaultFolder():
-        sceneLocalName = cmds.file( q=1, sceneName=1 ).split( '/' )[-1].split( '.' )[0]
-        return os.path.dirname( cmds.file( q=1, sceneName=1 ) ) + '/' + sceneLocalName
+        dirPath = os.path.dirname( cmds.file( q=1, sceneName=1 ) )
+        dirname = ntpath.split( dirPath )[-1]
+        return os.path.dirname( cmds.file( q=1, sceneName=1 ) ) + '/' + dirname + '_cache'# + '/' + sceneLocalName
     
     
     @staticmethod
     def getDefaultAlembicName():
-        sceneLocalName = cmds.file( q=1, sceneName=1 ).split( '/' )[-1].split( '.' )[0]
-        return sceneLocalName + '.abc'
+        dirPath = os.path.dirname( cmds.file( q=1, sceneName=1 ) )
+        dirname = ntpath.split( dirPath )[-1]
+        return dirname + '.abc'
     
     
     @staticmethod
     def getDefaultSceneInfoName():
-        sceneLocalName = cmds.file( q=1, sceneName=1 ).split( '/' )[-1].split( '.' )[0]
-        return sceneLocalName + '.sceneInfo'
+        dirPath = os.path.dirname( cmds.file( q=1, sceneName=1 ) )
+        dirname = ntpath.split( dirPath )[-1]
+        return dirname + '.sceneInfo'
     
     
     
@@ -164,7 +155,7 @@ class Window_cmds:
     @staticmethod
     def getDirectory( evt=0 ):
     
-        dialog = QtGui.QFileDialog(Window_global.mayaWin )
+        dialog = QFileDialog(Window_global.mayaWin )
         dialog.setDirectory( Window_global.getDefaultFolder() )
         choosedFolder = dialog.getExistingDirectory()
         if not choosedFolder: choosedFolder = Window_global.getDefaultFolder()

@@ -1,2 +1,0 @@
-import sgUICurve_createJoint
-sgUICurve_createJoint.Window().show()

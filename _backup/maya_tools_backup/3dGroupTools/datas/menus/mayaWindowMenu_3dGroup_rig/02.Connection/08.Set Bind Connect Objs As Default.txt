@@ -1,6 +1,0 @@
-sels = cmds.ls( 'BindCObj_*' )
-
-import sgBModel_data
-
-for sel in sels:
-    cmds.xform( sel, ws=1, matrix= sgBModel_data.getDefaultMatrix() )

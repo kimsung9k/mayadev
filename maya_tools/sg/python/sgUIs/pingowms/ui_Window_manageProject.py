@@ -3,7 +3,7 @@
 from commands import *
 
 
-class Window_manageProject( QtGui.QMainWindow ):
+class Window_manageProject( QMainWindow ):
     
     objectName = 'ui_pingowms_manageProject'
     title = "프로젝트 관리".decode('utf-8')
@@ -14,72 +14,160 @@ class Window_manageProject( QtGui.QMainWindow ):
         
         args = tuple( [ControlBase.mayawin] )
         
-        QtGui.QMainWindow.__init__( self, *args, **kwargs )
+        QMainWindow.__init__( self, *args, **kwargs )
+        self.setObjectName( Window_manageProject.objectName )
         self.installEventFilter( self )
         self.setWindowTitle( Window_manageProject.title )
         self.resize( Window_manageProject.defaultWidth, Window_manageProject.defaultHeight )
 
-        widgetVLayoutWorks = QtGui.QWidget()
+        widgetVLayoutWorks = QWidget()
         self.setCentralWidget(widgetVLayoutWorks)
         
-        vLayoutWorks = QtGui.QVBoxLayout( widgetVLayoutWorks )
+        vLayoutWorks = QVBoxLayout( widgetVLayoutWorks )
         
-        layout_projectName = QtGui.QHBoxLayout()
-        label_projectName = QtGui.QLabel( "프로젝트 : ".decode( 'utf8' ) )
-        lineEdit_projectName   = QtGui.QLineEdit()
-        button_projectName = QtGui.QPushButton( "이름변경".decode( 'utf8' ) )
+        layout_projectName = QHBoxLayout()
+        label_projectName = QLabel( "프로젝트 : ".decode( 'utf8' ) )
+        lineEdit_projectName   = QLineEdit()
+        button_projectName = QPushButton( "이름변경".decode( 'utf8' ) )
         lineEdit_projectName.setReadOnly( True )
         layout_projectName.addWidget( label_projectName )
         layout_projectName.addWidget( lineEdit_projectName )
         layout_projectName.addWidget( button_projectName )
         
-        WorkAreaGroupBox = QtGui.QGroupBox( '작업 리스트'.decode('utf-8') )
-        WorkAreaGroupLayout = QtGui.QVBoxLayout()
+        WorkAreaGroupBox = QGroupBox( '작업 리스트'.decode('utf-8') )
+        WorkAreaGroupLayout = QVBoxLayout()
         workTreeWidget = WorkTreeWidget()
-        buttonDelWork = QtGui.QPushButton( "작업삭제".decode( 'utf-8' ) )
         WorkAreaGroupLayout.addWidget( workTreeWidget )
-        WorkAreaGroupLayout.addWidget( buttonDelWork )
         WorkAreaGroupBox.setLayout( WorkAreaGroupLayout )
         
-        projectButtonsLayout = QtGui.QHBoxLayout()
-        buttonDelProject = QtGui.QPushButton( "프로젝트 삭제".decode('utf-8') )
+        projectButtonsLayout = QHBoxLayout()
+        buttonDelProject = QPushButton( "프로젝트 삭제".decode('utf-8') )
         projectButtonsLayout.addWidget( buttonDelProject )
         
         vLayoutWorks.addLayout( layout_projectName )
         vLayoutWorks.addWidget( WorkAreaGroupBox )
         vLayoutWorks.addLayout( projectButtonsLayout )
 
-        buttonDelWork.clicked.connect( self.deleteWork )
         buttonDelProject.clicked.connect( self.deleteProject )
-        button_projectName.clicked.connect( self.setNameEditable )
+        button_projectName.clicked.connect( self.setProjectNameEditable )
         QtCore.QObject.connect( lineEdit_projectName, QtCore.SIGNAL('returnPressed()'),  self.renameProject )
-        QtCore.QObject.connect( workTreeWidget, QtCore.SIGNAL('itemClicked(QTreeWidgetItem*, int)'),  self.updateButtonCondition )
-
-        buttonDelWork.setEnabled(False)
+        
+        workTreeWidget.setContextMenuPolicy( QtCore.Qt.CustomContextMenu )
+        QtCore.QObject.connect( workTreeWidget, QtCore.SIGNAL('customContextMenuRequested(QPoint)'),  self.loadContextMenu )
+        workTreeWidget.doubleClicked.connect( self.renameWorkArea )
     
         self.currentProjectName = ProjectControl.getCurrentProjectName()
         
         self.lineEdit_projectName = lineEdit_projectName
         self.workTreeWidget = workTreeWidget
         self.buttonDelProject = buttonDelProject
-        self.buttonDelWork = buttonDelWork
         
         self.loadUIInfo()
+        
+    
+    
+    
+    def loadContextMenu(self, *args ):
+        
+        menu = QMenu( self.workTreeWidget )
+        menu.addAction( "이름변경".decode( "utf-8" ), self.renameWorkArea )
+        menu.addAction( "삭제".decode( 'utf-8' ), self.deleteWorkArea )
+        pos = QCursor.pos()
+        point = QtCore.QPoint( pos.x()+10, pos.y() )
+        menu.exec_( point )
+        
+    
     
 
-    
-    def deleteWork(self, *args):
+
+    def renameWorkArea(self ):
         
-        data = ProjectControl.getProjectListData()
-        cuProjectData = data[ self.currentProjectName ]
+        objectName = "dialog_renameWorkArea_pingowms"
+        selItems = self.workTreeWidget.selectedItems()
+        if not selItems: return
+        selItem = selItems[0]
+        
+        dialog = QDialog( self )
+        dialog.setObjectName( objectName )
+        dialog.setWindowFlags(QtCore.Qt.Drawer)
+        dialog.setWindowTitle( "이름변경".decode( 'utf-8' ) )
+        dialog.resize( 200, 50 )
+        dialog.setModal(True )
+        
+        layout = QVBoxLayout( dialog )
+        lineEdit = QLineEdit( selItem.text(0) )
+        button = QPushButton("이름변경".decode( 'utf-8' ) )
+        layout.addWidget( lineEdit )
+        layout.addWidget( button )
+        
+        dialog.show()
+
+        def rename():
+            cuText = lineEdit.text()
+            
+            data = ProjectControl.getProjectListData()
+            cuProjectData = data[ self.currentProjectName ]
+            
+            selItems = self.workTreeWidget.selectedItems()
+            cuProjectData[ ControlBase.labelTasks ][ cuText ] = cuProjectData[ ControlBase.labelTasks ][ selItems[0].text(0) ]
+            del cuProjectData[ ControlBase.labelTasks ][ selItems[0].text(0) ]
+            
+            ProjectControl.setProjectListData( data )
+            
+            self.loadUIInfo()
+            ControlBase.mainui.updateProjectList( self.currentProjectName )
+            dialog.close()
+        
+        QtCore.QObject.connect( lineEdit, QtCore.SIGNAL( "returnPressed()" ), rename )
+        QtCore.QObject.connect( button, QtCore.SIGNAL( "clicked()" ), rename )
+    
+    
+    
+    
+    def deleteWorkArea(self, *args):
         
         selItems = self.workTreeWidget.selectedItems()
-        del cuProjectData[ ControlBase.labelTasks ][ selItems[0].text(0) ]
+        if not selItems: return
+        selItem = selItems[0]
         
-        ProjectControl.setProjectListData( data )
+        objectName = "dialog_deleteWorkArea_pingowms"
+        dialog = QDialog( self )
+        dialog.setWindowFlags( QtCore.Qt.Drawer )
+        dialog.setObjectName( objectName )
+        dialog.setWindowTitle( "이름변경".decode( 'utf-8' ) )
+        dialog.resize( 200, 50 )
+        dialog.setModal(True )
         
-        self.loadUIInfo()
-        ControlBase.mainui.updateProjectList( self.currentProjectName )
+        layout = QVBoxLayout( dialog )
+        label = QLabel( "'%s'를 삭제하시겠습니까?".decode( 'utf-8' ) % selItem.text( 0 ) )
+        layoutButtons = QHBoxLayout()
+        buttonDelete = QPushButton( "삭제".decode( 'utf-8' ) )
+        buttonCancel = QPushButton( "취소".decode( 'utf-8' ) )
+        layoutButtons.addWidget( buttonDelete )
+        layoutButtons.addWidget( buttonCancel )
+        layout.addWidget( label )
+        layout.addLayout( layoutButtons )
+        dialog.show()
+
+        def delete():
+            data = ProjectControl.getProjectListData()
+            cuProjectData = data[ self.currentProjectName ]
+            
+            selItems = self.workTreeWidget.selectedItems()
+            del cuProjectData[ ControlBase.labelTasks ][ selItems[0].text(0) ]
+            
+            ProjectControl.setProjectListData( data )
+            
+            self.loadUIInfo()
+            ControlBase.mainui.updateProjectList( self.currentProjectName )
+            dialog.close()
+    
+    
+        def cancel():
+            dialog.close()
+        
+        QtCore.QObject.connect( buttonDelete, QtCore.SIGNAL( "clicked()" ), delete )
+        QtCore.QObject.connect( buttonCancel, QtCore.SIGNAL( "clicked()" ), cancel )
         
 
 
@@ -105,7 +193,7 @@ class Window_manageProject( QtGui.QMainWindow ):
         projectNames = ProjectControl.getAllProjectNames()
         
         if editedProjectName in projectNames:
-            QtGui.QMessageBox.warning( self, "Warning", "동일한 프로젝트 이름이 존제합니다.\n다른이름으로 설정해주세요.".decode( 'utf-8' ) )
+            QMessageBox.warning( self, "Warning", "동일한 프로젝트 이름이 존제합니다.\n다른이름으로 설정해주세요.".decode( 'utf-8' ) )
             self.lineEdit_projectName.setReadOnly( False )
             self.lineEdit_projectName.selectAll()
             return
@@ -115,49 +203,19 @@ class Window_manageProject( QtGui.QMainWindow ):
 
 
 
-
-    def setNameEditable(self):
+    def setProjectNameEditable(self):
         
         self.lineEdit_projectName.setReadOnly( False )
         self.lineEdit_projectName.setFocus( QtCore.Qt.MouseFocusReason )
         self.lineEdit_projectName.selectAll()
-        
-
-
-
-    def editServerPath(self):
-        
-        standardModel = self.projectTableView.model()
-        selectionModel = self.projectTableView.selectionModel()
-        qIndices = selectionModel.selection().indexes()
-        qIndex = qIndices[-1]
-        rowIndex = qIndex.row()
-        columnIndex = qIndex.column()
-        
-        selItem = standardModel.itemFromIndex( qIndex )
-        
-        targetProjectRow = self.projectRows[rowIndex]
-        
-        if columnIndex == 0:
-            pass
-        elif columnIndex == 1:
-            selectedPath = os.path.abspath(os.path.join(selItem.text(), os.pardir))
-            selectedDirectory = FileControl.getFolderFromBrowser( self, selectedPath )
-            if selectedDirectory:selItem.setText(selectedDirectory)
-            selectionModel.select( qIndex, QtGui.QItemSelectionModel.Select )
-        elif columnIndex == 2:
-            selectedPath = os.path.abspath(os.path.join(selItem.text(), os.pardir))
-            selectedDirectory = FileControl.getFolderFromBrowser( self, selectedPath )
-            if selectedDirectory:selItem.setText(selectedDirectory)
-            selectionModel.select(  qIndex, QtGui.QItemSelectionModel.Select )
 
 
 
     def deleteProject(self):
         
-        resultButton = QtGui.QMessageBox.warning(self, self.tr("Warning"),'"%s" 프로젝트를 삭제하시겠습니까?'.decode( 'utf-8' ) % self.currentProjectName,
-                           QtGui.QMessageBox.Ok|QtGui.QMessageBox.Cancel )
-        if resultButton == QtGui.QMessageBox.Cancel: return
+        resultButton = QMessageBox.warning(self, self.tr("Warning"),'"%s" 프로젝트를 삭제하시겠습니까?'.decode( 'utf-8' ) % self.currentProjectName,
+                           QMessageBox.Ok|QMessageBox.Cancel )
+        if resultButton == QMessageBox.Cancel: return
         
         FileControl.makeFile( ControlBase.projectListPath )
         f = open( ControlBase.projectListPath, 'r' )
@@ -175,24 +233,6 @@ class Window_manageProject( QtGui.QMainWindow ):
         try:ControlBase.manageui.updateProjectList()
         except:pass
         self.close()
-    
-
-
-
-    def showProjectInfo( self ):
-        
-        qIndices = self.projectTableView.selectionModel().selection().indexes()
-        if not qIndices: 
-            self.WorkAreaGroupBox.setEnabled( False )
-            self.buttonDelProject.setEnabled( False )
-            return None
-        qIndex = qIndices[-1]
-        selIndex = qIndex.row()
-        
-        projectName, serverPath, localPath, updateDate, startDate  = self.projectRows[selIndex]
-        self.WorkAreaGroupBox.setTitle( '작업 리스트 - %s'.decode('utf-8') % projectName )
-        self.WorkAreaGroupBox.setEnabled( True )
-        self.buttonDelProject.setEnabled( True )
     
 
 

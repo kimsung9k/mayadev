@@ -1,7 +1,6 @@
 import maya.cmds as cmds
 import maya.OpenMayaUI
-from PySide import QtGui, QtCore
-import shiboken as shiboken
+from __qtImprot import *
 import os, sys
 import json
 from functools import partial
@@ -10,23 +9,8 @@ from pymel.core.uitypes import Layout
 
 
 def makeFolder( pathName ):
-    
-    pathName = pathName.replace( '\\', '/' )
-    splitPaths = pathName.split( '/' )
-    
-    cuPath = splitPaths[0]
-    
-    folderExist = True
-    for i in range( 1, len( splitPaths ) ):
-        checkPath = cuPath+'/'+splitPaths[i]
-        if not os.path.exists( checkPath ):
-            os.chdir( cuPath )
-            os.mkdir( splitPaths[i] )
-            folderExist = False
-        cuPath = checkPath
-        
-    if folderExist: return None
-        
+    if os.path.exists( pathName ):return None
+    os.makedirs( pathName )
     return pathName
 
 
@@ -46,7 +30,7 @@ def makeFile( filePath ):
 
 class Window_global:
     
-    mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QtGui.QWidget )
+    mayaWin = shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QWidget )
     objectName = "sgui_createPointOnCurve"
     title = "Create Point On Curve"
     width = 350
@@ -56,7 +40,7 @@ class Window_global:
     infoPath2 = cmds.about( pd=True ) + '/sg/createPointOnCurve/uiInfo2.txt'
     makeFile( infoPath )
     
-    mainGui = QtGui.QMainWindow()
+    mainGui = QMainWindow()
     listItems = []
     
 
@@ -97,7 +81,7 @@ class Window_global:
             
             Window_global.mainGui.resize( width, height )
             
-            desktop = QtGui.QApplication.desktop()
+            desktop = QApplication.desktop()
             desktopWidth = desktop.width()
             desktopHeight = desktop.height()
             if posX + width > desktopWidth: posX = desktopWidth - width
@@ -220,7 +204,7 @@ class Functions:
 
 
 
-class Window( QtGui.QMainWindow ):
+class Window( QMainWindow ):
     
     def __init__(self, *args, **kwargs ):
         
@@ -228,38 +212,38 @@ class Window( QtGui.QMainWindow ):
         self.maximum = 100
         self.lineEditMaximum = 10000
         
-        QtGui.QMainWindow.__init__( self, *args, **kwargs )
+        QMainWindow.__init__( self, *args, **kwargs )
         self.installEventFilter( self )
         #self.setWindowFlags( QtCore.Qt.Drawer )
         self.setWindowTitle( Window_global.title )
         
-        widgetMain = QtGui.QWidget()
-        layoutVertical = QtGui.QVBoxLayout( widgetMain )
+        widgetMain = QWidget()
+        layoutVertical = QVBoxLayout( widgetMain )
         self.setCentralWidget( widgetMain )
         
-        layoutSlider = QtGui.QHBoxLayout()
-        lineEdit     = QtGui.QLineEdit(); lineEdit.setFixedWidth( 100 )
+        layoutSlider = QHBoxLayout()
+        lineEdit     = QLineEdit(); lineEdit.setFixedWidth( 100 )
         lineEdit.setText( str( 1 ) )
-        validator    = QtGui.QIntValidator(self.minimum, self.lineEditMaximum, self)
+        validator    = QIntValidator(self.minimum, self.lineEditMaximum, self)
         lineEdit.setValidator( validator )
-        slider       = QtGui.QSlider(); slider.setOrientation( QtCore.Qt.Horizontal )
+        slider       = QSlider(); slider.setOrientation( QtCore.Qt.Horizontal )
         slider.setMinimum( self.minimum )
         slider.setMaximum( self.maximum )
         layoutSlider.addWidget( lineEdit )
         layoutSlider.addWidget( slider )
-        layoutAngle = QtGui.QVBoxLayout()
-        checkBox = QtGui.QCheckBox( 'Connect Angle By Tangent' )
-        layoutVector = QtGui.QHBoxLayout()
-        leVx = QtGui.QLineEdit(); leVx.setText( str( 1.000 ) ); leVx.setEnabled( False )
-        leVx.setValidator( QtGui.QDoubleValidator( -100, 100, 5, self ) )
-        leVy = QtGui.QLineEdit(); leVy.setText( str( 0.000 ) ); leVy.setEnabled( False )
-        leVy.setValidator( QtGui.QDoubleValidator( -100, 100, 5, self ) )
-        leVz = QtGui.QLineEdit(); leVz.setText( str( 0.000 ) ); leVz.setEnabled( False )
-        leVz.setValidator( QtGui.QDoubleValidator( -100, 100, 5, self ) )
+        layoutAngle = QVBoxLayout()
+        checkBox = QCheckBox( 'Connect Angle By Tangent' )
+        layoutVector = QHBoxLayout()
+        leVx = QLineEdit(); leVx.setText( str( 1.000 ) ); leVx.setEnabled( False )
+        leVx.setValidator( QDoubleValidator( -100, 100, 5, self ) )
+        leVy = QLineEdit(); leVy.setText( str( 0.000 ) ); leVy.setEnabled( False )
+        leVy.setValidator( QDoubleValidator( -100, 100, 5, self ) )
+        leVz = QLineEdit(); leVz.setText( str( 0.000 ) ); leVz.setEnabled( False )
+        leVz.setValidator( QDoubleValidator( -100, 100, 5, self ) )
         layoutAngle.addWidget( checkBox )
         layoutAngle.addLayout( layoutVector )
         layoutVector.addWidget( leVx ); layoutVector.addWidget( leVy ); layoutVector.addWidget( leVz )
-        button       = QtGui.QPushButton( 'Create' )
+        button       = QPushButton( 'Create' )
         
         layoutVertical.addLayout( layoutSlider )
         layoutVertical.addLayout( layoutAngle )

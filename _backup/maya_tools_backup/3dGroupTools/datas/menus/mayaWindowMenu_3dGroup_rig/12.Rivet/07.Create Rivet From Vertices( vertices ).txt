@@ -1,3 +1,0 @@
-import sgBFunction_rivet
-
-sgBFunction_rivet.createRivetFromVertex( cmds.ls( sl=1 ) )

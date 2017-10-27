@@ -1,6 +1,6 @@
 import maya.cmds as cmds
 import maya.OpenMaya as OpenMaya
-import PySide.QtGui
+from __qtImprot import *
 
 
 class Window_global:
@@ -40,7 +40,7 @@ class UI_commands:
     @staticmethod
     def setInfo( *args ):
         filePath = cmds.textField( Window_global.txf_imagePath, q=1, tx=1 )
-        pixmap = PySide.QtGui.QPixmap(filePath)
+        pixmap = QPixmap(filePath)
         
         Window_global.imgWidth = pixmap.width()
         Window_global.imgHeight = pixmap.height()

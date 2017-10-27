@@ -1,3 +1,0 @@
-import sgBControl_mayaHairSystem
-
-sgBControl_mayaHairSystem.copyFollicleAttribute()

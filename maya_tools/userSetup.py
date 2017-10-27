@@ -1,4 +1,4 @@
-toolPath = "D:/PINGO_SERVER/pingo_server1/@@DEV@@/maya_tools"
+toolPath = "A:/@@DEV@@/maya_tools"
 startupPath = toolPath + "/startup.py"
 
 f = open( startupPath, 'r' )

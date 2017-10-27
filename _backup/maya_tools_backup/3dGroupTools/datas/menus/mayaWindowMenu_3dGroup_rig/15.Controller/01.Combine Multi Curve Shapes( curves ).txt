@@ -1,4 +1,0 @@
-import maya.cmds as cmds
-import sgRigController
-sels = cmds.ls( sl=1 )
-sgRigController.combineMultiShapes( sels )

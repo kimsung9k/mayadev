@@ -1,2 +1,0 @@
-
-sgHairSystemLabelAttrName = 'sgHairSystemLabel'

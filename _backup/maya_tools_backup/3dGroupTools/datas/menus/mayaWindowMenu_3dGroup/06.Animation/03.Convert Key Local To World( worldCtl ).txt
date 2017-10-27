@@ -1,3 +1,0 @@
-import sgBCharacter_key
-sels = cmds.ls( sl=1 )
-sgBCharacter_key.convertKey_LocalToWorld( sels[0] )

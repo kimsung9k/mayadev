@@ -1,3 +1,0 @@
-import sg.skinCluster
-sels = cmds.ls( sl=1 )
-sg.skinCluster.autoCopyWeight( sels[0], sels[1] )

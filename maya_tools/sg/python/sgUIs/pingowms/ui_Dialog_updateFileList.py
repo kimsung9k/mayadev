@@ -1,12 +1,12 @@
 #coding=utf8
 
 from sgUIs.pingowms.Models import *
-from PySide import QtCore
+from sgUIs.__qtImprot import *
 import commands
 
 
 
-class Dialog_downloadFileList( QtGui.QDialog ):
+class Dialog_downloadFileList( QDialog ):
     
     objectName = 'ui_pingowms_updateFileList'
     title = "다운로드 리스트".decode('utf-8')
@@ -20,7 +20,7 @@ class Dialog_downloadFileList( QtGui.QDialog ):
         if cmds.window( Dialog_downloadFileList.objectName, ex=1 ):
             cmds.deleteUI( Dialog_downloadFileList.objectName, wnd=1 )
         
-        QtGui.QDialog.__init__( self, *args, **kwargs )
+        QDialog.__init__( self, *args, **kwargs )
         self.installEventFilter( self )
         self.setObjectName( Dialog_downloadFileList.objectName )
         self.setWindowTitle( Dialog_downloadFileList.title )
@@ -28,17 +28,21 @@ class Dialog_downloadFileList( QtGui.QDialog ):
         
         self.setModal( True )
         
-        vLayout = QtGui.QVBoxLayout( self )
-        label_download = QtGui.QLabel( "다음항목들이 서버에서 로컬로 다운로드 됩니다.".decode( 'utf-8' ) )
+        vLayout = QVBoxLayout( self )
+        label_download = QLabel( "다음항목들이 서버에서 로컬로 다운로드 됩니다.".decode( 'utf-8' ) )
         label_download.setMaximumHeight( 30 )
-        label  = QtGui.QLabel( "" )
-        hLayout_buttons = QtGui.QHBoxLayout()
-        buttonDownload = QtGui.QPushButton( "다운로드하기".decode( 'utf-8' ) )
-        buttonCanel    = QtGui.QPushButton( "다운로드 하지 않기".decode( 'utf-8' ) )
+        labelBaseWidget = QWidget()
+        scrollArea = QScrollArea( labelBaseWidget )
+        label  = QLabel( "" )
+        scrollArea.setWidget( label )
+        scrollArea.setWidgetResizable( True )
+        hLayout_buttons = QHBoxLayout()
+        buttonDownload = QPushButton( "다운로드하기".decode( 'utf-8' ) )
+        buttonCanel    = QPushButton( "다운로드 하지 않기".decode( 'utf-8' ) )
         hLayout_buttons.addWidget( buttonDownload )
         hLayout_buttons.addWidget( buttonCanel )
         vLayout.addWidget( label_download )
-        vLayout.addWidget( label )
+        vLayout.addWidget( labelBaseWidget )
         vLayout.addLayout( hLayout_buttons )
         
         self.label = label
@@ -97,7 +101,8 @@ class Dialog_downloadFileList( QtGui.QDialog ):
         
         for fileNode in pymel.core.ls( type='file' ):
             #print "AEfileTextureReloadCmd %s" % fileNode.fileTextureName.name()
-            mel.eval( "AEfileTextureReloadCmd %s" % fileNode.fileTextureName.name() )
+            try:mel.eval( "AEfileTextureReloadCmd %s" % fileNode.fileTextureName.name() )
+            except:pass
         cmds.deleteUI( Dialog_downloadFileList.objectName, wnd=1 )
         commands.TreeWidgetCmds.setTreeItemsCondition()
         
@@ -112,7 +117,7 @@ class Dialog_downloadFileList( QtGui.QDialog ):
 
 
 
-class Dialog_uploadFileList( QtGui.QDialog ):
+class Dialog_uploadFileList( QDialog ):
     
     objectName = 'ui_pingowms_updateFileList'
     title = "업로드 리스트".decode('utf-8')
@@ -126,7 +131,7 @@ class Dialog_uploadFileList( QtGui.QDialog ):
         if cmds.window( Dialog_uploadFileList.objectName, ex=1 ):
             cmds.deleteUI( Dialog_uploadFileList.objectName, wnd=1 )
         
-        QtGui.QDialog.__init__( self, *args, **kwargs )
+        QDialog.__init__( self, *args, **kwargs )
         self.installEventFilter( self )
         self.setObjectName( Dialog_uploadFileList.objectName )
         self.setWindowTitle( Dialog_uploadFileList.title )
@@ -134,17 +139,21 @@ class Dialog_uploadFileList( QtGui.QDialog ):
         
         self.setModal( True )
         
-        vLayout = QtGui.QVBoxLayout( self )
-        label_download = QtGui.QLabel( "다음항목들이 로컬에서 서버로 업로드 됩니다.".decode( 'utf-8' ) )
+        vLayout = QVBoxLayout( self )
+        label_download = QLabel( "다음항목들이 로컬에서 서버로 업로드 됩니다.".decode( 'utf-8' ) )
         label_download.setMaximumHeight( 30 )
-        label  = QtGui.QLabel( "" )
-        hLayout_buttons = QtGui.QHBoxLayout()
-        buttonUpload = QtGui.QPushButton( "업로드하기".decode( 'utf-8' ) )
-        buttonCanel    = QtGui.QPushButton( "업로드 하지 않기".decode( 'utf-8' ) )
+        labelBaseWidget = QWidget()
+        scrollArea = QScrollArea( labelBaseWidget )
+        label  = QLabel( "" )
+        scrollArea.setWidget( label )
+        scrollArea.setWidgetResizable( True )
+        hLayout_buttons = QHBoxLayout()
+        buttonUpload = QPushButton( "업로드하기".decode( 'utf-8' ) )
+        buttonCanel    = QPushButton( "업로드 하지 않기".decode( 'utf-8' ) )
         hLayout_buttons.addWidget( buttonUpload )
         hLayout_buttons.addWidget( buttonCanel )
         vLayout.addWidget( label_download )
-        vLayout.addWidget( label )
+        vLayout.addWidget( labelBaseWidget )
         vLayout.addLayout( hLayout_buttons )
         
         self.label = label

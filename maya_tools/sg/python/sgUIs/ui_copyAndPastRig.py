@@ -1,8 +1,7 @@
 #coding=utf8
 
 from maya import OpenMayaUI, cmds
-from PySide import QtGui, QtCore
-import shiboken
+from __qtImprot import *
 import os, json
 
 
@@ -10,18 +9,8 @@ class Commands:
     
     @staticmethod
     def makeFolder( pathName ):
-        pathName = pathName.replace( '\\', '/' )
-        splitPaths = pathName.split( '/' )
-        cuPath = splitPaths[0]
-        folderExist = True
-        for i in range( 1, len( splitPaths ) ):
-            checkPath = cuPath+'/'+splitPaths[i]
-            if not os.path.exists( checkPath ):
-                os.chdir( cuPath )
-                os.mkdir( splitPaths[i] )
-                folderExist = False
-            cuPath = checkPath
-        if folderExist: return None
+        if os.path.exists( pathName ):return None
+        os.makedirs( pathName )
         return pathName
 
 
@@ -57,7 +46,7 @@ class Commands:
 
 
 
-class ContextMenu( QtGui.QMenu ):
+class ContextMenu( QMenu ):
     
     def __init__(self, *args, **kwargs ):
         
@@ -67,7 +56,7 @@ class ContextMenu( QtGui.QMenu ):
             loadType = kwargs['loadTypes']
             del kwargs['loadTypes']
         
-        QtGui.QMenu.__init__( self, *args, **kwargs )
+        QMenu.__init__( self, *args, **kwargs )
         
         self.parentUi.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         QtCore.QObject.connect( self.parentUi, QtCore.SIGNAL('customContextMenuRequested(QPoint)'),
@@ -95,7 +84,7 @@ class ContextMenu( QtGui.QMenu ):
 
     def loadContextMenu(self):
 
-        pos = QtGui.QCursor.pos()
+        pos = QCursor.pos()
         point = QtCore.QPoint( pos.x()+10, pos.y() )
         self.exec_( point )
 
@@ -103,61 +92,61 @@ class ContextMenu( QtGui.QMenu ):
 
 
 
-class Window( QtGui.QMainWindow ):
+class Window( QMainWindow ):
     
     objectName = 'ui_copyAndPastRig'
     title = "UI - Copy And Past Rig"
     defaultWidth = 400
     defaultHeight = 50
     
-    infoBaseDir = cmds.about( pd=1 ) + "/pingo/ui_copyAndPastRig"
+    infoBaseDir = cmds.about( pd=1 ) + "/sg/ui_copyAndPastRig"
     uiInfoPath = infoBaseDir + '/uiInfo.json'
     
     def __init__(self, *args, **kwargs ):
         
-        QtGui.QMainWindow.__init__( self, *args, **kwargs )
+        QMainWindow.__init__( self, *args, **kwargs )
         self.installEventFilter( self )
         self.setObjectName( Window.objectName )
         self.setWindowTitle( Window.title )
         
         #-----------ui setting-----------------
-        baseWidget = QtGui.QWidget()
+        baseWidget = QWidget()
         self.setCentralWidget( baseWidget )
-        vLayout = QtGui.QVBoxLayout( baseWidget )
+        vLayout = QVBoxLayout( baseWidget )
         
-        layout_labels = QtGui.QHBoxLayout()
-        label_src = QtGui.QLabel("Copy Target")
-        label_dst = QtGui.QLabel("Past Target")
+        layout_labels = QHBoxLayout()
+        label_src = QLabel("Copy Target")
+        label_dst = QLabel("Past Target")
         label_src.setAlignment( QtCore.Qt.AlignCenter )
         label_dst.setAlignment( QtCore.Qt.AlignCenter )
         layout_labels.addWidget( label_src )
         layout_labels.addWidget( label_dst )
         
-        layout_lineEdits = QtGui.QHBoxLayout()
-        lineEdit_src = QtGui.QLineEdit()
-        lineEdit_dst = QtGui.QLineEdit()
+        layout_lineEdits = QHBoxLayout()
+        lineEdit_src = QLineEdit()
+        lineEdit_dst = QLineEdit()
         layout_lineEdits.addWidget( lineEdit_src )
         layout_lineEdits.addWidget( lineEdit_dst )
         
-        separator = QtGui.QFrame(); separator.setFrameShape( QtGui.QFrame.HLine )
+        separator = QFrame(); separator.setFrameShape( QFrame.HLine )
         
-        layout_buttons = QtGui.QHBoxLayout()
-        button_copyAndPast = QtGui.QPushButton( "Copy And Past" )
-        button_close  = QtGui.QPushButton( "Close" )
+        layout_buttons = QHBoxLayout()
+        button_copyAndPast = QPushButton( "Copy And Past" )
+        button_close  = QPushButton( "Close" )
         layout_buttons.addWidget( button_copyAndPast )
         layout_buttons.addWidget( button_close )
         
-        layout_labelsSecond = QtGui.QHBoxLayout()
-        label_src = QtGui.QLabel("Source transforms from copy target")
-        label_dst = QtGui.QLabel("Source transforms from cast target")
+        layout_labelsSecond = QHBoxLayout()
+        label_src = QLabel("Source transforms from copy target")
+        label_dst = QLabel("Source transforms from cast target")
         label_src.setAlignment( QtCore.Qt.AlignCenter )
         label_dst.setAlignment( QtCore.Qt.AlignCenter )
         layout_labelsSecond.addWidget( label_src )
         layout_labelsSecond.addWidget( label_dst )
         
-        layout_lineEditsSecond = QtGui.QHBoxLayout()
-        lineEdit_srcSecond = QtGui.QLineEdit()
-        lineEdit_dstSecond = QtGui.QLineEdit()
+        layout_lineEditsSecond = QHBoxLayout()
+        lineEdit_srcSecond = QLineEdit()
+        lineEdit_dstSecond = QLineEdit()
         layout_lineEditsSecond.addWidget( lineEdit_srcSecond )
         layout_lineEditsSecond.addWidget( lineEdit_dstSecond )
         
@@ -204,7 +193,7 @@ class Window( QtGui.QMainWindow ):
     def show( self, *args, **kwargs):
         
         self.loadUIInfo()
-        QtGui.QMainWindow.show( self, *args, **kwargs )
+        QMainWindow.show( self, *args, **kwargs )
     
     
     
@@ -249,7 +238,7 @@ class Window( QtGui.QMainWindow ):
             width, height = data['mainWindow']['size']
         except:
             return
-        desktop = QtGui.QApplication.desktop()
+        desktop = QApplication.desktop()
         desktopWidth = desktop.width()
         desktopHeight = desktop.height()
         
@@ -268,7 +257,7 @@ def show():
     if cmds.window( Window.objectName, ex=1 ):
         cmds.deleteUI( Window.objectName )
     
-    mayawin = shiboken.wrapInstance( long( OpenMayaUI.MQtUtil.mainWindow() ), QtGui.QWidget )
+    mayawin = shiboken.wrapInstance( long( OpenMayaUI.MQtUtil.mainWindow() ), QWidget )
     win = Window( mayawin )
     win.show()
 
