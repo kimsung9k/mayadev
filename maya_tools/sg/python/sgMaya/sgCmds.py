@@ -468,6 +468,49 @@ def addOptionAttribute( inputTarget, enumName = "Options" ):
 
 
 
+def getAttrInfo( inputTargetAttr ):
+
+    inputAttrInfo = sgModel.AttrInfo()
+
+    targetAttr = pymel.core.ls( inputTargetAttr )[0]
+    
+    inputAttrInfo.shortName = targetAttr.shortName()
+    inputAttrInfo.longName  = targetAttr.longName()
+    inputAttrInfo.type    = targetAttr.type()
+    inputAttrInfo.keyable = targetAttr.isKeyable()
+    inputAttrInfo.channelBox = targetAttr.isInChannelBox()
+    inputAttrInfo.lock = targetAttr.isLocked()
+    inputAttrInfo.range = targetAttr.getRange()
+    inputAttrInfo.defaultValue = pymel.core.attributeQuery( inputTargetAttr.attrName(), node=inputTargetAttr.node(), ld=1 )[0]
+    
+    if targetAttr.type() == 'enum':
+        inputAttrInfo.enums = targetAttr.getEnums()
+    return inputAttrInfo
+
+
+
+def createAttrByAttrInfo( attrInfo, inputNode ):
+    
+    node = pymel.core.ls( inputNode )[0]
+    try:
+        addAttr( node, ln= attrInfo.longName, sn= attrInfo.shortName, at=attrInfo.type, en=":", dv=attrInfo.defaultValue )
+    except:
+        try:addAttr( node, ln= attrInfo.longName, sn= attrInfo.shortName, at=attrInfo.type, dv=attrInfo.defaultValue )
+        except:pass
+        
+    nodeAttr = node.attr( attrInfo.longName )
+    if attrInfo.type in [ 'double' ]:
+        nodeAttr.setRange( attrInfo.range )
+    if attrInfo.channelBox:
+        nodeAttr.showInChannelBox(True)
+    if attrInfo.keyable:
+        nodeAttr.setKeyable(True)
+    if attrInfo.lock:
+        nodeAttr.set( lock=1 )
+
+
+
+
 
 def copyAttribute( inputSrc, inputDst, attrName ):
     
@@ -622,6 +665,50 @@ def createPointOnCurve( inputCurve, numPoints, **options ):
 
     return returnObjs
 
+
+
+
+
+def createNearestPointOnCurveObject( inputPointObj, inputCurve ):
+    
+    pointObj = pymel.core.ls( inputPointObj )[0]
+    curve    = pymel.core.ls( inputCurve )[0]
+    
+    nearPointOnCurve = pymel.core.createNode( 'nearestPointOnCurve' )
+    pointOnCurveInfo = pymel.core.createNode( 'pointOnCurveInfo' )
+
+    curve.getShape().worldSpace >> nearPointOnCurve.inputCurve
+    curve.getShape().worldSpace >> pointOnCurveInfo.inputCurve
+    dcmp = getDecomposeMatrix( pointObj )
+    dcmp.ot >> nearPointOnCurve.inPosition
+    nearPointOnCurve.parameter >> pointOnCurveInfo.parameter
+    
+    tangent = getMVector( pointOnCurveInfo.tangent.get() ) * getMMatrix( pointObj.wm.get() )
+    dirIndex = getDirectionIndex( tangent )
+    
+    args = [ None for i in range( 4 ) ]
+    upTrans = [0,0,0]
+    upTrans[ ( dirIndex + 1 )%3 ] = 1
+    vectorNodeUp = pymel.core.createNode( 'vectorProduct' )
+    vectorNodeUp.input1.set( upTrans )
+    vectorNodeUp.op.set( 3 )
+    inputPointObj.wm >> vectorNodeUp.matrix
+    
+    vectorNodeCross = getCrossVectorNode( pointOnCurveInfo, vectorNodeUp )
+    vectorNodeUp = getCrossVectorNode( vectorNodeCross, pointOnCurveInfo )
+    
+    args[ dirIndex % 3 ] = pointOnCurveInfo.tangent
+    args[ (dirIndex+1) % 3 ] = vectorNodeUp.output
+    args[ (dirIndex+2) % 3 ] = vectorNodeCross.output 
+    args[ 3 ] = nearPointOnCurve.position
+    
+    newTr = pymel.core.createNode( 'transform' )
+    fbf = getFbfMatrix( *args )
+    dcmp = getLocalDecomposeMatrix( fbf.o, newTr.pim )
+    dcmp.ot >> newTr.t
+    dcmp.outputRotate >> newTr.r
+    newTr.dh.set( 1 )
+    return newTr
 
 
 
@@ -966,7 +1053,7 @@ def blendTwoMatrixConnect( inputFirst, inputSecond, inputThird, **options ):
     second.wm >> wtAddMtx.i[1].m
     revNode.outputX >> wtAddMtx.i[0].w
     third.blend >> wtAddMtx.i[1].w
-    
+
     wtAddMtx.matrixSum >> multMtx.i[0]
     third.pim >> multMtx.i[1]
     
@@ -1901,18 +1988,32 @@ def copyWeightToSmoothedMesh( inputSrcMesh, inputSmoothedMesh, keepSrcVtx=False 
 
 
 
-def edgeStartAndEndWeightHammer( inputEdges, weightPercent=1.0, power=1.0 ):
+def edgeStartAndEndWeightHammer( inputEdges, power=1.0 ):
     
-    inputEdgeIndices = [ pymel.core.ls( inputEdge )[0].index() for inputEdge in inputEdges ]
-    orderedIndices = getOrderedEdgeLoopIndices( inputEdges[0] )
+    inputEdges = [ pymel.core.ls( inputEdge )[0] for inputEdge in inputEdges ]
+    inputEdgeIndices = [ inputEdge.index() for inputEdge in inputEdges ]
     
-    orderedInputIndices = []
-    for orderedIndex in orderedIndices:
-        if not orderedIndex in inputEdgeIndices: continue
-        orderedInputIndices.append( orderedIndex )
+    startEdge = None
+    for inputEdge in inputEdges:
+        indices = [ index for index in inputEdge.connectedEdges().indices() if index in inputEdgeIndices ]
+        if len( indices ) != 1: continue
+        startEdge = inputEdge
+        break
+
+    orderedEdges = [ startEdge ]
+    for i in range( len( inputEdges )-1 ):
+        connectedEdges = orderedEdges[-1].connectedEdges()
+        for connectedEdge in connectedEdges:
+            if not connectedEdge in inputEdges: continue
+            if connectedEdge in orderedEdges: continue
+            orderedEdges.append( connectedEdge )
+            break
     
-    mesh = pymel.core.ls( inputEdges[0] )[0].node()
+    orderedInputIndices = [ orderedEdge.index() for orderedEdge in orderedEdges ]
+    
+    mesh = inputEdges[0].node()
     srcMeshs = getNodeFromHistory( mesh, 'mesh' )
+    skinNode = getNodeFromHistory( mesh, 'skinCluster' )[0]
     
     origMesh = copy.copy( mesh )
     for srcMesh in srcMeshs:
@@ -1955,6 +2056,21 @@ def edgeStartAndEndWeightHammer( inputEdges, weightPercent=1.0, power=1.0 ):
     startPlugs = getWeightPlugFromSkinedVertex(startVtx)
     endPlugs   = getWeightPlugFromSkinedVertex(endVtx)
     
+    for startPlug in startPlugs:
+        print "start plug : ", startPlug, startPlug.get()
+    
+    for endPlug in endPlugs:
+        print "end plug : ", endPlug, endPlug.get()
+    
+    def getPoweredWeight( weightValue, powerValue ):
+        value = weightValue * 2 -1
+        negativeMult = 1.0
+        if value < 0: negativeMult = -1.0
+        value *= negativeMult
+        poweredValue = float( value ) ** 1.0/powerValue
+        return (poweredValue*negativeMult+ 1)/2
+        
+    
     for i in range( 1, len( orderedVtxIndices )-1 ):
         currentDist = reduce( lambda x, y : x+y, distList[:i] )
         targetVtx = mesh + '.vtx[%d]' % orderedVtxIndices[i]
@@ -1962,28 +2078,31 @@ def edgeStartAndEndWeightHammer( inputEdges, weightPercent=1.0, power=1.0 ):
         weightValue = currentDist/allDist
         revValue    = 1.0 - weightValue
         
+        poweredWeightValue = getPoweredWeight( weightValue, power )
+        poweredRevValue = getPoweredWeight( revValue, power )
+        
+        weightValue = poweredWeightValue/(poweredWeightValue+poweredRevValue)
+        revValue = poweredRevValue/(poweredWeightValue+poweredRevValue)
+        
         targetPlugArray = targetPlugs[0].array()
         
-        valueKeep = 1.0 - weightPercent
-        existsIndices = []
-        for targetPlug in targetPlugs:
-            targetPlug.set( valueKeep * targetPlug.get() )
-            existsIndices.append( targetPlug.index() )
+        for element in targetPlugArray.elements():
+            pymel.core.removeMultiInstance( skinNode + '.' + element )
         
+        existIndices = []
         for startPlug in startPlugs:
-            startIndex = startPlug.index()
-            if startIndex in existsIndices:
-                targetPlugArray[startIndex].set( targetPlugArray[startIndex].get() + revValue * startPlug.get() * weightPercent )
-            else:
-                targetPlugArray[startIndex].set( revValue * startPlug.get() * weightPercent )
-                existsIndices.append( startIndex )
+            plugIndex = startPlug.index()
+            targetPlugArray[plugIndex].set( revValue * startPlug.get() )
+            existIndices.append( plugIndex )
         
         for endPlug in endPlugs:
-            endIndex = endPlug.index()
-            if endIndex in existsIndices:
-                targetPlugArray[endIndex].set( targetPlugArray[endIndex].get() + weightValue * endPlug.get()* weightPercent )
+            plugIndex = endPlug.index()
+            if plugIndex in existIndices:
+                targetPlugArray[plugIndex].set( targetPlugArray[plugIndex].get() + weightValue * endPlug.get() )
             else:
-                targetPlugArray[endIndex].set( weightValue * endPlug.get() * weightPercent )
+                targetPlugArray[plugIndex].set( weightValue * endPlug.get() )
+    
+    pymel.core.skinCluster( skinNode, e=1, nw=1 )
 
         
 
@@ -2964,6 +3083,7 @@ def makeCloneObject( inputTarget, **options  ):
     op_cloneAttrName = 'iscloneObj'
     op_shapeOn       = False
     op_connectionOn  = False
+    op_searchSymmetry = False
     
     if options.has_key( 'cloneAttrName' ):
         op_cloneAttrName = options['cloneAttrName']
@@ -2972,11 +3092,12 @@ def makeCloneObject( inputTarget, **options  ):
         op_shapeOn = options['shapeOn']
     if options.has_key( 'connectionOn' ):
         op_connectionOn = options['connectionOn']
+    if options.has_key( 'searchSymmetry' ):
+        op_searchSymmetry = options['searchSymmetry']
     cloneLabel = op_cloneAttrName
 
     targets = target.getAllParents()
-    targets.reverse()
-    targets.append( target )
+    targets.insert( 0, target )
     
     def getSourceConnection( src, trg ):
         src = pymel.core.ls( src )[0]
@@ -2994,11 +3115,16 @@ def makeCloneObject( inputTarget, **options  ):
             if not cmds.isConnected( srcCon, destCon ):
                 cmds.connectAttr( srcCon, destCon, f=1 )
 
-    targetCloneParent = None
+    targetClones = []
     for cuTarget in targets:
         if not pymel.core.attributeQuery( op_cloneAttrName, node=cuTarget, ex=1 ):
             cuTarget.addAttr( op_cloneAttrName, at='message' )
         cloneConnection = cuTarget.attr( op_cloneAttrName ).listConnections(s=1, d=0 )
+        symmetryTargetStr = None
+        if op_searchSymmetry:
+            symmetryTargetStr = getOtherSideStr(cuTarget.name())
+            if pymel.core.objExists( symmetryTargetStr ):
+                cloneConnection = [pymel.core.ls( symmetryTargetStr )[0]]
         if not cloneConnection:
             targetClone = pymel.core.createNode( cuTarget.nodeType(), n= cuTarget.split( '|' )[-1]+ '_' + cloneLabel )
             targetClone.message >> cuTarget.attr( op_cloneAttrName )
@@ -3020,66 +3146,23 @@ def makeCloneObject( inputTarget, **options  ):
                 
                 if cuTargetShape and targetCloneShape:
                     getSourceConnection( cuTargetShape, targetCloneShape )
+
+            udAttrs = cmds.listAttr( cuTarget.name(), ud=1 )
+            for attr in udAttrs:
+                try:copyAttribute( cuTarget, targetClone, attr )
+                except:pass
+            targetClones.append( targetClone )
         else:
             targetClone = cloneConnection[0]
-        
-        udAttrs = cmds.listAttr( cuTarget.name(), ud=1 )
-        for attr in udAttrs:
-            try:copyAttribute( cuTarget, targetClone, attr )
-            except:pass
-        
-        targetCloneParentExpected = targetClone.getParent()
-        if targetCloneParent and targetCloneParentExpected != targetCloneParent:
-            pymel.core.parent( targetClone, targetCloneParent )
-
-        cuTargetPos = cuTarget.m.get()
-        pymel.core.xform( targetClone, os=1, matrix=cuTargetPos )
-
-        targetCloneParent = targetClone
-    return targetCloneParent
-
-
-
-
-def getAttrInfo( inputTargetAttr ):
-
-    inputAttrInfo = sgModel.AttrInfo()
-
-    targetAttr = pymel.core.ls( inputTargetAttr )[0]
+            targetClones.append( targetClone )
+            break
     
-    inputAttrInfo.shortName = targetAttr.shortName()
-    inputAttrInfo.longName  = targetAttr.longName()
-    inputAttrInfo.type    = targetAttr.type()
-    inputAttrInfo.keyable = targetAttr.isKeyable()
-    inputAttrInfo.channelBox = targetAttr.isInChannelBox()
-    inputAttrInfo.lock = targetAttr.isLocked()
-    inputAttrInfo.range = targetAttr.getRange()
-    inputAttrInfo.defaultValue = pymel.core.attributeQuery( inputTargetAttr.attrName(), node=inputTargetAttr.node(), ld=1 )[0]
+    cuTargets = targets[:len( targetClones )]
+    for i in range( len( targetClones )-1 ):
+        targetClones[i].setParent( targetClones[i+1] )
+        pymel.core.xform( targetClones[i], os=1, matrix=cuTargets[i].matrix.get() )
     
-    if targetAttr.type() == 'enum':
-        inputAttrInfo.enums = targetAttr.getEnums()
-    return inputAttrInfo
-
-
-
-def createAttrByAttrInfo( attrInfo, inputNode ):
-    
-    node = pymel.core.ls( inputNode )[0]
-    try:
-        addAttr( node, ln= attrInfo.longName, sn= attrInfo.shortName, at=attrInfo.type, en=":", dv=attrInfo.defaultValue )
-    except:
-        try:addAttr( node, ln= attrInfo.longName, sn= attrInfo.shortName, at=attrInfo.type, dv=attrInfo.defaultValue )
-        except:pass
-        
-    nodeAttr = node.attr( attrInfo.longName )
-    if nodeAttr.isnumeric():
-        nodeAttr.setRange( attrInfo.range )
-    if attrInfo.channelBox:
-        nodeAttr.showInChannelBox(True)
-    if attrInfo.keyable:
-        nodeAttr.setKeyable(True)
-    if attrInfo.lock:
-        nodeAttr.set( lock=1 )
+    return targetClones[0]
 
 
 
@@ -3228,12 +3311,12 @@ def addShapeToTarget( inputShapeNode, inputTransform ):
     elif shapeNode.nodeType() == 'nurbsCurve':
         oShape = OpenMaya.MFnNurbsCurve().copy( oShape, oTransform )
         fnCurve = OpenMaya.MFnNurbsCurve( oShape )
-        srcAttr = shapeNode.outMesh
+        srcAttr = shapeNode.local
         dstAttr = pymel.core.ls( fnCurve.name() + '.create' )[0]
     elif shapeNode.nodeType() == 'nurbsSurface':
         oShape = OpenMaya.MFnNurbsCurve().copy( oShape, oTransform )
         fnSurface = OpenMaya.MFnNurbsSurface( oShape )
-        srcAttr = shapeNode.outMesh
+        srcAttr = shapeNode.local
         dstAttr = pymel.core.ls( fnSurface.name() + '.create' )[0]
     
     trGeo = pymel.core.createNode( 'transformGeometry' )
@@ -3253,7 +3336,6 @@ def combineMultiShapes( inputTargetGrps ):
     newTransform = pymel.core.createNode( 'transform' )
     for targetShape in targetShapes:
         addedShape = addShapeToTarget( targetShape, newTransform )
-        print targetShape, addedShape
         copyShader( targetShape, addedShape )
     
     try:return pymel.core.polyUnite( newTransform, ch=0, mergeUVSets=1 )[0]
@@ -3914,11 +3996,11 @@ def mirrorControllerShape( inputTarget ):
     cvs = cmds.ls( target + '.cv[*]', fl=1 )
     poses = []
     for cv in cvs:
-        cvPoint = cmds.xform( cv, q=1, ws=1, t=1 )
+        cvPoint = cmds.xform( cv, q=1, os=1, t=1 )
         poses.append( cvPoint )
     otherCVs = cmds.ls( target.replace( targetName, othersideName ) + '.cv[*]', fl=1 )
     for i in range( len( otherCVs ) ):
-        cmds.move( -poses[i][0], poses[i][1], poses[i][2], otherCVs[i], ws=1 )
+        cmds.move( -poses[i][0], -poses[i][1], -poses[i][2], otherCVs[i], os=1 )
 
 
 
@@ -4050,6 +4132,8 @@ def vectorOutput( inputNode ):
         return node.attr( "output3D" )
     if nodeType == 'pointOnCurveInfo':
         return node.attr( "tangent" )
+    else:
+        return node
         
 
     
@@ -4086,6 +4170,11 @@ def getFbfMatrix( *args ):
     zAttrs[0] >> fbfMtx.attr('in20')
     zAttrs[1] >> fbfMtx.attr('in21')
     zAttrs[2] >> fbfMtx.attr('in22')
+    if len( args ) == 4:
+        pAttr = vectorOutput( args[3] ).children()
+        pAttr[0] >> fbfMtx.attr( 'in30' )
+        pAttr[1] >> fbfMtx.attr( 'in31' )
+        pAttr[2] >> fbfMtx.attr( 'in32' )
     
     return fbfMtx
 
@@ -4198,12 +4287,14 @@ def followIk( inputIkCtl, inputParents ):
     ikCtl = pymel.core.ls( inputIkCtl )[0]
     
     trList = []
+    nameList = []
     for inputParent in inputParents:
         targetParent = pymel.core.ls( inputParent )[0]
         ikPos = ikCtl.getParent().wm.get()
-        tr = pymel.core.createNode( 'transform', n='F' + targetParent )
+        tr = pymel.core.createNode( 'transform', n='F' + targetParent + '_for_' + inputIkCtl )
         tr.setParent( targetParent )
         trList.append( tr )
+        nameList.append( targetParent.name() )
         pymel.core.xform( tr, ws=1, matrix= ikPos )
     
     blendMatrix = pymel.core.createNode( 'wtAddMatrix' )
@@ -4229,14 +4320,14 @@ def followIk( inputIkCtl, inputParents ):
         cuPointer = trList[i]
         cuPointer.wm >> blendMatrix.i[i].m
         
-        try:ikCtl.addAttr( trList[i].name(), k=1, min=0, max=1, dv=0 )
+        try:ikCtl.addAttr( nameList[i], k=1, min=0, max=1, dv=0 )
         except:pass
         divWeight = pymel.core.createNode( 'multiplyDivide' ); divWeight.op.set( 2 )
-        ikCtl.attr( trList[i].name() ) >> divWeight.input1X
+        ikCtl.attr( nameList[i] ) >> divWeight.input1X
         divSumAttr >> divWeight.input2X
         divWeight.outputX >> blendMatrix.i[wIndex].w
         
-        ikCtl.attr( trList[i].name() ) >> sumWeight.input1D[ wIndex-1 ]
+        ikCtl.attr( nameList[i] ) >> sumWeight.input1D[ wIndex-1 ]
         wIndex += 1
     
     multMtx = pymel.core.createNode( 'multMatrix' )
@@ -5410,33 +5501,42 @@ def tangentContraint( inputCurve, inputUpObject, inputTarget ):
 
     curve    = pymel.core.ls( inputCurve )[0]
     upObject = pymel.core.ls( inputUpObject )[0]
-    target   = pymel.core.ls( inputTarget )[0]
+    target = pymel.core.ls( inputTarget )[0]
     
-    if curve.nodeType() == 'transform':
-        curveShape = curve.getShape()
-    else:
-        curveShape = curve
+    nearPointOnCurve = pymel.core.createNode( 'nearestPointOnCurve' )
+    pointOnCurveInfo = pymel.core.createNode( 'pointOnCurveInfo' )
+
+    curve.getShape().worldSpace >> nearPointOnCurve.inputCurve
+    curve.getShape().worldSpace >> pointOnCurveInfo.inputCurve
+    dcmp = getDecomposeMatrix( upObject.wm )
+    dcmp.ot >> nearPointOnCurve.inPosition
+    nearPointOnCurve.parameter >> pointOnCurveInfo.parameter
     
-    paramValue = getClosestParamAtPoint( target, curveShape )
-    curveInfo = pymel.core.createNode( 'pointOnCurveInfo' )
+    tangent = getMVector( pointOnCurveInfo.tangent.get() ) * getMMatrix( upObject.wm.get() ).inverse()
+    dirIndex = getDirectionIndex( tangent )
     
-    curveShape.worldSpace[0] >> curveInfo.inputCurve
-    curveInfo.parameter.set( paramValue )
+    args = [ None for i in range( 4 ) ]
+    upTrans = [0,0,0]
+    upTrans[ ( dirIndex + 1 )%3 ] = 1
+    vectorNodeUp = pymel.core.createNode( 'vectorProduct' )
+    vectorNodeUp.input1.set( upTrans )
+    vectorNodeUp.op.set( 3 )
+    upObject.wm >> vectorNodeUp.matrix
     
-    fnCurve = OpenMaya.MFnNurbsCurve( getDagPath( curveShape ) )
-    aimVector = fnCurve.tangent( paramValue, OpenMaya.MSpace.kWorld )
+    vectorNodeCross = getCrossVectorNode( pointOnCurveInfo, vectorNodeUp )
+    vectorNodeUp = getCrossVectorNode( vectorNodeCross, pointOnCurveInfo )
     
-    targetDagPath = getDagPath( inputTarget )
-    localAimVector = aimVector * targetDagPath.inclusiveMatrixInverse()
+    args[ dirIndex % 3 ] = pointOnCurveInfo.tangent
+    args[ (dirIndex+1) % 3 ] = vectorNodeUp.output
+    args[ (dirIndex+2) % 3 ] = vectorNodeCross.output 
+    args[ 3 ] = nearPointOnCurve.position
     
-    aimIndex = getDirectionIndex( localAimVector )
-    upIndex = (aimIndex+1) % 3
-    vectorList = [ [1,0,0], [0,1,0], [0,0,1], [-1,0,0], [0,-1,0], [0,0,-1] ]
+    newTr = pymel.core.createNode( 'transform' )
+    fbf = getFbfMatrix( *args )
+    dcmp = getLocalDecomposeMatrix( fbf.o, target.pim )
+    dcmp.ot >> newTr.t
+    dcmp.outputRotate >> target.r
     
-    aimVector = vectorList[ aimIndex ]
-    upVector = vectorList[ upIndex ]
-    
-    pymel.core.tangentConstraint( curve, target, aim= aimVector, u= upVector, wu= upVector, wut='objectrotation', wuo=upObject )
 
 
 
@@ -6267,13 +6367,26 @@ def constrainToCurve( curve, upObject, target ):
 
 
 
-def makeInterPointer( ctls ):
+def makeInterPointer( inputCtls ):
+    
+    ctls = [ pymel.core.ls( inputCtl )[0] for inputCtl in inputCtls ]
     
     interPointers = []
+    
+    pointerInverseMatrixObjects = []
+    for ctl in ctls:
+        tr = pymel.core.createNode( 'transform', n='invMtxObj_' + ctl.name() )
+        tr.setParent( ctl.getParent() )
+        ctl.t >> tr.t
+        pointerInverseMatrixObjects.append( tr )
+        tr.s.set( 1,1,1 )
+    
     for i in range( len( ctls )-1 ):
         
         firstCtl = ctls[i]
         secondCtl = ctls[i+1]
+        firstInvObj  = pointerInverseMatrixObjects[i]
+        secondInvObj = pointerInverseMatrixObjects[i+1]
         
         interPointer1 = pymel.core.createNode( 'transform' ); interPointer1.dh.set( 1 )
         interPointer2 = pymel.core.createNode( 'transform' ); interPointer2.dh.set( 1 )
@@ -6289,8 +6402,8 @@ def makeInterPointer( ctls ):
         interPointers.append( interPointer1 )
         interPointers.append( interPointer2 )
         
-        localDcmpPointer1 = getLocalDecomposeMatrix( secondCtl.wm, firstCtl.wim )
-        localDcmpPointer2 = getLocalDecomposeMatrix( firstCtl.wm, secondCtl.wim )
+        localDcmpPointer1 = getLocalDecomposeMatrix( secondInvObj.wm, firstInvObj.wim )
+        localDcmpPointer2 = getLocalDecomposeMatrix( firstInvObj.wm,  secondInvObj.wim )
         
         dirIndex1 = getDirectionIndex( localDcmpPointer1.ot.get() ) % 3
         dirIndex2 = getDirectionIndex( localDcmpPointer2.ot.get() ) % 3
@@ -6301,8 +6414,8 @@ def makeInterPointer( ctls ):
         localDcmpPointer1.ot >> multNode1.input1
         localDcmpPointer2.ot >> multNode2.input1
         
-        multValues1 = [0,0,0]; multValues1[ dirIndex1 ] = 0.25
-        multValues2 = [0,0,0]; multValues2[ dirIndex2 ] = 0.25
+        multValues1 = [0,0,0]; multValues1[ dirIndex1 ] = 0.3
+        multValues2 = [0,0,0]; multValues2[ dirIndex2 ] = 0.3
         
         multNode1.input2.set( multValues1 )
         multNode2.input2.set( multValues2 )
@@ -6462,15 +6575,32 @@ def makeMirrorTransform( inputTrTarget ):
         copyShapeToTransform( shape, mirrorTransform )
         reverseShape( mirrorTransform.getShape() )
     
-    return mirrorTransform
+    targetParent = trTarget.getParent()
+    otherSideParentStr = getOtherSideStr( targetParent.name())
+    if pymel.core.objExists( otherSideParentStr ):
+        pymel.core.parent( mirrorTransform, otherSideParentStr )
     
+    return mirrorTransform
+
+
+
+
+
+def deleteAttr( node, attr ):
+    if not pymel.core.attributeQuery( attr, node=node, ex=1 ): return None
+    pymel.core.deleteAttr( node + '.' + attr )
+
 
 
 
 def makeMirrorTransformWithHierarchy( inputTrTarget, cloneAttrName = 'mirrorH' ):
     
     trTarget = pymel.core.ls( inputTrTarget )[0]
-    cloneObj = makeCloneObject( inputTrTarget, cloneAttrName = cloneAttrName )
+    otherSideObjStr = getOtherSideStr( trTarget.name() )
+    if pymel.core.objExists( otherSideObjStr ):
+        cloneObj = pymel.core.ls( otherSideObjStr )[0]
+    else:
+        cloneObj = makeCloneObject( inputTrTarget, cloneAttrName = cloneAttrName, searchSymmetry=True )
     cloneParents = cloneObj.getAllParents()
     cloneParents.reverse()
     cloneParents.append( cloneObj )
@@ -6483,8 +6613,10 @@ def makeMirrorTransformWithHierarchy( inputTrTarget, cloneAttrName = 'mirrorH' )
             cloneParent.rename( getOtherSideStr(srcTarget.shortName()) )
             mirrorMatrix = matrixToList( getMirrorMatrix( getMMatrix( srcTarget.wm ) ) )
             pymel.core.xform( cloneParent, ws=1, matrix=mirrorMatrix )
-    cloneObj.dh.set( trTarget.dh.get() )
-    cloneObj.v.set( trTarget.v.get() )
+    try:cloneObj.dh.set( trTarget.dh.get() )
+    except:pass
+    try:cloneObj.v.set( trTarget.v.get() )
+    except:pass
     
     for shape in trTarget.listRelatives( s=1 ):
         if shape.io.get(): continue
@@ -6869,4 +7001,12 @@ def getLocalMapFolder():
 
 
 
+def printCurvePoints( crv ):
+
+    crvShape = getShape( crv )
+    returnStr = "["
+    for i in range( crvShape.numCVs() ):
+        returnStr += str( crvShape.controlPoints[i].get() ) + ",\n"
+    returnStr = returnStr[:-2] + "]"
+    print returnStr
 

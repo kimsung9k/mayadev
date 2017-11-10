@@ -1,4 +1,5 @@
 #include "sgSmoothWeightCommand.h"
+#include "SGPrintf.h"
 
 MObject sgSmoothWeightCommand::m_oSkinCluster;
 MDagPath sgSmoothWeightCommand::m_pathMesh;
@@ -233,10 +234,16 @@ void sgSmoothWeightCommand::editAfterValueByWeight( MIntArray& indicesBefore, MF
 void sgSmoothWeightCommand::setWeightValue( MPlug& plugWeightList,
 		                        const MIntArray& indices, const MFloatArray& values )
 {
+	int numElement = plugWeightList.array().numElements();
+	if (numElement <= plugWeightList.logicalIndex()) {
+		return;
+	}
+
 	MPlug plugWeights = plugWeightList.child(0);
 
 	MIntArray beforeIndices;
 	MFloatArray beforeValues;
+
 	for( int i=0; i< plugWeights.numElements(); i++ )
 	{
 		beforeIndices.append( plugWeights[i].logicalIndex() );

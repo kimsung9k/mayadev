@@ -1,6 +1,7 @@
 #include "sgSmoothWeightCommand.h"
 
 #include <maya/MGlobal.h>
+#include "SGPrintf.h"
 
 
 MSyntax sgSmoothWeightCommand::newSyntax()
@@ -58,7 +59,6 @@ MStatus sgSmoothWeightCommand::doIt( const MArgList& argList )
 MStatus sgSmoothWeightCommand::redoIt()
 {
 	MStatus status;
-
 	setWeightValue( m_plugWeightList.elementByLogicalIndex( m_index ),
 		m_indicesAfter, m_valuesAfter );
 
@@ -69,11 +69,10 @@ MStatus sgSmoothWeightCommand::redoIt()
 MStatus sgSmoothWeightCommand::undoIt()
 {
 	MStatus status;
-
+	
 	setWeightValue( m_plugWeightList.elementByLogicalIndex( m_index ),
 		m_indicesBefore, m_valuesBefore );
 	removeMultiInstance( m_indicesBefore, m_indicesAfter );
-
 	return MS::kSuccess;
 }
 

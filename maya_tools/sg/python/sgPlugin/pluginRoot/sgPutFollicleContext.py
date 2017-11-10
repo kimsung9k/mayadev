@@ -5,8 +5,6 @@ import maya.OpenMayaUI as OpenMayaUI
 import maya.OpenMayaMPx as OpenMayaMPx
 
 import maya.OpenMayaUI
-from PySide import QtGui, QtCore
-import shiboken
 
 
 
@@ -42,50 +40,6 @@ class Tool_global:
     mouseY = 0
     currentGlWidget = None
     currentEventFilter = None
-
-
-
-def getMayaWindowPtr():
-    return shiboken.wrapInstance( long( maya.OpenMayaUI.MQtUtil.mainWindow() ), QtGui.QWidget )
-
-
-
-class MainWindowEventFilter(QtCore.QObject):
-    
-    def __init__(self):
-        QtCore.QObject.__init__(self)
-
-    def eventFilter(self, obj, event):
-        
-        focusWidget = QtGui.QApplication.focusWidget()
-
-        widgetChildren = focusWidget.children()
-        
-        glWidget = None
-        
-        for widgetObj in widgetChildren:
-            widgetChildren2 = widgetObj.children()
-            if not len( widgetChildren2 ): continue
-            for widgetObj2 in widgetChildren2:
-                if widgetObj2.metaObject().className() != "QmayaGLWidget": continue
-                glWidget = widgetObj2
-                break
-            if glWidget: break
-        
-        if not glWidget:
-            if Tool_global.currentGlWidget:
-                #print "remove event filter"
-                Tool_global.currentGlWidget.removeEventFilter( Tool_global.currentEventFilter )
-                Tool_global.currentGlWidget = None
-        else:
-            if Tool_global.currentGlWidget != glWidget:
-                if Tool_global.currentGlWidget:
-                    #print "remove event filter"
-                    Tool_global.currentGlWidget.removeEventFilter( Tool_global.currentEventFilter )
-                #print "create event filter"
-                Tool_global.currentGlWidget = glWidget
-                Tool_global.currentGlWidget.installEventFilter( Tool_global.currentEventFilter )
-        return False
 
 
 

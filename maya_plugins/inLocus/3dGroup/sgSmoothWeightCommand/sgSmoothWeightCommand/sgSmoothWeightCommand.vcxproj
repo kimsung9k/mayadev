@@ -15,10 +15,12 @@
     <None Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="SGPrintf.h" />
     <ClInclude Include="sgSmoothWeightCommand.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pluginMain.cpp" />
+    <ClCompile Include="SGPrintf.cpp" />
     <ClCompile Include="sgSmoothWeightCommand.cpp" />
     <ClCompile Include="sgSmoothWeightCommand_def.cpp" />
   </ItemGroup>
@@ -104,7 +106,7 @@
       <ExceptionHandling>Sync</ExceptionHandling>
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <AdditionalOptions>%(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>.;C:\Program Files\Autodesk\Maya2017\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.;C:\Program Files\Autodesk\Maya2015\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeaderOutputFile>$(Configuration)\sgSmoothWeightCommand.pch</PrecompiledHeaderOutputFile>
     </ClCompile>
     <Link>
@@ -115,7 +117,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>Foundation.lib;OpenMaya.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\Program Files\Autodesk\Maya2017\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Program Files\Autodesk\Maya2015\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <OutputFile>$(Configuration)\sgSmoothWeightCommand.mll</OutputFile>
       <ImportLibrary>$(Configuration)\sgSmoothWeightCommand.lib</ImportLibrary>
       <ProgramDatabaseFile>$(Configuration)\sgSmoothWeightCommand.pdb</ProgramDatabaseFile>

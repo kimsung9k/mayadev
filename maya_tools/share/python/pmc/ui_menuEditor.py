@@ -27,24 +27,29 @@ class Cmds():
             if ntpath.split( orderedTargetPaths[i] )[-1].split( '.' )[0].isdigit():
                 extension = os.path.splitext( orderedTargetPaths[i] )[-1]
                 renameTargets.append( orderedTargetPaths[i] )
+            else:
+                renameTargets.append( None )
         
         tempTargets = []
         for i in range( len( renameTargets ) ):
+            tempTargets.append( None )
+            if not renameTargets[i]: continue
             folderName, fileName = ntpath.split( renameTargets[i] )
             fileSplits = [ splitName for splitName in fileName.split( '.' ) if splitName ]
             replacedFileName = '%02d..' % (i+1) + '.'.join( fileSplits[1:] )
             tempName = folderName + '/' + replacedFileName
             try:
                 os.rename( renameTargets[i], tempName )
-                tempTargets.append( tempName )
+                tempTargets[-1] = tempName
             except:
-                print "failed to rename : ", replacedFileName
-                tempTargets.append( None )
+                pass
             
         
         resultNames = []
         for i in range( len( tempTargets ) ):
-            if not tempTargets[i]: resultNames.append( None ); continue
+            if not tempTargets[i]:
+                resultNames.append( None )
+                continue
             folderName, fileName = ntpath.split( tempTargets[i] )
             fileSplits = [ splitName for splitName in fileName.split( '.' ) if splitName ]
             replacedFileName = '%02d.' % (i+1) + '.'.join( fileSplits[1:] )
@@ -55,7 +60,7 @@ class Cmds():
             except:
                 print "failed to rename : ", resultName
                 resultNames.append( None )
-            
+        
         return resultNames
 
 
@@ -92,7 +97,62 @@ class Cmds():
     def getSeparatedRPAndRPPosition( cleanName ):
         
         print cleanName
+    
+    
+    
+    @staticmethod
+    def loadMenuList( targetPath, menuHIndex ):
         
+        removeTargetWidgets = []
+        for i in range( menuHIndex, Window.mainui.layoutListWidget.count() ):
+            removeTargetWidgets.append( Window.mainui.layoutListWidget.itemAt( i ).widget() )
+        
+        for removeTargetWidget in removeTargetWidgets:
+            removeTargetWidget.setParent( None )
+        
+        listWidget = MenuListWidget( targetPath )
+        listWidget.setSizePolicy( Window.mainui.listWidgetSizePolicy )
+        Window.mainui.layoutListWidget.addWidget( listWidget )
+        listWidget.loadMenu()
+        
+        def cmd_itemClickedEvent( *args ):
+            listWidgetItem = args[0]
+            listWidget = listWidgetItem.listWidget()
+            if os.path.isfile( listWidgetItem.targetPath ):
+                Cmds.showScript( listWidgetItem.targetPath, listWidget.menuHIndex+1 )
+            elif os.path.isdir( listWidgetItem.targetPath ):
+                listWidget.nextWidget = Cmds.loadMenuList( listWidgetItem.targetPath, listWidget.menuHIndex+1 )
+        
+        listWidget.itemClicked.connect( cmd_itemClickedEvent )
+        listWidget.menuHIndex = menuHIndex
+        Window.mainui.scriptTextEdit.setText( "" )
+        Window.mainui.setButtonDisabled()
+        
+        return listWidget
+        
+
+
+    @staticmethod
+    def showScript( targetPath, menuHIndex ):
+        
+        removeTargetWidgets = []
+        for i in range( menuHIndex, Window.mainui.layoutListWidget.count() ):
+            removeTargetWidgets.append( Window.mainui.layoutListWidget.itemAt( i ).widget() )
+        
+        for removeTargetWidget in removeTargetWidgets:
+            removeTargetWidget.setParent( None )
+        
+        if not os.path.exists( targetPath ) or not os.path.isfile( targetPath ): return None
+        f = open( targetPath, 'r' )
+        data = f.read()
+        f.close()
+        Window.mainui.scriptTextEdit.setText( data )
+        Window.mainui.setButtonDisabled()
+        
+        Window.mainui.currentScriptPath = targetPath
+        Window.mainui.defaultTextValue = data
+        Window.mainui.currentMenuHIndex = menuHIndex
+
 
 
 
@@ -400,7 +460,7 @@ class MenuListWidget( QListWidget ):
         items = filter( lambda x:x[0], [ [StringEdit.convertFilenameToMenuname(shortname), fullname] for shortname, fullname in items] )
         
         resultNames = Cmds.renamePaths( [fullName for shortName, fullName in items ] )
-        #print "resultNames length : ", len( resultNames )
+        
         for i in range( len( items ) ):
             items[i][1] = resultNames[i]
         
@@ -457,12 +517,21 @@ class MenuListWidget( QListWidget ):
         
         layout.addLayout( layout_name )
         layout.addLayout( layout_buttons )
-        
         dialog.show()
         
         def cmd_rename():
-            lineEdit_name.text()
+            targetName = lineEdit_name.text()
+            dirName = os.path.dirname( selItem.targetPath )
+            fileName = ntpath.split( selItem.targetPath )[-1]
+            index = fileName.split( '.' )[0]
+            if os.path.isfile( selItem.targetPath ):
+                ext = os.path.splitext( selItem.targetPath )[-1]
+                resultPath = dirName + '/' + index + '.' + targetName + ext
+            else:
+                resultPath = dirName + '/' + index + '.' + targetName
+            os.rename( selItem.targetPath, resultPath )
             dialog.close()
+            Cmds.loadMenuList( os.path.dirname( selItem.targetPath ), self.menuHIndex )
         
         def cmd_close():
             dialog.close()
@@ -563,9 +632,13 @@ class Window( QMainWindow ):
     uiInfoPath = infoBaseDir + '/uiInfo.json'
     defaultMenuPath = infoBaseDir + '/defaultMenuPath.txt'
     defaultSearchPath = infoBaseDir + '/defaultSearchPath.txt'
+    
+    mainui = None
 
 
     def __init__(self, *args, **kwargs ):
+        
+        Window.mainui = self
         
         QMainWindow.__init__( self, *args, **kwargs )
         self.installEventFilter( self )
@@ -647,7 +720,7 @@ class Window( QMainWindow ):
         self.loadUIInfo()
         self.lineEdit_menuPath.setText( FileAndPaths.getStringDataFromFile( Window.defaultMenuPath ) )
         if os.path.exists( self.lineEdit_menuPath.text() ):
-            self.loadMenuList( self.lineEdit_menuPath.text(), 0 )
+            Cmds.loadMenuList( self.lineEdit_menuPath.text(), 0 )
         QMainWindow.show( self, *args, **kwangs )
 
 
@@ -737,61 +810,7 @@ class Window( QMainWindow ):
         FileAndPaths.setStringDataToFile( menuPath, Window.defaultMenuPath )
         self.lineEdit_menuPath.setText( FileAndPaths.getStringDataFromFile( Window.defaultMenuPath ) )
         if os.path.exists( self.lineEdit_menuPath.text() ):
-            self.loadMenuList( self.lineEdit_menuPath.text(), 0 )
-    
-
-
-    def loadMenuList(self, targetPath, menuHIndex ):
-        
-        removeTargetWidgets = []
-        for i in range( menuHIndex, self.layoutListWidget.count() ):
-            removeTargetWidgets.append( self.layoutListWidget.itemAt( i ).widget() )
-        
-        for removeTargetWidget in removeTargetWidgets:
-            removeTargetWidget.setParent( None )
-        
-        listWidget = MenuListWidget( targetPath )
-        listWidget.setSizePolicy( self.listWidgetSizePolicy )
-        self.layoutListWidget.addWidget( listWidget )
-        listWidget.loadMenu()
-        
-        def cmd_itemClickedEvent( *args ):
-            listWidgetItem = args[0]
-            listWidget = listWidgetItem.listWidget()
-            if os.path.isfile( listWidgetItem.targetPath ):
-                print "target path : ", listWidgetItem.targetPath
-                self.showScript( listWidgetItem.targetPath, listWidget.menuHIndex+1 )
-            elif os.path.isdir( listWidgetItem.targetPath ):
-                listWidget.nextWidget = self.loadMenuList( listWidgetItem.targetPath, listWidget.menuHIndex+1 )
-        
-        listWidget.itemClicked.connect( cmd_itemClickedEvent )
-        listWidget.menuHIndex = menuHIndex
-        self.scriptTextEdit.setText( "" )
-        self.setButtonDisabled()
-        
-        return listWidget
-        
-
-
-    def showScript(self, targetPath, menuHIndex ):
-        
-        removeTargetWidgets = []
-        for i in range( menuHIndex, self.layoutListWidget.count() ):
-            removeTargetWidgets.append( self.layoutListWidget.itemAt( i ).widget() )
-        
-        for removeTargetWidget in removeTargetWidgets:
-            removeTargetWidget.setParent( None )
-        
-        if not os.path.exists( targetPath ) or not os.path.isfile( targetPath ): return None
-        f = open( targetPath, 'r' )
-        data = f.read()
-        f.close()
-        self.scriptTextEdit.setText( data )
-        self.setButtonDisabled()
-        
-        self.currentScriptPath = targetPath
-        self.defaultTextValue = data
-        self.currentMenuHIndex = menuHIndex
+            Cmds.loadMenuList( self.lineEdit_menuPath.text(), 0 )
     
     
     

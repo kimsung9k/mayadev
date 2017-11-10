@@ -116,9 +116,140 @@ class NetControlRig:
                     
                     
                     
-                    
-                    
+class SplineRig:
+    
+    def __init__(self, topJoint ):
+        
+        self.topJoint = pymel.core.ls( topJoint )[0]
+        self.jointH = self.topJoint.listRelatives( c=1, ad=1, type='joint' )
+        self.jointH.append( self.topJoint )
+        self.jointH.reverse()
+    
+    
+    def createSplineCurve(self):
+        
+        poses = []
+        for jnt in self.jointH:
+            pos = pymel.core.xform( jnt, q=1, ws=1, t=1 )
+            poses.append( pos )
+        
+        curve = pymel.core.curve( ep=poses, d=3 )
+        return curve
+    
+    
+    def assignToCurve(self, inputCurve ):
+        
+        curve = pymel.core.ls( inputCurve )[0]
+        return pymel.core.ikHandle( sj=self.topJoint, ee=self.jointH[-1], sol="ikSplineSolver", ccv=False, pcv=False, curve=curve )[0]
+        
+        
+        
+
+
+class IkDetailJoint:
+
+    def __init__( self, baseJoint, targetJoint ):
+        
+        self.baseJoint   = pymel.core.ls( baseJoint )[0]
+        self.targetJoint = pymel.core.ls( targetJoint )[0]
+        self.joints = []
+    
+        localMtx = getLocalMatrix( self.targetJoint.wm, self.baseJoint.wim )
+        upVectorStart = pymel.core.createNode( 'vectorProduct' ); upVectorStart.op.set( 3 )
+        upVectorEnd   = pymel.core.createNode( 'vectorProduct' ); upVectorEnd.op.set( 3 )
+        directionIndex = getDirectionIndex( [localMtx.o.get().a30, localMtx.o.get().a31, localMtx.o.get().a32] )
+        upVector = getVectorList()[(directionIndex+1)%6]
+        upVectorStart.input1.set( upVector )
+        upVectorEnd.input1.set( upVector )
+        localMtx.o >> upVectorEnd.matrix
+        
+        self.aimIndex = ( directionIndex ) % 3
+        self.upIndex  = ( directionIndex + 1 ) % 3
+        self.crossIndex = ( directionIndex + 2 ) % 3
+        self.upVectorStart = upVectorStart
+        self.upVectorEnd   = upVectorEnd
+        self.reverseVector = False
+        if directionIndex >= 3:
+            self.reverseVector = True
+
+
+    def makeCurve(self):
+        
+        crvGrp = pymel.core.createNode( 'transform', n='CrvGrp_'+self.baseJoint )
+        crv = pymel.core.curve( p=[[0,0,0],[0,0,0]], n='Crv_'+self.baseJoint, d=1 )
+        crv.setParent( crvGrp )
+        dcmp = getLocalDecomposeMatrix( self.targetJoint.wm, self.baseJoint.wim )
+        dcmp.ot >> crv.getShape().controlPoints[1]
+        constrain_all( self.baseJoint, crvGrp )
+        self.baseGrp = crvGrp
+        self.curve = crv
+
+
+
+    def addJointAtParam(self, paramValue ):
+        
+        pointOnCurveInfo = pymel.core.createNode( 'pointOnCurveInfo' )
+        self.curve.getShape().local >> pointOnCurveInfo.inputCurve
+        pointOnCurveInfo.top.set( 1 )
+        pymel.core.select( self.baseGrp )
+        newJoint = pymel.core.joint()
+        addAttr( newJoint, ln='param', min=0, max=1, dv=paramValue, k=1 )
+        newJoint.attr( 'param' ) >> pointOnCurveInfo.parameter
+        
+        fbfMtx = pymel.core.createNode( 'fourByFourMatrix' )
+        
+        def getMultVector( outputAttr, reverse ):
+            multVector = pymel.core.createNode( 'multiplyDivide' )
+            outputAttr >> multVector.input1
+            if reverse:
+                multVector.input2.set( -1, -1, -1 )
+            else:
+                multVector.input2.set( 1,1,1 )
+            return multVector
+        
+        aimMultVector = getMultVector( pointOnCurveInfo.tangent, self.reverseVector )
+        
+        aimMultVector.outputX >> fbfMtx.attr( 'in%d0' % self.aimIndex )
+        aimMultVector.outputY >> fbfMtx.attr( 'in%d1' % self.aimIndex )
+        aimMultVector.outputZ >> fbfMtx.attr( 'in%d2' % self.aimIndex )   
+        
+        blendColor = pymel.core.createNode( 'blendColors' )
+        self.upVectorEnd.output >> blendColor.color1
+        self.upVectorStart.output >> blendColor.color2
+        newJoint.param >> blendColor.blender
+        
+        upMultVector = getMultVector( blendColor.output, self.reverseVector )
+        
+        upMultVector.outputX >> fbfMtx.attr( 'in%d0' % self.upIndex )
+        upMultVector.outputY >> fbfMtx.attr( 'in%d1' % self.upIndex )
+        upMultVector.outputZ >> fbfMtx.attr( 'in%d2' % self.upIndex )
+        
+        print self.aimIndex, self.upIndex, self.crossIndex
+        
+        crossVector = getCrossVectorNode( aimMultVector.output, upMultVector.output )
+        
+        crossVector.outputX >> fbfMtx.attr( 'in%d0' % self.crossIndex )
+        crossVector.outputY >> fbfMtx.attr( 'in%d1' % self.crossIndex )
+        crossVector.outputZ >> fbfMtx.attr( 'in%d2' % self.crossIndex )
+        
+        pointOnCurveInfo.positionX >> fbfMtx.in30
+        pointOnCurveInfo.positionY >> fbfMtx.in31
+        pointOnCurveInfo.positionZ >> fbfMtx.in32
+        
+        dcmp = getDecomposeMatrix( fbfMtx.output )
+        dcmp.ot >> newJoint.t
+        dcmp.outputRotate >> newJoint.r
+        
+        self.joints.append( newJoint )
+    
+    
+    def renameJoints(self, name ):
+        
+        for i in range( len( self.joints ) ):
+            self.joints[i].rename( name + '_%02d' % i )
             
             
-            
-                    
+        
+        
+
+

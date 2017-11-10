@@ -254,6 +254,7 @@ class Window( QMainWindow ):
         enableReference = commands.QueryCmds.isEnableReference( targetPath_inServer, targetPath_inLocal )
         enableExportReferenceInfo = commands.QueryCmds.isEnableExportReferneceInfo( targetPath_inLocal )
         enableFileDownload = commands.QueryCmds.isEnableFileDownload( targetPath_inServer )
+        enableBackup = commands.QueryCmds.isEnableBackup( targetPath_inLocal )
         
         if enableOpenFile: 
             menu.addAction("파일열기".decode( 'utf-8'), commands.ContextMenuCmds.loadFile_local )
@@ -267,6 +268,8 @@ class Window( QMainWindow ):
             menu.addAction("업로드( +레퍼런스 정보 )".decode( 'utf-8'), commands.ContextMenuCmds.upload )
         else:
             menu.addAction("업로드".decode( 'utf-8'), commands.ContextMenuCmds.upload )
+        if enableBackup:
+            menu.addAction( "백업".decode( 'utf-8' ), commands.ContextMenuCmds.backup )
         separator = QAction( self ); separator.setSeparator( True );menu.addAction( separator )
         #if enableOpenFile: menu.addAction("파일열기( 서버 )".decode( 'utf-8'), commands.ContextMenuCmds.loadFile_server )
         menu.addAction("폴더열기( 서버 )".decode( 'utf-8'), commands.ContextMenuCmds.openFileBrowser_server )

@@ -10,7 +10,6 @@ import os, json
 
 class Cmds:
     
-    
     @staticmethod
     def makeFolder( pathName ):
         
@@ -116,6 +115,39 @@ class Cmds:
             
         button1.clicked.connect( cmd_change )
         button2.clicked.connect( cmd_close )
+    
+    
+    @staticmethod
+    def replace():
+        
+        furAttrAndValueList = Cmds.getFurAttrAndValueList()
+        
+        srcText = Win.currentWin.replaceStringWidget.srcLineEdit.text()
+        dstText = Win.currentWin.replaceStringWidget.dstLineEdit.text()
+        
+        if not srcText: return None
+        
+        for attr, value in furAttrAndValueList:
+            pymel.core.setAttr( attr, value.replace( srcText, dstText ), type='string' )
+        
+        Cmds.updateFurAttrWidgetList()
+    
+    
+    @staticmethod
+    def setToLocalMapFolder():
+        
+        import ntpath
+        
+        furAttrAndValueList = Cmds.getFurAttrAndValueList()
+        
+        scenePath = cmds.file( q=1, sceneName=1 )
+        mapFolder = os.path.dirname( scenePath ) + '/maps'
+        
+        for attr, value in furAttrAndValueList:
+            fileName = ntpath.split( value )[-1]
+            pymel.core.setAttr( attr, mapFolder + '/' + fileName, type='string' )
+        
+        Cmds.updateFurAttrWidgetList()
             
     
 
@@ -157,6 +189,45 @@ class FurAttrListWidget( QTreeWidget ):
         
 
 
+class WidgetReplaceString( QWidget ):
+    
+    def __init__(self, *args, **kwargs ):
+        
+        QWidget.__init__( self, *args, **kwargs )
+        
+        layout = QVBoxLayout( self )
+        srcLayout = QHBoxLayout()
+        dstLayout = QHBoxLayout()
+        
+        mainDesLabel = QLabel( "Replace Path string All" )
+        mainDesLabel.setAlignment( QtCore.Qt.AlignCenter )
+        
+        srcDesLabel = QLabel( "Source String : ")
+        dstDesLabel = QLabel( "Dest String : ")
+        srcLineEdit = QLineEdit()
+        dstLineEdit = QLineEdit()
+        buttonReplace = QPushButton( 'Replace' )
+        buttonSetToLocalMapFolder = QPushButton( 'Set to local map folder' )
+        
+        srcLayout.addWidget( srcDesLabel )
+        srcLayout.addWidget( srcLineEdit )
+        dstLayout.addWidget( dstDesLabel )
+        dstLayout.addWidget( dstLineEdit )
+        
+        layout.addWidget( buttonSetToLocalMapFolder )
+        layout.addWidget( mainDesLabel )
+        layout.addLayout( srcLayout )
+        layout.addLayout( dstLayout )
+        layout.addWidget( buttonReplace )
+        
+        QtCore.QObject.connect( buttonReplace, QtCore.SIGNAL('clicked()'), Cmds.replace )
+        QtCore.QObject.connect( buttonSetToLocalMapFolder, QtCore.SIGNAL('clicked()'), Cmds.setToLocalMapFolder )
+        
+        self.srcLineEdit = srcLineEdit
+        self.dstLineEdit = dstLineEdit
+        
+
+
 
 
 class Win(QDialog):
@@ -185,13 +256,16 @@ class Win(QDialog):
         layout = QVBoxLayout( self )
         
         furAttrListWidget = FurAttrListWidget()
+        replaceStringWidget = WidgetReplaceString()
 
         closeButton = QPushButton( 'Close' )
         
         layout.addWidget( furAttrListWidget )
+        layout.addWidget( replaceStringWidget )
         layout.addWidget( closeButton )
         
         self.furAttrListWidget = furAttrListWidget
+        self.replaceStringWidget = replaceStringWidget
         
         QtCore.QObject.connect( closeButton, QtCore.SIGNAL('clicked()'), self.close )
     

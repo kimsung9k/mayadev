@@ -1,9 +1,15 @@
 from sgModules import sgcommands
 import maya.cmds as cmds
+import pymel.core
 
 sels = cmds.ls( sl=1 )
 for sel in sels:
-    cmds.select( sel )
+    pymelSel = pymel.core.ls( sel )[0]
+    pymelSel.rotatePivot.set( 0,0,0 )
+    pymelSel.scalePivot.set( 0,0,0 )
+    pymelSel.rotatePivotTranslate.set( 0,0,0 )
+    pymelSel.scalePivotTranslate.set( 0,0,0 )
+    
     cmds.DeleteHistory()
     pivMtx = sgcommands.getPivotMatrix( sel )
     worldMtx = sgcommands.listToMatrix( cmds.getAttr( sel + '.wm' ) )
@@ -12,11 +18,6 @@ for sel in sels:
     cmds.xform( tempTr, ws=1, matrix=sgcommands.matrixToList( worldPivMtx ) )
     sgcommands.setGeometryMatrixToTarget( sel, tempTr )
     cmds.delete( tempTr )
+    
 cmds.select( sels )
 cmds.DeleteHistory()
-
-for sel in sels:
-    selShape = cmds.listRelatives( sel, s=1, f=1 )[0]
-    engine = cmds.listConnections( selShape, type='shadingEngine' )
-    if not engine: continue
-    cmds.sets( sel, e=1, forceElement = engine[0] )

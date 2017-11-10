@@ -252,6 +252,14 @@ class QueryCmds:
         if scenePath != targetPath: return False
         if not cmds.ls( type='reference' ): return False
         return True
+    
+    
+    @staticmethod
+    def isEnableBackup( targetPath ):
+        
+        if not os.path.exists(targetPath): return False
+        return True
+        
 
 
 
@@ -582,9 +590,9 @@ class FileControl:
         import shutil
         FileControl.makeFolder( os.path.dirname( dstFullPath ) )
         if os.path.exists( dstFullPath ):
-            shutil.copy2( dstFullPath, FileControl.getBackupPath( dstFullPath ) )
+            shutil.copy2( dstFullPath, FileControl.getBackupPath( srcFullPath ) )
         shutil.copy2( srcFullPath, dstFullPath )
-        shutil.copy2( srcFullPath, FileControl.getBackupPath( dstFullPath ) )
+        shutil.copy2( srcFullPath, FileControl.getBackupPath( srcFullPath ) )
     
 
     
@@ -874,15 +882,7 @@ class ContextMenuCmds:
                         FileControl.downloadFile( serverFullPath, localFullPath )
                         EditorCmds.setEditorInfo( serverEditor, localFullPath )
             else:
-                txDownload = "다운받고 열기".decode( "utf-8" )
-                txJustOpen = "그냥열기".decode( "utf-8" )
-                confirmResult = cmds.confirmDialog( title='Confirm', message='%s에 의해 %s에 변경되었습니다.\n다운받으시겠습니까?'.decode( 'utf-8' ) % (serverEditor.host, Models.FileTime.getStrFromMTime( serverEditor.mtime )), 
-                                                        button=[txDownload,txJustOpen], 
-                                                        defaultButton=txJustOpen, 
-                                                        parent= Models.ControlBase.mainui.objectName )
-                if confirmResult == txDownload:
-                    FileControl.downloadFile( serverFullPath, localFullPath )
-                    EditorCmds.setEditorInfoToFile( serverEditor, localFullPath )
+                pass
         
         def afterCmd():
             if isMayaFile:
@@ -941,6 +941,36 @@ class ContextMenuCmds:
         FileControl.referenceFile( localFullPath )
         SceneControl.getNeedDownloadTextureFileList( serverUnitInst, localUnitInst )
         TreeWidgetCmds.setTreeItemsCondition( Models.ControlBase.uiTreeWidget )
+    
+    
+    
+    @staticmethod
+    def backup():
+        
+        import shutil
+        selItems = Models.ControlBase.uiTreeWidget.selectedItems()
+        if not selItems: return None
+        selItem  = selItems[0]
+    
+        localUnitInst = Models.FileUnit( FileControl.getCurrentLocalProjectPath(), selItem.taskPath, selItem.unitPath )
+        if not os.path.exists( localUnitInst.fullPath() ): return None
+        
+        backupPath = FileControl.getBackupPath( localUnitInst.fullPath() )
+        txBackup = '백업'.decode( 'utf-8' )
+        txCancel = '취소'.decode( 'utf-8' )
+        confirmResult = cmds.confirmDialog( title='백업'.decode( 'utf-8' ), message="%s\n위 경로로 업로드를 진행하시겠습니까?".decode( 'utf-8' ) % backupPath, 
+                                            button=[txBackup,txCancel], 
+                                            parent= Models.ControlBase.mainui.objectName )
+        if confirmResult == txBackup:
+            FileControl.makeFolder( os.path.dirname( backupPath ) )
+            shutil.copy2( localUnitInst.fullPath(), backupPath )
+            cmds.confirmDialog( title = "백업완료".decode( 'utf-8' ), message="백업이 완료되었습니다.".decode( 'utf-8'),
+                                button = ['확인'.decode( 'utf-8') ],
+                                parent = Models.ControlBase.mainui.objectName )
+        else:
+            return None
+            
+        
     
     
     @staticmethod
@@ -1081,11 +1111,13 @@ class ContextMenuCmds:
                     if serverEditorInfo <= localEditorInfo: continue
                     targetPaths.append( targetPath )
             
-            if not targetPaths:
-                cmds.confirmDialog( title='Notice', message='다운로드할 파일이 없습니다.'.decode( 'utf-8' ),
-                                    button=["확인".decode( 'utf-8' )], parent= Models.ControlBase.mainui.objectName )
-                return
-
+            confirmResult = cmds.confirmDialog( title='Confirm',
+                                                message='%s는\n%s%s 에 변경된 파일입니다.\n로컬에 덮어씌울까요?%s'.decode( 'utf-8' ) % (filename, 
+                                                                                                                        hostAddString, Models.FileTime.getStrFromMTime( recentEditor.mtime ),
+                                                                                                                        localIsRecentString ),
+                                                button=[txDownload,txCancel],
+                                                defaultButton=txCancel, parent = Models.ControlBase.mainui.objectName )
+            
             ui_downloadFileList = Dialog_downloadFileList( Models.ControlBase.mayawin )
             ui_downloadFileList.setServerPath( serverUnit.projectPath )
             ui_downloadFileList.setLocalPath( localUnit.projectPath )
