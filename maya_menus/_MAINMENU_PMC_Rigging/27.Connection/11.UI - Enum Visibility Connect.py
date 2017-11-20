@@ -1,2 +1,2 @@
-from sgUIs import ui_visibilityConnect_b
-ui_visibilityConnect_b.show()
+from sgUIs import ui_enumVisibilityConnect
+ui_enumVisibilityConnect.show()

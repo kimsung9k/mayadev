@@ -1,20 +1,19 @@
-from sgModules import sgcommands
+from sgMaya import sgCmds
+import pymel.core
 
-sels = cmds.ls( sl=1 )
-
+sels = pymel.core.ls( sl=1 )
 targets = []
 for sel in sels:
-    putTarget = sgcommands.convertSg( sgcommands.putObject( sel, 'transform' ) )
-    putTarget.attr( 'dh' ).set( 1 )
-    sgcommands.parent( putTarget, sel )
+    putTarget = sgCmds.putObject( sel, 'null' ) 
+    putTarget.setParent( sel )
     
     selName = sel.split('|')[-1]
     childName = ''
     if selName[-1] == '_':
-        childName = sel.split('|')[-1] + 'child'
+        childName = sel.nodeName() + 'child'
     else:
-        childName = sel.split('|')[-1] + '_child'
+        childName = sel.nodeName() + '_child'
     putTarget.rename( childName )
-    targets.append( putTarget.name() )
+    targets.append( putTarget )
 
-cmds.select( targets )
+pymel.core.select( targets )

@@ -1,2 +1,2 @@
-import sgUIs.sceneOptimize.exportScene
-sgUIs.sceneOptimize.exportScene.show()
+import sgMaya.sgWidget.sceneOptimize.exportScene
+sgMaya.sgWidget.sceneOptimize.exportScene.show()

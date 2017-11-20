@@ -1,2 +1,2 @@
-from sgUIs import getImageFromObject
+from sgMaya.sgWidget import getImageFromObject
 getImageFromObject.show()

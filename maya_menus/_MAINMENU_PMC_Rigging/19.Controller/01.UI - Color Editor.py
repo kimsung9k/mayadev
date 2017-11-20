@@ -1,2 +1,2 @@
-from sgUIs import colorEditor
+from sgMaya.sgWidget import colorEditor
 colorEditor.Win().create()

@@ -1,5 +1,5 @@
 from maya import cmds
-import sgPlugin
+from sgMaya import sgPlugin
 
 if not cmds.pluginInfo( 'sgPutInsideContext', q=1, l=1 ):
     cmds.loadPlugin( 'sgPutInsideContext' )

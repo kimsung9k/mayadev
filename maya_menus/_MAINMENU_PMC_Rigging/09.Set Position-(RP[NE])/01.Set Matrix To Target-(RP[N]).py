@@ -1,4 +1,4 @@
-from sgModules import sgcommands
+from sgMaya import sgCmds
 import maya.cmds as cmds
 
 sels = cmds.ls( sl=1 )
@@ -6,4 +6,4 @@ target = sels[-1]
 targetMtxList = cmds.getAttr( target + '.wm' )
 
 for sel in sels[:-1]:
-    sgcommands.setMatrixToTarget( targetMtxList, sel )
+    sgCmds.setMatrixToTarget( targetMtxList, sel )

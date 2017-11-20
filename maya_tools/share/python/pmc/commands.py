@@ -377,10 +377,7 @@ class SGFileBaseMenu:
                 if extention in ['mel','melScript']:
                     targets.append( [name, 'from maya import mel\nf = open( "%s", "r" )\ndata = f.read()\nf.close()\nmel.eval( data )' % (root + '/' + name) ] )
                 else:
-                    if data.find( '%' ) != -1:
-                        targets.append( [name, 'execfile( "%s" )' % (root + '/' + name) ] )
-                    else:
-                        targets.append( [name, data ] )
+                    targets.append( [name, 'execfile( "%s" )' % (root + '/' + name) ] )
             targets.sort()
             
             targetOnlyNames = []

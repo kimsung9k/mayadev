@@ -3106,9 +3106,11 @@ def makeCloneObject( inputTarget, **options  ):
     
         if not cons: return None
     
+        print "cons : ", cons
+    
         for destCon, srcCon in cons:
             srcCon = srcCon.name()
-            destCon = destCon.name().replace( src, trg )
+            destCon = destCon.name().replace( src.name(), trg.name() )
             if cmds.nodeType( src ) == 'joint' and cmds.nodeType( trg ) =='transform':
                 destCon = destCon.replace( 'jointOrient', 'rotate' )
             if not cmds.ls( destCon ): continue
@@ -3158,9 +3160,23 @@ def makeCloneObject( inputTarget, **options  ):
             break
     
     cuTargets = targets[:len( targetClones )]
-    for i in range( len( targetClones )-1 ):
-        targetClones[i].setParent( targetClones[i+1] )
-        pymel.core.xform( targetClones[i], os=1, matrix=cuTargets[i].matrix.get() )
+    for i in range( len( targetClones ) ):
+        if len( targetClones ) > i+1:
+            targetClones[i].setParent( targetClones[i+1] )
+        
+        selRp  = pymel.core.xform( cuTargets[i], q=1, os=1, rp=1 )
+        selSp  = pymel.core.xform( cuTargets[i], q=1, os=1, sp=1 )
+        pymel.core.xform( targetClones[i], os=1, rp=selRp )
+        pymel.core.xform( targetClones[i], os=1, sp=selSp )
+        
+        targetClones[i].t.set( cuTargets[i].t.get() )
+        targetClones[i].r.set( cuTargets[i].r.get() )
+        targetClones[i].s.set( cuTargets[i].s.get() )
+        targetClones[i].sh.set( cuTargets[i].sh.get() )
+        targetClones[i].rotatePivot.set( cuTargets[i].rotatePivot.get() )
+        targetClones[i].scalePivot.set( cuTargets[i].scalePivot.get() )
+        targetClones[i].rotatePivotTranslate.set( cuTargets[i].rotatePivotTranslate.get() )
+        targetClones[i].scalePivotTranslate.set( cuTargets[i].scalePivotTranslate.get() )
     
     return targetClones[0]
 
@@ -4589,7 +4605,7 @@ def lookAt( inputAimTarget, inputRotTarget, baseDir=None, **options ):
     rotVector = trRotMatrix.eulerRotation().asVector()
     
     options.update( {'ws':1, 'pcp':1} )
-    pymel.core.rotate( math.degrees( rotVector.x ), math.degrees( rotVector.y ), math.degrees( rotVector.z ), **options )
+    pymel.core.rotate( inputRotTarget, math.degrees( rotVector.x ), math.degrees( rotVector.y ), math.degrees( rotVector.z ), **options )
 
 
 
@@ -7009,4 +7025,47 @@ def printCurvePoints( crv ):
         returnStr += str( crvShape.controlPoints[i].get() ) + ",\n"
     returnStr = returnStr[:-2] + "]"
     print returnStr
+
+
+
+
+def lockParent( inputTarget ):
+    
+    target = pymel.core.ls( inputTarget )[0].getParent()
+    if not target: return None
+    keyAttrs = cmds.listAttr( target.name(), k=1 )
+    for attr in keyAttrs:
+        target.attr( attr ).set( lock=1 )
+
+
+def unlockParent( inputTarget ):
+    
+    target = pymel.core.ls( inputTarget )[0].getParent()
+    if not target: return None
+    keyAttrs = cmds.listAttr( target.name(), k=1 )
+    for attr in keyAttrs:
+        target.attr( attr ).set( lock=0 )
+
+
+
+def renameParent( inputTarget ):
+    
+    target = pymel.core.ls( inputTarget )[0]
+    target.getParent().rename( 'P' + target.nodeName() )
+
+
+
+def renameShape( inputTarget ):
+    
+    target = pymel.core.ls( inputTarget )[0]
+    targetShapes = target.listRelatives( s=1 )
+    
+    if len( targetShapes ) == 1:
+        targetShapes[0].rename( target.nodeName() + 'Shape' )
+    for i in range( len( targetShapes ) ):
+        targetShapes[i].rename( target.nodeName() + 'Shape%02d' % i )
+
+
+
+
 

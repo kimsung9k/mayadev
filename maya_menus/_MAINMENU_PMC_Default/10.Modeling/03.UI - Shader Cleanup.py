@@ -1,2 +1,2 @@
-import sgUIs.shaderCleanup
+import sgMaya.sgWidget.shaderCleanup
 sgUIs.shaderCleanup.show()

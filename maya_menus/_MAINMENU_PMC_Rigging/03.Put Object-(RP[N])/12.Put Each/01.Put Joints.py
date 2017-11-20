@@ -1,9 +1,9 @@
-from sgModules import sgcommands
-import maya.cmds as cmds
+from sgMaya import sgCmds
+import pymel.core
 
-sels = cmds.ls( sl=1, fl=1 )
+sels = pymel.core.ls( sl=1, fl=1 )
 newObjects = []
 for sel in sels:
-    newObject = sgcommands.putObject( sel, 'joint' )
+    newObject = sgCmds.putObject( sel, 'joint' )
     newObjects.append( newObject )
-sgcommands.select( newObjects )
+pymel.core.select( newObjects )

@@ -1,2 +1,2 @@
-from sgUIs import putObjectOnGround
+from sgMaya.sgWidget import putObjectOnGround
 putObjectOnGround.show()

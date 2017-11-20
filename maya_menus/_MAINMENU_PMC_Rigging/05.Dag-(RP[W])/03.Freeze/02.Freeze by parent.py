@@ -1,4 +1,5 @@
-from sgModules import sgcommands
+from sgMaya import sgCmds
+from maya import cmds
 
-for sel in sgcommands.listNodes( sl=1 ):
-    sgcommands.freezeByParent( sel )
+for sel in cmds.ls( sl=1 ):
+    sgCmds.freezeByParent( sel )

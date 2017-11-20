@@ -1,7 +1,10 @@
-from sgModules import sgcommands
-from maya import cmds
+from sgMaya import sgCmds
+import pymel.core
 
-sels = cmds.ls( sl=1 )
+sels = pymel.core.ls( sl=1 )
+newObjs = []
 for sel in sels:
-    newObj = sgcommands.putObject( sel, 'locator' )
-    sgcommands.constrain_parent( sel, newObj )
+    newObj = sgCmds.putObject( sel, 'locator' )
+    sgCmds.constrain_parent( sel, newObj )
+    newObjs.append( newObj )
+pymel.core.select( newObjs )

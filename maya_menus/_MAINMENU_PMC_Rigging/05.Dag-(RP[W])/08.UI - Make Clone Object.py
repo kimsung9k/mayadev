@@ -1,2 +1,2 @@
-from sgUIs import makeCloneObject
+from sgMaya.sgWidget import makeCloneObject
 makeCloneObject.WinA().create()

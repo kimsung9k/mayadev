@@ -17,5 +17,7 @@ def setMatrixPreventChildren( target, moveTarget ):
 
 for sel in sels[:-1]:
     if sgCmds.getShape( sel ):
+        cmds.select( sel )
+        cmds.DeleteHistory( sel )
         sgCmds.setGeometryMatrixToTarget( sel, sels[-1] )
     setMatrixPreventChildren( sel, sels[-1] )

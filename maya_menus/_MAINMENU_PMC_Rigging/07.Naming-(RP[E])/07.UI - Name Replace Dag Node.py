@@ -1,2 +1,2 @@
-from sgUIs import replaceDagNodeNames
+from sgMaya.sgWidget import replaceDagNodeNames
 replaceDagNodeNames.ReplaceNameUI().show()

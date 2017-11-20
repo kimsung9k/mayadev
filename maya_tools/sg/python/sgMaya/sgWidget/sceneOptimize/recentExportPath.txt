@@ -1,0 +1,1 @@
+{"abcPath": "EP110_S008.abc", "sceneInfoPath": "EP110_S008.sceneInfo", "rootPath": "Z:/KAD_Pipeline/04_Shot-Production/05_RenderScenes/EP110/EP110_S008/EP110_S008_cache"}

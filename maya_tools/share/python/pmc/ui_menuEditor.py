@@ -822,7 +822,7 @@ class Window( QMainWindow ):
     def saveScript(self):
         textEditData = self.scriptTextEdit.toPlainText()
         f = open( self.currentScriptPath, 'w' )
-        f.write( textEditData )
+        f.write( textEditData.encode( 'utf-8') )
         f.close()
 
 
