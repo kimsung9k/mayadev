@@ -45,7 +45,7 @@ def exportAlembic( exportPath, minFrame, maxFrame ):
         rootStr += ' -root %s ' % exportRoot
     
     cmds.AbcExport( j="-frameRange %d %d -noNormals -ro -uvWrite -wholeFrameGeo -writeVisibility -eulerFilter"\
-                " -dataFormat ogawa %s -file %s" %( minFrameZ, maxFrame, rootStr, exportPath ) )
+                " -dataFormat ogawa %s -file %s" %( minFrame, maxFrame, rootStr, exportPath ) )
 
 
 

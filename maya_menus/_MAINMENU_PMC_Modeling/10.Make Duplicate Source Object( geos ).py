@@ -1,3 +1,3 @@
-from sgModules import sgcommands
+from sgMaya import sgCmds
 for sel in cmds.ls( sl=1, type='transform' ):
-    sgcommands.DuplicateSourceObjectSet.makeDuplicateSourceObject( sel )
+    sgCmds.DuplicateSourceObjectSet.makeDuplicateSourceObject( sel )

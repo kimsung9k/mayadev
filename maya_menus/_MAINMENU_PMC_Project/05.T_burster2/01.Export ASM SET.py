@@ -1,6 +1,6 @@
 import pymel.core
 from sgMaya import sgCmds
-from maya import cmds, mel
+from maya import cmds, mel, OpenMaya
 
 trs = pymel.core.ls( tr=1 )
 
@@ -68,7 +68,7 @@ for target in targets:
     
     targetParents = cmds.listRelatives( target.name(), p=1, f=1 )
     targetPos = cmds.getAttr( target+ '.m' )
-    cmds.xform( target.name(), os=1, matrix= sgcommands.matrixToList( sgcommands.OpenMaya.MMatrix() ) )
+    cmds.xform( target.name(), os=1, matrix= sgCmds.matrixToList( OpenMaya.MMatrix() ) )
     abcPath = cmds.gpuCache( target.name(), startTime=1, endTime=1, optimize=1, optimizationThreshold=1000, writeMaterials=0, dataFormat='ogawa',
                              directory=gpuPath, fileName=target.replace( '|', '_' ), saveMultipleFiles=False )[0]
     cmds.xform( target.name(), os=1, matrix= targetPos )

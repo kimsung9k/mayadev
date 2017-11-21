@@ -37,6 +37,7 @@ if __name__ == "sgPlugin":
 
 
 def setTool_putFollicleContext( evt=0 ):
+    appendPluginPath()
     if not cmds.pluginInfo( 'sgPutFollicleContext', q=1, l=1 ):
         cmds.loadPlugin( 'sgPutFollicleContext' )
     cmds.setToolTo( 'sgPutFollicleContext1' )
@@ -45,6 +46,7 @@ def setTool_putFollicleContext( evt=0 ):
 
 
 def setTool_putInsideContext( evt=0 ):
+    appendPluginPath()
     if not cmds.pluginInfo( 'sgPutInsideContext', q=1, l=1 ):
         cmds.loadPlugin( 'sgPutInsideContext' )
     cmds.setToolTo( 'sgPutInsideContext1' )
@@ -53,6 +55,7 @@ def setTool_putInsideContext( evt=0 ):
 
 
 def setTool_SGMPlugMod01( evt=0 ):
+    appendPluginPath()
     import sgCppPlug_modelingTool
     if not cmds.pluginInfo( 'SGMPlugMod01', q=1, l=1 ):
         cmds.loadPlugin( 'SGMPlugMod01' )
@@ -62,6 +65,7 @@ def setTool_SGMPlugMod01( evt=0 ):
 
 def setTool_smoothSkinWeightBrush( evt=0 ):
 
+    appendPluginPath()
     _cmdStr =  """global string $tf_skinSmoothPatin_selection[];
     
     global proc tf_smoothBrush( string $context )     
@@ -94,6 +98,8 @@ def setTool_smoothSkinWeightBrush( evt=0 ):
 
 
 def cmd_sgAverageVertex( *args, **kwargs ):
+    
+    appendPluginPath()
     if not cmds.pluginInfo( 'sgAverageVertex', q=1, l=1 ):
         cmds.loadPlugin( 'sgAverageVertex' )
     cmds.sgAverageVertex( *args, **kwargs )
@@ -102,6 +108,7 @@ def cmd_sgAverageVertex( *args, **kwargs ):
 
 def cmd_putObjectAtGround( *args, **kwargs ):
     
+    appendPluginPath()
     if not cmds.pluginInfo( "sgPutObjectAtGround_test", q=1, l=1 ):
         cmds.loadPlugin( 'sgPutObjectAtGround_test' )
     

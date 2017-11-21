@@ -1,6 +1,5 @@
 import pymel.core
 from sgMaya import sgCmds
-reload( sgCmds )
 
 sels = pymel.core.ls( sl=1 )
 

@@ -1,6 +1,6 @@
-from sgModules import sgcommands
+from sgMaya import sgCmds
 
-sels = sgcommands.listNodes( sl=1 )
+sels = sgCmds.listNodes( sl=1 )
 
 for sel in sels:
-    sgcommands.setCenter( sel )
+    sgCmds.setCenter( sel )

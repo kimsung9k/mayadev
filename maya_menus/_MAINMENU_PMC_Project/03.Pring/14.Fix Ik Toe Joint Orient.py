@@ -1,3 +1,2 @@
-from sgModules import sgcommands
-from sgModules import sgHumanRigCommands
+from sgMaya.sgHumanRig import sgHumanRigCommands
 sgHumanRigCommands.AddAndFixRig.fixIkToeJointOrient()

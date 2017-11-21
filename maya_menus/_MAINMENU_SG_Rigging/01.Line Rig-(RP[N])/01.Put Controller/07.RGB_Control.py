@@ -1,6 +1,5 @@
 from sgMaya import sgModel, sgCmds
 import pymel.core
-reload( sgCmds )
 
 sels  = pymel.core.ls( sl=1 )
 mtx   = sgCmds.getMatrixFromSelection( sels )

@@ -1,2 +1,2 @@
-from sgUIs import pluginReload
+from sgMaya.sgWidget import pluginReload
 pluginReload.show()

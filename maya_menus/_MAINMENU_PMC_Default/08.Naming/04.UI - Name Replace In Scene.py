@@ -1,2 +1,2 @@
-from sgUIs import renameInScene
+from sgMaya.sgWidget import renameInScene
 renameInScene.WinA().create()

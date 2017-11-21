@@ -1,2 +1,2 @@
-from sgUIs import createPointOnCurve
+from sgMaya.sgWidget import createPointOnCurve
 createPointOnCurve.show()

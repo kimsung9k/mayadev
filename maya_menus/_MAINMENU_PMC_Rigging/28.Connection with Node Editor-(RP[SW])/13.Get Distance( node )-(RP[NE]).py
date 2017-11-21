@@ -1,8 +1,9 @@
-from sgModules import sgcommands
+from sgMaya import sgCmds
+import pymel.core
 
-sels = cmds.ls( sl=1 )
+sels = pymel.core.ls( sl=1 )
 distNodes = []
 for sel in sels:
-    distNode = sgcommands.getDistance( sel )
+    distNode = sgCmds.getDistance( sel )
     distNodes.append( distNode )
-sgcommands.select( distNodes )
+pymel.core.select( distNodes )

@@ -1,2 +1,2 @@
-from sgUIs import ui_createFkControl
+from sgMaya.sgWidget import ui_createFkControl
 ui_createFkControl.Win().create()

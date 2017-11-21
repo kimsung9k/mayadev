@@ -1,10 +1,13 @@
 import pymel.core
+
 references = pymel.core.ls( type='reference' )
 for refNode in references:
     try:cmds.file( importReference=1, referenceNode=refNode.name() )
     except:pass
 
+
 import maya.cmds as cmds
+
 def cleanMeshInScene( *args ):
 
     def cleanMesh( targetObj ):

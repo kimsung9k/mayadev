@@ -1,11 +1,11 @@
-from sgModules import sgcommands
+from sgMaya import sgCmds
 
 sels = cmds.ls( sl=1 )
 
 bindJoints = []
 
 for sel in sels:
-    skinNodes = sgcommands.getNodeFromHistory( sel, 'skinCluster' )
+    skinNodes = sgCmds.getNodeFromHistory( sel, 'skinCluster' )
     
     if not skinNodes: continue
     joints = cmds.listConnections( skinNodes[0] + '.matrix' )

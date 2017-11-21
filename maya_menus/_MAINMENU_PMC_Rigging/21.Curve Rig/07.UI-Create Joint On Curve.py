@@ -1,2 +1,2 @@
-from sgUIs import createJointOnCurve
+from sgMaya.sgWidget import createJointOnCurve
 createJointOnCurve.show()

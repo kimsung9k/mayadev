@@ -1,5 +1,6 @@
-from sgModules import sgcommands
+from sgMaya import sgCmds
+import pymel.core
 
-sels = sgcommands.listNodes( sl=1 )
-mtxNode = sgcommands.getFbfMatrix( sels[0], sels[1], sels[2] )
-sgcommands.select( mtxNode )
+sels = pymel.core.ls( sl=1 )
+mtxNode = sgCmds.getFbfMatrix( sels[0], sels[1], sels[2] )
+pymel.core.select( mtxNode )

@@ -1,5 +1,5 @@
 from maya import cmds
-from sgModules import sgcommands
+from sgMaya import sgCmds
 
 sels = cmds.ls( sl=1 )
 
@@ -14,6 +14,6 @@ for sel in sels:
     if attrs3: attrs += attrs3
     
     for attr in attrs:
-        sgcommands.addMultDoubleLinearConnection( sel, attr )
+        sgCmds.addMultDoubleLinearConnection( sel, attr )
 
 cmds.select( sels )

@@ -4,7 +4,6 @@
 # 아래 세줄을 스크립트 에디터에서 실행하거나 셸프에 등록하세요.
 '''
 import mayawms
-reload(mayawms)
 mayawms.UI()
 '''
 #   2017-08-08

@@ -1,2 +1,2 @@
-from sgUIs import selectByName
+from sgMaya.sgWidget import selectByName
 selectByName.WinA().create()

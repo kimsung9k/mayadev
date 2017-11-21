@@ -1,5 +1,6 @@
-from sgModules import sgcommands
+from sgMaya import sgCmds
+import pymel.core
 
-sels = sgcommands.listNodes( sl=1 )
-crossVectorNode = sgcommands.getCrossVectorNode( sels[0], sels[1] )
-sgcommands.select( crossVectorNode )
+sels = pymel.core.ls( sl=1 )
+crossVectorNode = pymel.core.getCrossVectorNode( sels[0], sels[1] )
+pymel.core.select( crossVectorNode )

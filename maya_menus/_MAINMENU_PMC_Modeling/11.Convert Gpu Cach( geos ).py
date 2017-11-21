@@ -1,12 +1,12 @@
 import pymel.core
 import os
-from sgModules import sgcommands
+from sgMaya import sgCmds
 
 sceneName = cmds.file( q=1, sceneName=1 )
 dirName = os.path.dirname( sceneName )
 gpuPath = dirName + '/gpucaches'
 
-sgcommands.makeFolder( gpuPath )
+sgCmds.makeFolder( gpuPath )
 
 sels = cmds.ls( sl=1 )
 
@@ -14,7 +14,7 @@ closeParents = []
 for sel in sels:
     selParents = cmds.listRelatives( sel, p=1, f=1 )
     selPos = cmds.getAttr( sel+ '.m' )
-    cmds.xform( sel, os=1, matrix= sgcommands.matrixToList( sgcommands.OpenMaya.MMatrix() ) )
+    cmds.xform( sel, os=1, matrix= sgCmds.matrixToList( sgCmds.OpenMaya.MMatrix() ) )
     abcPath = cmds.gpuCache( sel, startTime=1, endTime=1, optimize=1, optimizationThreshold=1000, writeMaterials=0, dataFormat='ogawa',
                              directory=gpuPath, fileName=sel.replace( '|', '_' ), saveMultipleFiles=False )[0]
     cmds.xform( sel, os=1, matrix= selPos )

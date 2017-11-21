@@ -550,12 +550,14 @@ class FileControl:
     
     
     @staticmethod
-    def getBackupPath( filePath ):
+    def getBackupPath( filePath, timeTarget = None ):
+        
+        if not timeTarget: timeTarget = filePath
         
         filename = ntpath.split( filePath )[-1]
         dirpath = os.path.dirname( filePath ) + '/' + Models.ControlBase.backupDirName + '/' + filename
         FileControl.makeFolder( dirpath )
-        stringtime = Models.FileTime( filePath ).stringTime()
+        stringtime = Models.FileTime( timeTarget ).stringTime()
         ext = os.path.splitext( filePath )[-1]
         return dirpath + '/' + stringtime + ext
     
@@ -580,7 +582,7 @@ class FileControl:
         if os.path.exists( dstFullPath ):
             shutil.copy2( dstFullPath, FileControl.getBackupPath( dstFullPath ) )
         shutil.copy2( srcFullPath, dstFullPath )
-        shutil.copy2( srcFullPath, FileControl.getBackupPath( dstFullPath ) )
+        shutil.copy2( srcFullPath, FileControl.getBackupPath( dstFullPath, srcFullPath ) )
     
 
 
@@ -588,9 +590,14 @@ class FileControl:
     def uploadFile( srcFullPath, dstFullPath ):
         
         import shutil
+        import ntpath
+        
+        srcFolder, srcName = ntpath.split( srcFullPath )
+        dstFolder, dstName = ntpath.split( dstFullPath ) 
+        
         FileControl.makeFolder( os.path.dirname( dstFullPath ) )
         if os.path.exists( dstFullPath ):
-            shutil.copy2( dstFullPath, FileControl.getBackupPath( srcFullPath ) )
+            shutil.copy2( dstFullPath, FileControl.getBackupPath( srcFullPath, dstFullPath ) )
         shutil.copy2( srcFullPath, dstFullPath )
         shutil.copy2( srcFullPath, FileControl.getBackupPath( srcFullPath ) )
     
@@ -695,6 +702,7 @@ class EditorCmds:
     @staticmethod
     def getMyEditorInfo( localPath ):
         return Models.EditorInfo.getMyInfo(localPath)
+
 
 
     @staticmethod
@@ -823,6 +831,7 @@ class SceneControl:
             ui_updateFileList.show()
         else:
             afterCmd()
+
 
 
 
@@ -1144,8 +1153,20 @@ class ContextMenuCmds:
         localUnit  = Models.FileUnit( FileControl.getCurrentLocalProjectPath(),  selItems[0].taskPath, selItems[0].unitPath )
         
         if os.path.isfile( localUnit.fullPath() ):
-            txUpload = '덮어 씌우기'.decode( 'utf-8' )
-            txCancel = '취소'.decode( 'utf-8' )
+            scenePath = cmds.file( q=1, sceneName=1 )
+            txSave = "저장하기".decode( 'utf-8' )
+            txDoNotSave = "저장하기 않고 업로드".decode( "utf-8" )
+            txCancel = "취소".decode( 'utf-8' )
+            if os.path.normpath( scenePath ) == os.path.normpath( localUnit.fullPath() ) and cmds.file( q=1, amf=1 ):
+                confirmResult = cmds.confirmDialog( title='Confirm', message='업로드하기전에 Scene을 저장하시겠습니까?'.decode( 'utf-8' ),
+                                                        button=[txSave,txDoNotSave,txCancel],
+                                                        defaultButton=txCancel, parent= Models.ControlBase.mainui.objectName )
+                if confirmResult == txCancel:
+                    return
+                elif confirmResult == txSave:
+                    cmds.file( save=1, f=1 )
+                else:
+                    pass
             
             if not os.path.exists( serverUnit.fullPath() ):
                 myEditor = EditorCmds.getMyEditorInfo( localUnit.fullPath() )
@@ -1153,6 +1174,9 @@ class ContextMenuCmds:
                 EditorCmds.setEditorInfoToFile( myEditor, localUnit.fullPath() )
                 EditorCmds.setEditorInfoToFile( myEditor, serverUnit.fullPath() )
             else:
+                txUpload = '덮어 씌우기'.decode( 'utf-8' )
+                txCancel = '취소'.decode( 'utf-8' )
+                
                 recentEditor = EditorCmds.getEditorInfoFromFile( serverUnit.fullPath() )
                 myEditor     = EditorCmds.getMyEditorInfo( localUnit.fullPath() )
                 if recentEditor == myEditor:
@@ -1180,6 +1204,7 @@ class ContextMenuCmds:
                     FileControl.uploadFile( localUnit.fullPath(), serverUnit.fullPath() )
                     EditorCmds.setEditorInfoToFile( myEditor, serverUnit.fullPath() )
                     EditorCmds.setEditorInfoToFile( myEditor, localUnit.fullPath() )
+
         elif os.path.isdir( localUnit.fullPath() ):
             EditorCmds.fixEditorInfo( localUnit.fullPath()  )
             EditorCmds.fixEditorInfo( serverUnit.fullPath() )
@@ -1193,8 +1218,6 @@ class ContextMenuCmds:
                     localEditorInfo  = EditorCmds.getEditorInfoFromFile( localUnit.projectPath  + targetPath )
                     if serverEditorInfo >= localEditorInfo: continue
                     targetPaths.append( targetPath )
-            
-            print "target paths: ", targetPaths
             
             if not targetPaths:
                 cmds.confirmDialog( title='Notice', message='업로드할 파일이 없습니다.'.decode( 'utf-8' ),

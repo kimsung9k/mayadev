@@ -6,7 +6,6 @@ from functools import partial
 import ntpath
 import shutil
 from commands import *
-from maya.app.stereo.stereoCameraSettings import gViewLayoutButtons
 
 
 
@@ -146,7 +145,7 @@ class Cmds():
         f = open( targetPath, 'r' )
         data = f.read()
         f.close()
-        Window.mainui.scriptTextEdit.setText( data )
+        Window.mainui.scriptTextEdit.setText( data.decode( 'utf-8') )
         Window.mainui.setButtonDisabled()
         
         Window.mainui.currentScriptPath = targetPath

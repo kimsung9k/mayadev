@@ -1,5 +1,6 @@
-from sgModules import sgcommands
-nodes = sgcommands.listNodes( sl=1 )
+from sgMaya import sgCmds
+import pymel.core
+nodes = pymel.core.ls( sl=1 )
 for node in nodes:
-    md = sgcommands.createNode( 'multDoubleLinear' )
+    md = pymel.core.createNode( 'multDoubleLinear' )
     node.scalarOutput() >> md.input1

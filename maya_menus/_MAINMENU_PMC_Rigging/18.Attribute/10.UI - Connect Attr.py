@@ -1,2 +1,2 @@
-from sgUIs import connectAttr
+from sgMaya.sgWidget import connectAttr
 connectAttr.show()

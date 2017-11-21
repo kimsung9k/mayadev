@@ -1,6 +1,6 @@
-from sgModules import sgcommands
-from maya import cmds
+from sgMaya import sgCmds
+import pymel.core
 
-sels = cmds.ls( sl=1 )
-node = sgcommands.getLocalMatrix( sels[0], sels[1] )
-sgcommands.select( node )
+sels = pymel.core.ls( sl=1 )
+node = sgCmds.getLocalMatrix( sels[0], sels[1] )
+pymel.core.select( node )

@@ -32,3 +32,51 @@ def reloadModules( pythonPath='' ):
                 try:
                     reload( sys.modules[moduleName] )
                 except:pass
+
+
+
+import os, shutil
+
+
+
+def removeDirectory( targetdir ):
+    
+    if not os.path.exists( targetdir ): return None
+    for root, dirs, names in os.walk( targetdir ):
+        for name in names:
+            os.remove( root + '/' + name )
+    targetDirs = []
+    for root, dirs, names in os.walk( targetdir ):
+        for dir in dirs:
+            if os.path.exists( root + '/' + dir ):
+                targetDirs.append( root + '/' + dir )
+    targetDirs.reverse()
+    for dir in targetDirs:
+        os.rmdir( dir )
+    os.rmdir( targetdir )
+
+
+
+def copyPythonModules( srcdir, targetdir ):
+    
+    removeDirectory( targetdir )
+    packages = []
+    for root, dirs, names in os.walk( srcdir ):
+        for dir in dirs:
+            packages.append( root.replace( '\\', '/' ) + '/' + dir )
+        break
+    
+    for package in packages:
+        pythonFolder = package + '/python'
+        for root, dirs, names in os.walk( pythonFolder ):
+            replacedName = root.replace( pythonFolder, '' )
+            if replacedName and replacedName[1] == '.': continue
+            baseFolder = targetdir + replacedName
+            if not os.path.exists( baseFolder ):os.makedirs( baseFolder )
+            for dir in dirs:
+                if dir[0] == '.': continue
+                newFolder = baseFolder + '/' + dir
+                if not os.path.exists( newFolder ):os.makedirs( newFolder )
+            for name in names:
+                if os.path.splitext( name )[-1].lower() in ['.pyc'] or name[0] == '.': continue
+                shutil.copy2( root + '/' + name, baseFolder + '/' + name )

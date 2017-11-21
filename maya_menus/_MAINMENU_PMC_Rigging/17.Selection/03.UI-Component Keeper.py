@@ -1,2 +1,2 @@
-from sgUIs import ui_componentKeeper
+from sgMaya.sgWidget import ui_componentKeeper
 ui_componentKeeper.Win().create()

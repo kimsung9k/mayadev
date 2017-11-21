@@ -2741,7 +2741,7 @@ def addCurveDistanceInfo( inputCurve ):
 
 
 
-def makeCurveFromSelection( inputSels, **options ):
+def makeCurveFromSelection( *inputSels, **options ):
     
     poses = []
     sels = []
@@ -3239,6 +3239,20 @@ def getDefaultAnimCurveUA( floats, values ):
     pymel.core.keyTangent( animCurve, itt='linear', ott='linear' )
     return animCurve
 
+
+
+
+
+def getOutputMatrixAttribute( node ):
+    targetAttr = None
+    if node.nodeType() == 'transform':
+        targetAttr = node.worldMatrix
+    elif node.nodeType() in ['multMatrix', 'wtAddMatrix', 'addMatrix']:
+        targetAttr = node.matrixSum
+    elif node.nodeType() in ['composeMatrix', 'transposeMatrix', 'inverseMatrix']:
+        targetAttr = node.outputMatrix
+    
+    return targetAttr
 
 
 
@@ -4077,20 +4091,7 @@ def constrain_parentToParent( src, inputTarget ):
 def constrain_allToParent( src, inputTarget ):
     target = pymel.core.ls( inputTarget )[0]
     constrain_all( src, target.getParent() )
-    
 
-
-def getOutputMatrixAttribute( inputNode ):
-    node = pymel.core.ls( inputNode )[0]
-    targetAttr = None
-    if node.nodeType() == 'transform':
-        targetAttr = node.worldMatrix
-    elif node.nodeType() in ['multMatrix', 'wtAddMatrix', 'addMatrix']:
-        targetAttr = node.matrixSum
-    elif node.nodeType() in ['composeMatrix', 'transposeMatrix', 'inverseMatrix']:
-        targetAttr = node.outputMatrix
-    
-    return targetAttr
 
 
 
@@ -7028,6 +7029,21 @@ def printCurvePoints( crv ):
 
 
 
+def getParentNameOf( target, searchName ):
+    
+    longNameTarget = pymel.core.ls( target, l=1 )[0].longName()
+    
+    splits = longNameTarget.split( '|' )
+    
+    targetIndex = -1
+    for i in range( len( splits ) ):
+        if splits[i].find( searchName ) == -1: continue
+        targetIndex = i
+    if targetIndex == -1: return None
+    
+    return '|'.join( splits[:targetIndex+1] ) 
+
+
 
 def lockParent( inputTarget ):
     
@@ -7068,4 +7084,108 @@ def renameShape( inputTarget ):
 
 
 
+def setAttrDefault( sels, **options ):
+    
+    attrs = []
+    targetIsKeyAttrs = False
+    
+    if options.has_key( 'attrs' ):
+        attrs = options['attrs']
+    if options.has_key( 'k' ):
+        if options['k']:
+            targetIsKeyAttrs = True
+    
+    for sel in sels:
+        if targetIsKeyAttrs:
+            keyAttrs = cmds.listAttr( sel, k=1 )
+            for attr in keyAttrs:
+                defaultValue = cmds.attributeQuery( attr, node=sel, ld=1 )
+                try:cmds.setAttr( sel + '.' + attr, defaultValue[0] )
+                except:pass
+        for attr in attrs:
+            defaultValue = cmds.attributeQuery( attr, node=sel, ld=1 )
+            try:cmds.setAttr( sel + '.' + attr, defaultValue[0] )
+            except:pass
+
+
+class SliderBase:
+    
+    def __init__(self):
+
+        pass
+    
+
+    def create(self, axis=None, *args ):
+    
+        axisX = True
+        axisY = True
+        
+        if axis:
+            axisX = False
+            axisY = False
+            if axis == 'x': axisX = True
+            elif axis == 'y': axisY = True
+            elif axis == 'xy': axisX = True; axisY = True
+    
+        baseData = [[-.5,-.5,0],[.5,-.5,0],[.5,.5,0],[-.5,.5,0],[-.5,-.5,0]]
+        baseCurve = pymel.core.curve( p=baseData, d=1 )
+        baseCurveOrigShape=  addIOShape( baseCurve )
+        baseCurveShape = baseCurve.getShape()
+        
+        trGeo = pymel.core.createNode( 'transformGeometry' )
+        composeMatrix = pymel.core.createNode( 'composeMatrix' )
+        
+        if axisX:
+            multNodeX = pymel.core.createNode( 'multDoubleLinear' );multNodeX.setAttr( 'input2', 0.5 )
+            addNodeX = pymel.core.createNode( 'addDoubleLinear' );addNodeX.setAttr( 'input2', 1 )
+            addAttr( baseCurve, ln='slideSizeX', min=0, cb=1 )
+            baseCurve.slideSizeX >> multNodeX.input1
+            baseCurve.slideSizeX >> addNodeX.input1
+            addNodeX.output >> composeMatrix.inputScaleX
+            multNodeX.output >> composeMatrix.inputTranslateX
+        
+        if axisY:
+            multNodeY = pymel.core.createNode( 'multDoubleLinear' );multNodeY.setAttr( 'input2', 0.5 )
+            addNodeY = pymel.core.createNode( 'addDoubleLinear' );addNodeY.setAttr( 'input2', 1 )
+            addAttr( baseCurve, ln='slideSizeY', min=0, cb=1 )
+            baseCurve.slideSizeY >> multNodeY.input1
+            baseCurve.slideSizeY >> addNodeY.input1
+            addNodeY.output >> composeMatrix.inputScaleY
+            multNodeY.output >> composeMatrix.inputTranslateY
+        
+        composeMatrix.outputMatrix >> trGeo.transform
+        baseCurveOrigShape.local >> trGeo.inputGeometry
+        trGeo.outputGeometry >> baseCurveShape.create
+
+        return baseCurve
+
+
+
+def createTextureFileNode( filePath ):
+    
+    fileNode = pymel.core.shadingNode( "file", asTexture=1 )
+    place2d  = pymel.core.shadingNode( "place2dTexture", asUtility=1 )
+    
+    fileNode.attr( 'fileTextureName' ).set( filePath, type='string' )
+    
+    place2d.coverage >> fileNode.coverage
+    place2d.translateFrame  >> fileNode.translateFrame 
+    place2d.rotateFrame  >> fileNode.rotateFrame 
+    place2d.mirrorU  >> fileNode.mirrorU 
+    place2d.mirrorV  >> fileNode.mirrorV
+    place2d.stagger >> fileNode.stagger
+    place2d.wrapU >> fileNode.wrapU
+    place2d.wrapV >> fileNode.wrapV
+    place2d.repeatUV >> fileNode.repeatUV
+    place2d.offset >> fileNode.offset
+    place2d.rotateUV >> fileNode.rotateUV
+    place2d.noiseUV >> fileNode.noiseUV
+    place2d.vertexUvOne >> fileNode.vertexUvOne
+    place2d.vertexUvTwo >> fileNode.vertexUvTwo
+    place2d.vertexUvThree >> fileNode.vertexUvThree
+    place2d.vertexCameraOne >> fileNode.vertexCameraOne
+    place2d.outUV >> fileNode.uv
+    place2d.outUvFilterSize >> fileNode.uvFilterSize
+    
+    return fileNode.name(), place2d.name()
 

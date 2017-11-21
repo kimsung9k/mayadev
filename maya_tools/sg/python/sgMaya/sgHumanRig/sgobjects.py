@@ -2,8 +2,8 @@ from maya import OpenMaya
 from maya import cmds
 from maya import mel
 import math
-import sgModules.sgdata as data
-from sgModules.sgbase import *
+import sgdata as data
+from sgbase import *
 
 
 class SGPoint:
