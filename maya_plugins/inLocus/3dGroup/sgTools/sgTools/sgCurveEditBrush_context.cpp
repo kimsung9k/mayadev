@@ -83,7 +83,7 @@ MStatus sgCurveEditBrush_ToolCommand::finalize()
 sgCurveEditBrush_context::sgCurveEditBrush_context()
 {
 	m_radiusEditOn  = false;
-	m_radiusCurrent = 1;
+	m_radiusCurrent = 10;
 }
 
 sgCurveEditBrush_context::~sgCurveEditBrush_context()
@@ -92,6 +92,7 @@ sgCurveEditBrush_context::~sgCurveEditBrush_context()
 
 
 #include "sgPrintf.h"
+
 void sgCurveEditBrush_context::toolOnSetup( MEvent& evt )
 {
 	MStatus status;
@@ -153,8 +154,9 @@ void sgCurveEditBrush_context::toolOffCleanup()
 
 void sgCurveEditBrush_context::getClassName( MString& name ) const
 {
-	name.set( "sgCurveEditBrush_context" );
+	name.set( "sgCurveEditBrushContext" );
 }
+
 
 MStatus sgCurveEditBrush_context::doPress( MEvent& evt )
 {
@@ -180,6 +182,7 @@ MStatus sgCurveEditBrush_context::doPress( MEvent& evt )
 		m_pToolCmd->m_dagPathCurves = m_dagPathCurves;
 		m_pToolCmd->m_pointArrsCurvesAfter.setLength( m_dagPathCurves.length() );
 		m_pToolCmd->m_pointArrsCurvesBefore.setLength( m_dagPathCurves.length() );
+
 		for( unsigned int i=0; i< m_dagPathCurves.length(); i++ )
 		{
 			MFnNurbsCurve fnCurve = m_dagPathCurves[i];
@@ -213,7 +216,7 @@ MStatus sgCurveEditBrush_context::doDrag( MEvent& evt )
 
 	if( m_radiusEditOn )
 	{
-		double diffValue = ( mouseX - m_radiusEditX ) * 0.03 * 2.0/5.0; 
+		double diffValue = ( mouseX - m_radiusEditX ); 
 		m_radiusCurrent = (float)(m_beforeRadius + diffValue);
 		if(m_manipulator) m_manipulator->m_radiusCircle = m_radiusCurrent;
 	}

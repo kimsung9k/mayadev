@@ -23,6 +23,7 @@
     <ClCompile Include="sgCurveDraw_context_def.cpp" />
     <ClCompile Include="sgCurveEditBrush_contextCommand.cpp" />
     <ClCompile Include="sgCurveEditBrush_context_def.cpp" />
+    <ClCompile Include="sgCurveEditBrush_functions.cpp" />
     <ClCompile Include="sgCurveEditBrush_manip.cpp" />
     <ClCompile Include="pluginMain.cpp" />
     <ClCompile Include="sgCurveEditBrush_context.cpp" />
@@ -34,6 +35,7 @@
     <ClInclude Include="sgCurveDraw_context.h" />
     <ClInclude Include="sgCurveDraw_contextCommand.h" />
     <ClInclude Include="sgCurveEditBrush_contextCommand.h" />
+    <ClInclude Include="sgCurveEditBrush_functions.h" />
     <ClInclude Include="sgCurveEditBrush_manip.h" />
     <ClInclude Include="sgCurveEditBrush_context.h" />
     <ClInclude Include="sgPrintf.h" />
@@ -120,7 +122,7 @@
       <ExceptionHandling>Sync</ExceptionHandling>
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <AdditionalOptions>%(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>D:\02.SOURCE\CODING\Maya-devkit\win\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Program Files\Autodesk\Maya2015\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeaderOutputFile>$(Configuration)\sgTools.pch</PrecompiledHeaderOutputFile>
     </ClCompile>
     <Link>
@@ -131,7 +133,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>Foundation.lib;OpenMaya.lib;OpenMayaUI.lib;OpenMayaAnim.lib;OpenMayaFX.lib;Image.lib;OpenAl32.lib;cg.lib;cgGL.lib;OpenMayaRender.lib;libMocap.lib;OpenGL32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\Program Files\Autodesk\Maya2016\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Program Files\Autodesk\Maya2015\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <OutputFile>$(Configuration)\sgTools.mll</OutputFile>
       <ImportLibrary>$(Configuration)\sgTools.lib</ImportLibrary>
       <ProgramDatabaseFile>$(Configuration)\sgTools.pdb</ProgramDatabaseFile>

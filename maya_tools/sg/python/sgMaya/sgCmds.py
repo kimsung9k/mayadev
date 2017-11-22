@@ -1,5 +1,4 @@
-import maya.cmds as cmds
-import maya.OpenMaya as OpenMaya
+from maya import OpenMaya, OpenMayaUI, cmds
 import pymel.core
 import math, copy
 import os
@@ -7188,4 +7187,27 @@ def createTextureFileNode( filePath ):
     place2d.outUvFilterSize >> fileNode.uvFilterSize
     
     return fileNode.name(), place2d.name()
+
+
+
+
+def getActiveProjectionMatrix():
+    
+    activeView = OpenMayaUI.M3dView.active3dView()
+    dagCam = OpenMaya.MDagPath()
+    
+    activeView.getCamera( dagCam )
+    
+    projMtx = OpenMaya.MMatrix()
+    activeView.projectionMatrix( projMtx )
+    
+    width = activeView.portWidth()
+    height = activeView.portHeight()
+    
+    return dagCam.inclusiveMatrixInverse() * projMtx
+    
+    
+    
+
+
 

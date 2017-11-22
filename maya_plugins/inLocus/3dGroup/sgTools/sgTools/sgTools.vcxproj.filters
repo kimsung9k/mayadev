@@ -80,6 +80,9 @@
     <ClCompile Include="sgPrintf.cpp">
       <Filter>sgPrintf</Filter>
     </ClCompile>
+    <ClCompile Include="sgCurveEditBrush_functions.cpp">
+      <Filter>Source Files\sgCurveEditBrush</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="createJointContextCommand.h">
@@ -105,6 +108,9 @@
     </ClInclude>
     <ClInclude Include="sgPrintf.h">
       <Filter>sgPrintf</Filter>
+    </ClInclude>
+    <ClInclude Include="sgCurveEditBrush_functions.h">
+      <Filter>Header Files\sgCurveEditBrush</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
