@@ -12,10 +12,11 @@ for i in range( len( replaceSrcs ) ):
 
 shotFolderName = '_'.join( fileName.split( '_' )[:2] ).upper()
 shotFolderPath = folder + '/' + shotFolderName
+shotFolderPath = shotFolderPath.replace( '//', '/' )
 shotFilePath = shotFolderPath + '/' + shotFolderName + '_OPTIMIZED.mb'
 
 if not os.path.exists( shotFolderPath ):
-    os.mkdir( shotFolderPath )
+    os.makedirs( shotFolderPath )
 
 cmds.file( rename=shotFilePath )
 cmds.file( s=1, f=1 )

@@ -4,7 +4,7 @@ import pymel.core
 sels = pymel.core.ls( sl=1 )
 
 for sel in sels[2:]:
-    blendNode = sgCmds.createBlendTwoMatrixNode( sels[0], sels[1] )
+    blendNode = sgCmds.createBlendTwoMatrixNode( sels[0].wm, sels[1].wm )
     mm = pymel.core.createNode( 'multMatrix' )
     sgCmds.matrixOutput( blendNode ) >> mm.i[0]
     sel.pim >> mm.i[1]

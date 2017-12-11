@@ -1,7 +1,8 @@
 #coding=utf8
 
-import maya.cmds as cmds
-from maya import OpenMayaUI
+from maya import OpenMayaUI, cmds
+
+from pymel import api
 
 import os, sys
 import json
@@ -32,7 +33,7 @@ class TreeWidgetCmds:
 
     @staticmethod
     def setTreeItemCondition( targetItem ):
-        
+
         cuLocalFullPath  = FileControl.getCurrentLocalProjectPath() + targetItem.taskPath + targetItem.unitPath
         cuServerFullPath = FileControl.getCurrentServerProjectPath() + targetItem.taskPath + targetItem.unitPath
         
@@ -555,11 +556,10 @@ class FileControl:
         if not timeTarget: timeTarget = filePath
         
         filename = ntpath.split( filePath )[-1]
-        dirpath = os.path.dirname( filePath ) + '/' + Models.ControlBase.backupDirName + '/' + filename
-        FileControl.makeFolder( dirpath )
         stringtime = Models.FileTime( timeTarget ).stringTime()
-        ext = os.path.splitext( filePath )[-1]
-        return dirpath + '/' + stringtime + ext
+        dirpath = os.path.dirname( filePath ) + '/' + Models.ControlBase.backupDirName + '/' + stringtime
+        FileControl.makeFolder( dirpath )
+        return dirpath + '/' + filename
     
     
     @staticmethod
@@ -778,6 +778,7 @@ class SceneControl:
                     continue
                 if not os.path.exists( textureServerPath ): continue
                 else:
+                    pass
                     print nodeType, textureServerPath
                 
                 if FileControl.isUpdateRequired( textureServerPath, textureLocalPath ):
@@ -831,6 +832,7 @@ class SceneControl:
             ui_updateFileList.show()
         else:
             afterCmd()
+
 
 
 
@@ -967,7 +969,7 @@ class ContextMenuCmds:
         backupPath = FileControl.getBackupPath( localUnitInst.fullPath() )
         txBackup = '백업'.decode( 'utf-8' )
         txCancel = '취소'.decode( 'utf-8' )
-        confirmResult = cmds.confirmDialog( title='백업'.decode( 'utf-8' ), message="%s\n위 경로로 업로드를 진행하시겠습니까?".decode( 'utf-8' ) % backupPath, 
+        confirmResult = cmds.confirmDialog( title='백업'.decode( 'utf-8' ), message="%s\n위 경로로 백업을 진행하시겠습니까?".decode( 'utf-8' ) % backupPath, 
                                             button=[txBackup,txCancel], 
                                             parent= Models.ControlBase.mainui.objectName )
         if confirmResult == txBackup:
@@ -1206,9 +1208,32 @@ class ContextMenuCmds:
                     EditorCmds.setEditorInfoToFile( myEditor, localUnit.fullPath() )
 
         elif os.path.isdir( localUnit.fullPath() ):
+            
+            scenePath = cmds.file( q=1, sceneName=1 )
+            txSave = "저장하고 업로드".decode( 'utf-8' )
+            txDoNotSave = "저장하기 않고 업로드".decode( "utf-8" )
+            txCancel = "취소".decode( 'utf-8' )
+            
+            for root, dirs, names in os.walk( localUnit.fullPath() ):
+                for name in names:
+                    targetPath = root + '/' + name
+                    
+                    if os.path.normpath( scenePath ) == os.path.normpath( targetPath ) and cmds.file( q=1, amf=1 ):
+                        confirmResult = cmds.confirmDialog( title='Confirm', message='업로드할 파일들 중 현제 Scene이 존재합니다.\n업로드하기전에 Scene을 저장하시겠습니까?'.decode( 'utf-8' ),
+                                                                button=[txSave,txDoNotSave,txCancel],
+                                                                defaultButton=txCancel, parent= Models.ControlBase.mainui.objectName )
+                        if confirmResult == txCancel:
+                            return
+                        elif confirmResult == txSave:
+                            cmds.file( save=1, f=1 )
+                        else:
+                            pass
+                        break
+            
             EditorCmds.fixEditorInfo( localUnit.fullPath()  )
             EditorCmds.fixEditorInfo( serverUnit.fullPath() )
             targetPaths = []
+            
             for root, dirs, names in os.walk( localUnit.fullPath() ):
                 for name in names:
                     targetPath = FileControl.getArrangedPathString( root + '/' + name )[ len( localUnit.projectPath ): ]
@@ -1216,7 +1241,11 @@ class ContextMenuCmds:
                     if FileControl.isEditorInfoFile( targetPath ): continue
                     serverEditorInfo = EditorCmds.getEditorInfoFromFile( serverUnit.projectPath + targetPath )
                     localEditorInfo  = EditorCmds.getEditorInfoFromFile( localUnit.projectPath  + targetPath )
-                    if serverEditorInfo >= localEditorInfo: continue
+                    if os.path.normpath( cmds.file( q=1, sceneName=1 ) ) == os.path.normpath( localUnit.projectPath + '/' + targetPath ) and cmds.file( q=1, amf=1 ):
+                        targetPaths.append( targetPath )
+                        continue
+                    elif serverEditorInfo >= localEditorInfo:
+                        continue
                     targetPaths.append( targetPath )
             
             if not targetPaths:

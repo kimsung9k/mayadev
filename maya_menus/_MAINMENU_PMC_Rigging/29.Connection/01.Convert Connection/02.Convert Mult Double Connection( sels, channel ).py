@@ -14,6 +14,6 @@ for sel in sels:
     if attrs3: attrs += attrs3
     
     for attr in attrs:
-        sgCmds.addMultDoubleLinearConnection( sel, attr )
+        sgCmds.addMultDoubleLinearConnection( sel + '.' + attr )
 
 cmds.select( sels )

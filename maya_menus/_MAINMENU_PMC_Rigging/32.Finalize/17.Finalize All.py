@@ -1,4 +1,5 @@
 import pymel.core
+from sgMaya import sgCmds
 
 references = pymel.core.ls( type='reference' )
 for refNode in references:
@@ -58,5 +59,5 @@ sels = pymel.core.ls( 'Ctl_*', type='transform' )
 for sel in sels:
     sgCmds.lockParent( sel )
     sgCmds.renameShape( sel )
-    if not sel.getParent()[:3] == 'Ctl':
+    if not sel.getParent().nodeName()[:3] == 'Ctl':
         sgCmds.renameParent( sel )

@@ -3,13 +3,13 @@ from maya import mel
 import pymel.core
 sels = pymel.core.ls( sl=1 )
 mel.eval( "DeleteHistory" )
-selChildren = pymel.core.listRelatives( c=1, ad=1, type='transform' )
+selChildren = pymel.core.listRelatives( c=1, ad=1 )
 
 def isVisible( target ):
-    if not target.v.get() and not target.v.listConnections(s=1, d=0): return False
+    if not target.attr( 'v' ).get() and not target.attr( 'v' ).listConnections(s=1, d=0): return False
     targetParents = target.getAllParents()
     for p in targetParents:
-        if not p.v.get() and not p.v.listConnections(s=1, d=0): return False
+        if not p.attr( 'v' ).get() and not p.v.listConnections(s=1, d=0): return False
     return True
 
 hiddenTransforms = []

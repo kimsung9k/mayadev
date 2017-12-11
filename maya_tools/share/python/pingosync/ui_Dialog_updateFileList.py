@@ -175,8 +175,8 @@ class Dialog_uploadFileList( QDialog ):
         
         QtCore.QObject.connect( buttonUpload, QtCore.SIGNAL('clicked()'),  self.cmd_upload )
         QtCore.QObject.connect( buttonCanel, QtCore.SIGNAL('clicked()'),   self.cmd_deleteUI )
-        
-    
+
+
 
     def setServerPath(self, serverPath ):
         

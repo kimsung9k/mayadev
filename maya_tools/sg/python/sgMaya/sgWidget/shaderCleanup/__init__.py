@@ -2,10 +2,9 @@
 
 import maya.cmds as cmds
 import maya.OpenMaya as OpenMaya
-from sgUIs.__qtImprot import * 
+from __qtImprot import * 
 import pymel.core
 import os
-from sgUIs.putObjectOnGround import Window_cmd
 
 
 class Window_global:

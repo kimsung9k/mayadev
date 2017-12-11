@@ -6,6 +6,7 @@ from __qtImport import *
 import os, sys
 import json
 from functools import partial
+import pymel.core
 
 
 def makeFolder( pathName ):
@@ -450,7 +451,7 @@ class Menu_Global:
     makeFile( loadedMenuInfoFile )
     makeFile( loadedPopupInfoFile_sa )
     makeFile( loadedPopupInfoFile_ca )
-    
+
     menuPrefix = 'sg_maya_mainWindow'
     popupPrefix = 'sg_maya_popupMenu'
     menuFolderPrefixList = ['_MENU_', '_MAINMENU_', '_POPUPMENU_' ]

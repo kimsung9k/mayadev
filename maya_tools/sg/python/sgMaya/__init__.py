@@ -44,7 +44,8 @@ def removeDirectory( targetdir ):
     if not os.path.exists( targetdir ): return None
     for root, dirs, names in os.walk( targetdir ):
         for name in names:
-            os.remove( root + '/' + name )
+            try:os.remove( root + '/' + name )
+            except:pass
     targetDirs = []
     for root, dirs, names in os.walk( targetdir ):
         for dir in dirs:
@@ -52,9 +53,10 @@ def removeDirectory( targetdir ):
                 targetDirs.append( root + '/' + dir )
     targetDirs.reverse()
     for dir in targetDirs:
-        os.rmdir( dir )
-    os.rmdir( targetdir )
-
+        try:os.rmdir( dir )
+        except:pass
+    try:os.rmdir( targetdir )
+    except:pass
 
 
 def copyPythonModules( srcdir, targetdir ):
@@ -79,4 +81,6 @@ def copyPythonModules( srcdir, targetdir ):
                 if not os.path.exists( newFolder ):os.makedirs( newFolder )
             for name in names:
                 if os.path.splitext( name )[-1].lower() in ['.pyc'] or name[0] == '.': continue
-                shutil.copy2( root + '/' + name, baseFolder + '/' + name )
+                try:shutil.copy2( root + '/' + name, baseFolder + '/' + name )
+                except:
+                    print "failed to copy : %s --> %s" % ( root + '/' + name, baseFolder + '/' + name )

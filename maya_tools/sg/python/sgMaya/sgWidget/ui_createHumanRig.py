@@ -1,5 +1,5 @@
 from maya import cmds
-from sgModules import sgHumanRigCommands
+from sgMaya.sgHumanRig import sgHumanRigCommands
 import os, json
 
 
@@ -64,14 +64,14 @@ class Win_Cmd:
     @staticmethod
     def createStds( *args ):
         
-        from sgModules import sgHumanRigCommands
+        from sgMaya.sgHumanRig import sgHumanRigCommands
         sgHumanRigCommands.HumanStdRig()
     
     
     @staticmethod
     def setSymmetry( *args ):
         
-        from sgModules import sgHumanRigCommands
+        from sgMaya.sgHumanRig import sgHumanRigCommands
         sgHumanRigCommands.StdControl().setSymmetry( cmds.ls( sl=1 )[0] )
     
     
@@ -87,7 +87,7 @@ class Win_Cmd:
         headType = cmds.intFieldGrp( Win_Global.headType, q=1, v=1 )[0]
         bodyType = cmds.intFieldGrp( Win_Global.bodyType, q=1, v=1 )[0]
         
-        from sgModules import sgHumanRigCommands
+        from sgMaya.sgHumanRig import sgHumanRigCommands
         sgHumanRigCommands.createHumanByStd(controllerSize=controllerSize,
                                             numBodyJnts=numBodyJnts,
                                             numArmUpperJnts=numArmUpperJnts,
@@ -107,7 +107,7 @@ class Win_Cmd:
         move  = cmds.checkBox( Win_Global.movefollow, q=1, v=1 )
         world = cmds.checkBox( Win_Global.worldfollow, q=1, v=1 )
         
-        from sgModules import sgHumanRigCommands
+        from sgMaya.sgHumanRig import sgHumanRigCommands
         followList = sgHumanRigCommands.FollowingIk.getFollowList( root=root, fly=fly, move=move, world=world )
         
         sels = cmds.ls( sl=1 )

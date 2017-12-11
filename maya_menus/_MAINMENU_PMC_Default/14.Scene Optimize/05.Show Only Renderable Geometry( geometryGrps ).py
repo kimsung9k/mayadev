@@ -25,6 +25,11 @@ for child in selChildren:
 for child in selChildren:
     try:child.v.set( 0 )
     except:pass
+    childShapes = child.listRelatives( s=1 )
+    for childShape in childShapes:
+        if childShape.nodeType() == 'nurbsCurve':
+            try: childShape.v.set( 0 )
+            except:pass
 
 pymel.core.select( visibleChildren )
 pymel.core.showHidden( a=1 )

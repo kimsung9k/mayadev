@@ -146,8 +146,11 @@ class Functions:
     def getTransform( mouseX, mouseY ):
         
         import math
+        import pymel.core
+        
         for transform in cmds.ls( type='transform' ):
             if not cmds.getAttr( transform + '.dh' ): continue
+            if not pymel.core.ls( transform )[0].isVisible(): continue
             
             point = OpenMaya.MPoint( *cmds.xform( transform, q=1, ws=1, t=1 ) )
             viewPoint = worldPointToViewPoint( point )

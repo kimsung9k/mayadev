@@ -39,7 +39,7 @@ global proc JW_SetFileDir()
         $cfmDir=`filetest -e $setDir`;
         if($cfmDir!=1)
         {
-            warning ($lf+"ÀÇ "+$setDir+"ÆÄÀÏÀº Á¸ÀçÇÏÁö¾Ê½À´Ï´Ù.");
+            warning ($lf+"í•´ë‹¹ ê²½ë¡œê°€ ì¡´ìž¬í•˜ì§€ ì•ŠìŠµë‹ˆë‹¤.");
             continue;
         }
         setAttr -type "string" ($lf+".fileTextureName")  $setDir;

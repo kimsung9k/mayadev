@@ -33,7 +33,7 @@ MStatus sgSkinCluster::deform( MDataBlock& data, MItGeometry& iter, const MMatri
 	MStatus status;
 
 	MDataHandle      hGeomMatrix = data.inputValue( aGeomMatrix );
-	MArrayDataHandle hArrMatrix = data.inputArrayValue( aMatrix );
+	MArrayDataHandle hArrMatrix  = data.inputArrayValue( aMatrix );
 	MArrayDataHandle hArrBindPre = data.inputArrayValue( aBindPreMatrix );
 
 	MMatrix mtxGeom    = hGeomMatrix.asMatrix();

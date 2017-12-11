@@ -1,4 +1,6 @@
-import sgPlugin
+from sgMaya import sgPlugin
+
+sgPlugin.appendPluginPath()
 
 if not cmds.pluginInfo( 'sgCmdSkinCluster', q=1, l=1 ):
     cmds.loadPlugin( 'sgCmdSkinCluster' )

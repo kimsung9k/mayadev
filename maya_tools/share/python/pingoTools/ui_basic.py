@@ -2,7 +2,7 @@ from maya import cmds
 import maya.mel as mel
 
 class cList:
-    
+
     @staticmethod
     def selCtrl(self):
         sel=cmds.ls(sl=True)

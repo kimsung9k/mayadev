@@ -1,0 +1,66 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{2512e431-595f-41a3-86ce-17715e157129}</ProjectGuid>
+    <ProjectHome />
+    <StartupFile />
+    <SearchPath>C:\Program Files\Autodesk\Maya2017\Python\Lib\site-packages\</SearchPath>
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <ProjectTypeGuids>{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <InterpreterId>{2af0f10d-7135-4994-9156-5d01c9c11b7e}</InterpreterId>
+    <InterpreterVersion>2.7</InterpreterVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
+  <PropertyGroup>
+    <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
+    <PtvsTargetsFile>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets</PtvsTargetsFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="furDescriptionMapEditor\__init__.py" />
+    <Compile Include="furDescriptionMapEditor\__qtImport.py" />
+    <Compile Include="pingosync\commands.py" />
+    <Compile Include="pingosync\Models.py" />
+    <Compile Include="pingosync\ui_Dialog_addProject.py" />
+    <Compile Include="pingosync\ui_Dialog_addTask.py" />
+    <Compile Include="pingosync\ui_Dialog_help_fileCondition.py" />
+    <Compile Include="pingosync\ui_Dialog_updateFileList.py" />
+    <Compile Include="pingosync\ui_Window_manageProject.py" />
+    <Compile Include="pingosync\__init__.py" />
+    <Compile Include="pingosync\__qtImport.py" />
+    <Compile Include="pingoTools\HairAnimationToFkControl\function.py" />
+    <Compile Include="pingoTools\HairAnimationToFkControl\model.py" />
+    <Compile Include="pingoTools\HairAnimationToFkControl\ui.py" />
+    <Compile Include="pingoTools\HairAnimationToFkControl\__init__.py" />
+    <Compile Include="pingoTools\ui_basic.py" />
+    <Compile Include="pingoTools\__init__.py" />
+    <Compile Include="pmc\commands.py" />
+    <Compile Include="pmc\fileDialog.py" />
+    <Compile Include="pmc\menuLister.py" />
+    <Compile Include="pmc\ui_menuEditor.py" />
+    <Compile Include="pmc\__init__.py" />
+    <Compile Include="pmc\__qtImport.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="pmc\icons\list.png" />
+    <Content Include="pmc\icons\reload.png" />
+    <Content Include="pmc\icons\search.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="furDescriptionMapEditor" />
+    <Folder Include="pingosync" />
+    <Folder Include="pingoTools" />
+    <Folder Include="pingoTools\HairAnimationToFkControl" />
+    <Folder Include="pmc" />
+    <Folder Include="pmc\icons" />
+  </ItemGroup>
+  <ItemGroup>
+    <InterpreterReference Include="{2af0f10d-7135-4994-9156-5d01c9c11b7e}\2.7" />
+  </ItemGroup>
+  <Import Project="$(PtvsTargetsFile)" Condition="Exists($(PtvsTargetsFile))" />
+  <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" Condition="!Exists($(PtvsTargetsFile))" />
+</Project>

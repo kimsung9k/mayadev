@@ -1,13 +1,12 @@
 from sgMaya import sgCmds
-from maya import cmds
 import pymel.core
 
-sels = cmds.ls( sl=1 )
+sels = pymel.core.ls( sl=1 )
 targets = sels[:-1]
 parentTarget = sels[-1]
 dcmps = []
 for target in targets:
-    node = sgCmds.getLocalMatrix( target, parentTarget )
-    dcmp = sgCmds.getDecomposeMatrix(node)
+    node = sgCmds.getLocalMatrix( target.wm, parentTarget.wim )
+    dcmp = sgCmds.getDecomposeMatrix(node.o)
     dcmps.append( dcmp )
 pymel.core.select( dcmps )
