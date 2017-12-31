@@ -150,13 +150,19 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="sgFootPrintDeformer.cpp" />
+    <ClCompile Include="sgBulgeDeformer.cpp" />
+    <ClCompile Include="sgFootPrintMesh.cpp" />
     <ClCompile Include="sgMeshInfo.cpp" />
+    <ClCompile Include="sgModifiedMeshKeeper.cpp" />
     <ClCompile Include="sgPrintf.cpp" />
+    <ClCompile Include="sgSnowBulge.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="sgFootPrintDeformer.h" />
+    <ClInclude Include="sgBulgeDeformer.h" />
+    <ClInclude Include="sgFootPrintMesh.h" />
     <ClInclude Include="sgMeshInfo.h" />
+    <ClInclude Include="sgModifiedMeshKeeper.h" />
+    <ClInclude Include="sgSnowBulge.h" />
     <ClInclude Include="sgPrintf.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -12,6 +12,8 @@ def isVisible( target ):
 
 visibleChildren = []
 for child in selChildren:
+    if child.nodeType() == 'place3dTexture':
+        visibleChildren.append( child )
     childShape = child.getShape()
     if not childShape:
         continue
@@ -34,3 +36,9 @@ for child in selChildren:
 pymel.core.select( visibleChildren )
 pymel.core.showHidden( a=1 )
 pymel.core.select( sels )
+
+for selChild in selChildren:
+    vCons = selChild.v.listConnections( s=1, d=0, p=1 )
+    if not vCons: continue
+    try:selChild.v.set( vCons[0].get() )
+    except:pass

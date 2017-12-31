@@ -14,13 +14,14 @@ if shadingEngines:
     shadingEngines = list( set( shadingEngines ) )
     
     for shadingEngine in shadingEngines:
-        cons = shadingEngines[0].surfaceShader.listConnections( s=1, d=0 )
-        pymel.core.defaultNavigation( ce=1, source = cons[0], destination = shadingEngines[0].rsSurfaceShader )
+        cons = shadingEngine.surfaceShader.listConnections( s=1, d=0 )
+        if cons and cons[0].nodeType() in ['blinn', 'lambert']: continue
+        pymel.core.defaultNavigation( ce=1, source = cons[0], destination = shadingEngine.rsSurfaceShader )
         blinn = pymel.core.shadingNode( 'blinn', asShader=1 )
-        blinn.outColor >> shadingEngines[0].surfaceShader
+        blinn.outColor >> shadingEngine.surfaceShader
         blinn.specularColor.set( 0,0,0 )
         
-        attrList = [ 'diffuse_color', 'diffuse', 'facing_color']
+        attrList = [ 'diffuse_color', 'diffuse', 'facing_color', 'color']
         for attr in attrList:
             try:
                 colorNodeCon = cons[0].attr( attr ).listConnections( s=1, d=0, p=1 )

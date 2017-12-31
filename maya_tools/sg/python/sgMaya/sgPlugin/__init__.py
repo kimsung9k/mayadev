@@ -97,6 +97,40 @@ def setTool_smoothSkinWeightBrush( evt=0 ):
 
 
 
+def setTool_hardSkinWeightBrush( evt=0 ):
+
+    appendPluginPath()
+    _cmdStr =  """global string $tf_skinSmoothPatin_selection[];
+    
+    global proc tf_smoothBrush( string $context )     
+    {       
+     artUserPaintCtx -e -ic "tf_init_smoothBrush"
+     -svc "tf_set_smoothBrushValue"
+     -fc "" -gvc "" -gsc "" -gac "" -tcc "" $context;
+    }
+    
+    global proc tf_init_smoothBrush( string $name )
+    {
+        string $sel[] = `ls -sl -fl`;
+        string $obj[] = `ls -sl -o`;
+        
+        sgSmoothWeightCommand $obj;
+    }
+    
+    global proc tf_set_smoothBrushValue( int $slot, int $index, float $val )             
+    {         
+        sgSmoothWeightCommand -h 1 -i $index -w $val;
+    }
+    
+    ScriptPaintTool;     
+    artUserPaintCtx -e -tsc "tf_smoothBrush" `currentCtx`;"""
+    
+    if not cmds.pluginInfo( 'sgSmoothWeightCommand', q=1, l=1 ):
+        cmds.loadPlugin( 'sgSmoothWeightCommand' )
+    mel.eval( _cmdStr )
+
+
+
 def cmd_sgAverageVertex( *args, **kwargs ):
     
     appendPluginPath()

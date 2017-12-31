@@ -7,6 +7,17 @@ import maya.OpenMayaUI
 
 
 
+if not cmds.pluginInfo( 'AbcExport', q=1, l=1 ):
+    cmds.loadPlugin( 'AbcExport' )
+
+
+def makeFolder( pathName ):
+    if os.path.exists( pathName ):return None
+    os.makedirs( pathName )
+    return pathName
+
+
+
 class Window_global:
     
     name = "sgSceneImport"

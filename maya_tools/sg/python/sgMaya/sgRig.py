@@ -1,7 +1,7 @@
 from maya import OpenMaya
 from maya import cmds
 import pymel.core
-from sgMaya import sgCmds
+from sgMaya import sgCmds, sgModel
 import random
 
 
@@ -631,4 +631,432 @@ class IkDetailJoint:
         
         
 
+def chainRig( mesh, curve, upObject, upVector, percentOfSpaceOfBlock=0.0, randomOffsetPercent=0 ):
+    
+    from maya import mel
+    
+    pymel.core.select( mesh )
+    mel.eval( 'CenterPivot' )
+    
+    pivotMatrix = sgCmds.getPivotWorldMatrix( mesh )
+    sgCmds.setPivotZero( mesh )
+    sgCmds.setMatrixToTarget( pivotMatrix, mesh, pcp=1 )
+    
+    def getMeshStartAndEndPoint( mesh, curve ):
+        param = sgCmds.getClosestParamAtPoint( mesh, curve )
+        direction = sgCmds.getTangentAtParam( curve, param )
+        localDirection = sgCmds.getMVector(direction) * sgCmds.listToMatrix( mesh.wim.get() )
+        directionIndex = sgCmds.getDirectionIndex( localDirection )
+        
+        meshChildren = mesh.listRelatives( c=1 )
+        bbmin = [10000000,10000000,1000000]
+        bbmax = [-10000000,-10000000,-10000000]
+        for child in meshChildren:
+            cbbmin = child.attr( 'boundingBoxMin' ).get()
+            cbbmax = child.attr( 'boundingBoxMax' ).get()
+            for i in range( 3 ):
+                bbmin[i] = min( bbmin[i], cbbmin[i] )
+                bbmax[i] = max( bbmax[i], cbbmax[i] )
+            
+        meshStartPoint = [ 0,0,0 ]
+        meshEndPoint = [ 0,0,0 ]
+        meshStartPoint[ directionIndex%3 ] = bbmin[directionIndex%3]
+        meshEndPoint[ directionIndex%3 ] = bbmax[directionIndex%3]
+        meshStartPoint = sgCmds.getMPoint(meshStartPoint) * sgCmds.listToMatrix( mesh.wm.get() )
+        meshEndPoint = sgCmds.getMPoint(meshEndPoint) * sgCmds.listToMatrix( mesh.wm.get() )
+        return meshStartPoint, meshEndPoint, directionIndex
+    
+    paramMinValue = curve.getShape().minValue.get()
+    paramMaxValue = curve.getShape().maxValue.get()
+    
+    startPoint, endPoint,  dirIndex = getMeshStartAndEndPoint( mesh, curve )
+    direction = sgCmds.getVectorList()[dirIndex]
+    param   = sgCmds.getClosestParamAtPoint( mesh, curve )
+    closePoint = sgCmds.getPointAtParam( curve, param )
+    tangent = sgCmds.getTangentAtParam( curve, param )
+    
+    startTr = pymel.core.createNode( 'transform' )
+    rot = pymel.core.angleBetween( v1=direction, v2=[tangent.x, tangent.y, tangent.z], euler=1 )
+    startTr.t.set( closePoint )
+    startTr.r.set( rot )
+    
+    if mesh.getShape():
+        sgCmds.setGeometryMatrixToTarget( mesh, startTr )
+    else:
+        sgCmds.setMatrixToTarget( startTr.wm.get(), mesh, pcp=1 )
+    pymel.core.delete( startTr )
+    
+    curveLength = sgCmds.getCurveLength( curve )
+    
+    sizeOfBlock = startPoint.distanceTo( endPoint )
+    spaceOfBlock = sizeOfBlock * percentOfSpaceOfBlock
+    
+    numBlock = int( curveLength/(sizeOfBlock + spaceOfBlock) )
+    elseSpace = curveLength - ( sizeOfBlock + spaceOfBlock ) * numBlock
+    
+    spaceOfBlock += elseSpace / numBlock
+    
+    blockLength = ( spaceOfBlock + sizeOfBlock )
+    eachParamLengthOfBlock = blockLength / curveLength * (paramMaxValue-paramMinValue)
+    
+    mainGrp = pymel.core.createNode( 'transform' )
+    sgCmds.addAttr( mainGrp, ln='param', k=1 )
+    
+    duMeshPointers = []
+    duMeshs = []
+    
+    for i in range( numBlock ):
+        duMesh = pymel.core.duplicate( mesh )[0]
+        if mesh.getShape():
+            mesh.getShape().outMesh >> duMesh.getShape().inMesh
+            sgCmds.copyShader( mesh, duMesh )
+        randomOffset = random.uniform( -randomOffsetPercent*blockLength/2, randomOffsetPercent*blockLength/2 )
+        duMesh.addAttr( 'offset', k=1, dv= randomOffset )
+        
+        duMeshPointer = pymel.core.createNode( 'transform' )
+        pymel.core.xform( duMeshPointer, ws=1, matrix= duMesh.wm.get() )
+        
+        animCurve = pymel.core.createNode( 'animCurveUU' )
+        animCurve.attr( 'preInfinity' ).set( 3 )
+        animCurve.attr( 'postInfinity').set( 3 )
 
+        offsetAdd = pymel.core.createNode( 'addDoubleLinear' )
+        paramAdd = pymel.core.createNode( 'addDoubleLinear' )
+        paramMult = pymel.core.createNode( 'multDoubleLinear' )
+        mainGrp.attr( 'param' ) >> offsetAdd.input1
+        duMesh.attr( 'offset' ) >> offsetAdd.input2
+        offsetAdd.output >> paramMult.input1
+        paramMult.input2.set( (paramMaxValue-paramMinValue)/curveLength )
+        paramMult.output >> paramAdd.input1
+        paramAdd.input2.set( eachParamLengthOfBlock * i + paramMinValue )
+        paramAdd.output >> animCurve.input
+
+        pymel.core.setKeyframe( animCurve, f=paramMinValue, v = paramMinValue )
+        pymel.core.setKeyframe( animCurve, f=paramMaxValue, v = paramMaxValue )
+        pymel.core.keyTangent( animCurve, itt='linear', ott='linear' )
+        
+        sgCmds.attachToCurve( duMeshPointer, curve )
+        animCurve.output >> duMeshPointer.param
+        sgCmds.constrain_parent( duMeshPointer, duMesh )
+        duMeshPointers.append( duMeshPointer )
+        duMeshs.append( duMesh )
+        
+        pymel.core.tangentConstraint( curve, duMeshPointer, aim=direction, u=upVector, wu=upVector, wut='objectrotation', wuo=upObject)
+    
+    pointersGrp   = pymel.core.group( duMeshPointers, n='conveyer_pointersGrp' )
+    duMeshsGrp    = pymel.core.group( duMeshs, n='conveyer_duMeshsGrp' )
+    mesh.v.set( 0 ); upObject.v.set( 0 ); pointersGrp.v.set( 0 );curve.v.set( 0 )
+    pymel.core.parent( mesh, curve, upObject, pointersGrp, duMeshsGrp, mainGrp )
+    pymel.core.select( mainGrp )
+    
+    
+
+
+def conveyerBeltRig( mesh, curve, percentOfSpaceOfBlock=0.0 ):
+    
+    def getMeshStartAndEndPoint( mesh, curve ):
+        param = sgCmds.getClosestParamAtPoint( mesh, curve )
+        direction = sgCmds.getTangentAtParam( curve, param )
+        localDirection = sgCmds.getMVector(direction) * sgCmds.listToMatrix( mesh.wim.get() )
+        directionIndex = sgCmds.getDirectionIndex( localDirection )
+        meshShape = sgCmds.getShape( mesh )
+        bbmin = meshShape.attr( 'boundingBoxMin' ).get()
+        bbmax = meshShape.attr( 'boundingBoxMax' ).get()
+        meshStartPoint = [ 0,0,0 ]
+        meshEndPoint = [ 0,0,0 ]
+        meshStartPoint[ directionIndex%3 ] = bbmin[directionIndex%3]
+        meshEndPoint[ directionIndex%3 ] = bbmax[directionIndex%3]
+        meshStartPoint = sgCmds.getMPoint(meshStartPoint) * sgCmds.listToMatrix( mesh.wm.get() )
+        meshEndPoint = sgCmds.getMPoint(meshEndPoint) * sgCmds.listToMatrix( mesh.wm.get() )
+        return meshStartPoint, meshEndPoint, sgCmds.getVectorList()[directionIndex]
+    
+    paramMinValue = curve.getShape().minValue.get()
+    paramMaxValue = curve.getShape().maxValue.get()
+    
+    startPoint, endPoint, direction = getMeshStartAndEndPoint( mesh, curve )
+    param   = sgCmds.getClosestParamAtPoint( mesh, curve )
+    tangent = sgCmds.getTangentAtParam( curve, param )    
+    
+    paramStartPoint = sgCmds.getClosestParamAtPoint( startPoint, curve )
+    paramEndPoint   = sgCmds.getClosestParamAtPoint( endPoint, curve )
+    sp = sgCmds.getPointAtParam( curve, paramStartPoint )
+    ep = sgCmds.getPointAtParam( curve, paramEndPoint )
+    startTr = pymel.core.createNode( 'transform', n='startTr' ); startTr.t.set( sp )
+    endTr   = pymel.core.createNode( 'transform', n='endTr' ); endTr.t.set( ep )
+    sgCmds.lookAt( endTr, startTr, direction )
+    
+    if mesh.getShape():
+        sgCmds.setGeometryMatrixToTarget( mesh, startTr )
+    else:
+        sgCmds.setMatrixToTarget( mesh, startTr, pcp=1 )
+    curveLength = sgCmds.getCurveLength( curve )
+    
+    sizeOfBlock = OpenMaya.MPoint( *pymel.core.xform( endTr, q=1, ws=1, t=1 ) ).distanceTo( OpenMaya.MPoint( *pymel.core.xform( startTr, q=1, ws=1, t=1 ) ) )
+    spaceOfBlock = sizeOfBlock * percentOfSpaceOfBlock 
+    
+    numBlock = int( curveLength/(sizeOfBlock + spaceOfBlock) )
+    elseSpace = curveLength - ( sizeOfBlock + spaceOfBlock ) * numBlock
+    
+    spaceOfBlock += elseSpace / numBlock
+    
+    eachParamLengthOfBlock = ( spaceOfBlock + sizeOfBlock ) / curveLength * (paramMaxValue-paramMinValue)
+    
+    mainGrp = pymel.core.createNode( 'transform' )
+    sgCmds.addAttr( mainGrp, ln='param', k=1 )
+    
+    duMeshPointers = []
+    duMeshs = []
+    
+    for i in range( numBlock+1 ):
+        duMesh = pymel.core.duplicate( mesh )[0]
+        mesh.getShape().outMesh >> duMesh.getShape().inMesh
+        sgCmds.copyShader( mesh, duMesh )
+        
+        duMeshPointer = pymel.core.createNode( 'transform' )
+        pymel.core.xform( duMeshPointer, ws=1, matrix= duMesh.wm.get() )
+        
+        animCurve = pymel.core.createNode( 'animCurveUU' )
+        animCurve.attr( 'preInfinity' ).set( 3 )
+        animCurve.attr( 'postInfinity').set( 3 )
+
+        offsetAdd = pymel.core.createNode( 'addDoubleLinear' )
+        offsetMult = pymel.core.createNode( 'multDoubleLinear' )
+        mainGrp.attr( 'param' ) >> offsetMult.input1
+        offsetMult.input2.set( (paramMaxValue-paramMinValue)/curveLength )
+        offsetMult.output >> offsetAdd.input1
+        offsetAdd.input2.set( eachParamLengthOfBlock * i + paramMinValue )
+        offsetAdd.output >> animCurve.input
+
+        pymel.core.setKeyframe( animCurve, f=paramMinValue, v = paramMinValue )
+        pymel.core.setKeyframe( animCurve, f=paramMaxValue, v = paramMaxValue )
+        pymel.core.keyTangent( animCurve, itt='linear', ott='linear' )
+        
+        sgCmds.attachToCurve( duMeshPointer, curve )
+        animCurve.output >> duMeshPointer.param
+        
+        sgCmds.makeParent( duMeshPointer )
+        sgCmds.constrain_parent( duMeshPointer, duMesh )
+        duMeshPointers.append( duMeshPointer )
+        duMeshs.append( duMesh )
+    
+    for i in range( numBlock ):
+        sgCmds.lookAtConnect( duMeshPointers[(i+1)%(numBlock+1)], duMeshPointers[i], direction=tangent )
+    pymel.core.delete( duMeshs[-1] )
+    
+    duMeshGrp    = pymel.core.group( duMeshs, n='conveyer_meshs' )
+    duPointerGrp = pymel.core.group( duMeshPointers, n='conveyer_pointers' )
+
+
+
+
+def conveyerBeltRig_deform( mesh, curve, upObject, upVector, numDetail=4 ):
+    
+    if numDetail < 3: numDetail = 3
+    
+    def editGeometryTransform( mesh, curve ):
+        meshMtx = sgCmds.getPivotWorldMatrix( mesh )
+        sgCmds.setGeometryMatrixToTarget( mesh, meshMtx )
+        newTr = sgCmds.createNearestPointOnCurveObject( mesh, curve )
+        newTrPos = newTr.t.get()
+        pymel.core.delete( newTr )
+        setMtx = sgCmds.matrixToList( meshMtx )
+        setMtx = setMtx[:-4] + [newTrPos[0],newTrPos[1],newTrPos[2]] + [1]
+        sgCmds.setGeometryMatrixToTarget( mesh, setMtx ) 
+    
+    editGeometryTransform( mesh, curve )
+    
+    curveLength = sgCmds.getCurveLength( curve )
+    meshBB = pymel.core.exactWorldBoundingBox( mesh )
+    bbmin = meshBB[:3]
+    bbmax = meshBB[3:]
+    
+    sizeX = bbmax[0]-bbmin[0]
+    sizeY = bbmax[1]-bbmin[1]
+    sizeZ = bbmax[2]-bbmin[2]
+    
+    size = [ sizeX, sizeY, sizeZ ]
+    
+    closeParam = sgCmds.getClosestParamAtPoint( mesh, curve )
+    paramMinValue = curve.getShape().minValue.get()
+    paramMaxValue = curve.getShape().maxValue.get()
+    
+    tangent = sgCmds.getTangentAtParam( curve, closeParam )
+    directionIndex = sgCmds.getDirectionIndex( tangent )
+    
+    sizeOfBlock = size[ directionIndex%3 ]
+    spaceOfEachBlock = sizeOfBlock * 0.02
+    
+    numBlock = int( curveLength/(sizeOfBlock + spaceOfEachBlock) )
+    elseSpace = curveLength - ( sizeOfBlock + spaceOfEachBlock ) * numBlock
+    
+    spaceOfEachBlock += elseSpace / numBlock
+    
+    eachParamLengthOfBlock = ( spaceOfEachBlock + sizeOfBlock ) / curveLength * (paramMaxValue-paramMinValue)
+    
+    mainGrp = pymel.core.createNode( 'transform', n='conveyer_allGrp' )
+    sgCmds.addAttr( mainGrp, ln='param', k=1 )
+    
+    eachCurves = []
+    baseCurves = []
+    pointers = []
+    duMeshs = []
+    localMeshs = []
+    for i in range( numBlock ):
+        duMesh = pymel.core.duplicate( mesh )[0]
+        mesh.getShape().outMesh >> duMesh.getShape().inMesh
+        localOutMesh = pymel.core.duplicate( mesh )[0]
+        duMesh.getShape().outMesh >> localOutMesh.inMesh
+        
+        offsetMin = -eachParamLengthOfBlock/2
+        offsetMax =  eachParamLengthOfBlock/2
+        
+        eachPointers = []
+        for j in range( numDetail ):
+            addOffsetValue = ((offsetMax - offsetMin) / (numDetail-1)) * j + offsetMin
+            
+            animCurve = pymel.core.createNode( 'animCurveUU' )
+            animCurve.attr( 'preInfinity' ).set( 3 )
+            animCurve.attr( 'postInfinity').set( 3 )
+    
+            offsetAdd = pymel.core.createNode( 'addDoubleLinear' )
+            offsetMult = pymel.core.createNode( 'multDoubleLinear' )
+            mainGrp.attr( 'param' ) >> offsetMult.input1
+            offsetMult.input2.set( (paramMaxValue-paramMinValue)/curveLength )
+            offsetMult.output >> offsetAdd.input1
+            offsetAdd.input2.set( eachParamLengthOfBlock * i + addOffsetValue + paramMinValue )
+            offsetAdd.output >> animCurve.input
+    
+            pymel.core.setKeyframe( animCurve, f=paramMinValue, v = paramMinValue )
+            pymel.core.setKeyframe( animCurve, f=paramMaxValue, v = paramMaxValue )
+            pymel.core.keyTangent( animCurve, itt='linear', ott='linear' )
+        
+            pointer = pymel.core.createNode( 'transform' )
+            sgCmds.attachToCurve( pointer, curve )
+            animCurve.output >> pointer.param
+            eachPointers.append( pointer )
+        pointers += eachPointers
+
+        eachCurve = sgCmds.makeCurveFromSelection( *eachPointers, d=2 )
+        mainGrp.attr( 'param' ).set( (closeParam - eachParamLengthOfBlock * i + paramMinValue) * curveLength )
+        wireNode = pymel.core.wire( duMesh, gw=False, en=1, ce=0, li=0, w=eachCurve, dds=[0,100000] )[0]
+        baseCurve = wireNode.attr( 'baseWire' ).listConnections( s=1, d=0 )[0]
+        
+        eachCurves.append( eachCurve )
+        baseCurves.append( baseCurve )
+        duMeshs.append( duMesh )
+        localMeshs.append( localOutMesh )
+        
+        pymel.core.refresh()
+    
+    eachCurveGrp  = pymel.core.group( eachCurves, n='conveyer_eachCurvesGrp' )
+    baseCurveGrp  = pymel.core.group( baseCurves, n='conveyer_baseCurvesGrp' )
+    pointersGrp   = pymel.core.group( pointers, n='conveyer_pointersGrp' )
+    duMeshsGrp    = pymel.core.group( duMeshs, n='conveyer_duMeshsGrp' )
+    localMeshsGrp = pymel.core.group( localMeshs, n='conveyer_localMeshsGrp' )
+    mesh.v.set( 0 ); upObject.v.set( 0 ); eachCurveGrp.v.set( 0 ); baseCurveGrp.v.set( 0 ); pointersGrp.v.set( 0 ); duMeshsGrp.v.set( 0 );curve.v.set( 0 )
+    pymel.core.parent( mesh, curve, upObject, eachCurveGrp, baseCurveGrp, pointersGrp, duMeshsGrp, localMeshsGrp, mainGrp )
+    pymel.core.select( mainGrp )
+    
+    
+
+
+def createDefaultPropRig( propGrp ):
+    
+    propGrp = pymel.core.ls( propGrp )[0]
+    
+    def makeParent( target ):
+        targetP = pymel.core.createNode( 'transform' )
+        pymel.core.xform( targetP, ws=1, matrix= target.wm.get() )
+        pymel.core.parent( target, targetP )
+        targetP.rename( 'P' + target.shortName() )
+        return targetP
+    
+    worldCtl = pymel.core.ls( sgCmds.makeController( sgModel.Controller.circlePoints ).name() )[0]
+    moveCtl  = pymel.core.ls( sgCmds.makeController( sgModel.Controller.crossPoints ).name() )[0]
+    rootCtl  = pymel.core.ls( sgCmds.makeController( sgModel.Controller.circlePoints ).name() )[0]
+    
+    bb = cmds.exactWorldBoundingBox(propGrp.name())
+    bbmin = bb[:3]
+    bbmax = bb[3:]
+    
+    bbsize = max( bbmax[0] - bbmin[0], bbmax[2] - bbmin[2] )/2
+    
+    center     = ( ( bbmin[0] + bbmax[0] )/2, ( bbmin[1] + bbmax[1] )/2, ( bbmin[2] + bbmax[2] )/2 )
+    floorPoint = ( ( bbmin[0] + bbmax[0] )/2, bbmin[1], ( bbmin[2] + bbmax[2] )/2 )
+    
+    worldCtl.t.set( *floorPoint )
+    moveCtl.t.set( *floorPoint )
+    rootCtl.t.set( *center )
+    
+    rootCtl.shape_sx.set( bbsize*1.2 )
+    rootCtl.shape_sy.set( bbsize*1.2 )
+    rootCtl.shape_sz.set( bbsize*1.2 )
+
+    moveCtl.shape_sx.set( bbsize*1.3 )
+    moveCtl.shape_sy.set( bbsize*1.3 )
+    moveCtl.shape_sz.set( bbsize*1.3 )
+    
+    worldCtl.shape_sx.set( bbsize*1.5 )
+    worldCtl.shape_sy.set( bbsize*1.5 )
+    worldCtl.shape_sz.set( bbsize*1.5 )
+    
+    rootCtl.getShape().setAttr( 'overrideEnabled', 1 )
+    rootCtl.getShape().setAttr( 'overrideColor', 29 )
+    moveCtl.getShape().setAttr( 'overrideEnabled', 1 )
+    moveCtl.getShape().setAttr( 'overrideColor', 20 )
+    worldCtl.getShape().setAttr( 'overrideEnabled', 1 )
+    worldCtl.getShape().setAttr( 'overrideColor', 17 )
+    
+    shortName = propGrp.shortName().split( '|' )[-1]
+    rootCtl.rename( 'Ctl_%s_Root' % shortName )
+    moveCtl.rename( 'Ctl_%s_Move' % shortName )
+    worldCtl.rename( 'Ctl_%s_World' % shortName )
+    
+    pRootCtl  = makeParent( rootCtl )
+    pMoveCtl  = makeParent( moveCtl )
+    pWorldCtl = makeParent( worldCtl )
+    
+    pymel.core.parent( pRootCtl, moveCtl )
+    pymel.core.parent( pMoveCtl, worldCtl )
+
+    sgCmds.setMatrixToGeoGroup( rootCtl.wm.get(), propGrp.name() )
+    sgCmds.constrain_all( rootCtl, propGrp )
+
+
+    
+def createSimplePlaneControl( inputTarget ):
+    
+    target = pymel.core.ls( inputTarget )[0]
+    worldCtl = sgCmds.makeController( sgModel.Controller.cubePoints, makeParent=1 )
+    
+    bb = cmds.exactWorldBoundingBox(target.name())
+    bbmin = bb[:3]
+    bbmax = bb[3:]
+    
+    bbsize = max( bbmax[0] - bbmin[0], bbmax[2] - bbmin[2] )/2
+    
+    center     = ( ( bbmin[0] + bbmax[0] )/2, ( bbmin[1] + bbmax[1] )/2, ( bbmin[2] + bbmax[2] )/2 )
+    floorPoint = ( ( bbmin[0] + bbmax[0] )/2, bbmin[1], ( bbmin[2] + bbmax[2] )/2 )
+    
+    worldCtl.t.set( *floorPoint )
+    worldCtlShape = worldCtl.getShape()
+    worldCtlShape.shape_sx.set( bbsize*1.2*2 )
+    worldCtlShape.shape_sy.set( max((bbmax[1] - bbmin[1]), bbsize * 0.02 )*1.2*2 )
+    worldCtlShape.shape_sz.set( bbsize*1.2*2 )
+    
+    worldCtlShape.setAttr( 'overrideEnabled', 1 )
+    worldCtlShape.setAttr( 'overrideColor', 17 )
+    
+    worldCtl.rename( 'Ctl_World' )
+    targetChildren = pymel.core.listRelatives( target, c=1, ad=1, type='transform' )
+    if not targetChildren: targetChildren = []
+    targetChildren += [target]
+    for targetChild in targetChildren:
+        if not targetChild.getShape(): continue
+        sgCmds.optimizeMesh( targetChild )
+    sgCmds.setMatrixToTarget( worldCtl.wm.get(), target, pcp=1  )
+    sgCmds.setPivotZero( target )
+    sgCmds.constrain_all( worldCtl, target )
+    
+    
+    

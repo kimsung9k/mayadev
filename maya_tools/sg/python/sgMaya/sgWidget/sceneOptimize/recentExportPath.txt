@@ -1,1 +1,1 @@
-{"abcPath": "EP106_S026.abc", "sceneInfoPath": "EP106_S026.sceneInfo", "rootPath": "Z:/KAD_Pipeline/04_Shot-Production/05_RenderScenes/EP106/EP106_S026/EP106_S026_cache"}
+{"abcPath": "EP113_S017A.abc", "sceneInfoPath": "EP113_S017A.sceneInfo", "rootPath": "Z:/KAD_Pipeline/04_Shot-Production/05_RenderScenes/EP113/EP113_S017A/EP113_S017A_cache"}

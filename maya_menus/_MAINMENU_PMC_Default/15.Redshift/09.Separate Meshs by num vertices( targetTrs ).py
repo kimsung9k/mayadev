@@ -98,9 +98,5 @@ for targetGrp in targetGrps:
 
 pymel.core.delete( otherGrps )
 
-for resultGrp in resultGrps:
-    children = resultGrp.listRelatives( c=1 )
-    renameSelOrder( children, firstName= resultGrp.name() + '_00' )
-
 pymel.core.select( resultGrps )
 

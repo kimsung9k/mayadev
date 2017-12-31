@@ -8,4 +8,4 @@ upObject = sels[1]
 targets = sels[2:]
 
 for target in targets:
-    sgCmds.tangentContraint( curve, upObject, target )
+    sgCmds.tangentConstraint( curve, upObject, target )

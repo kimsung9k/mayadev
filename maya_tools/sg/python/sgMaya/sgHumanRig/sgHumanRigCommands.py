@@ -2474,7 +2474,8 @@ class HandRig:
         self.createRigBase()
         self.createControllers()
         self.createJoints()
-        #self.createFingerAttributeControl( self.stdHandPrefixList )
+        
+        AddAndFixRig.createFingerAttributeControl( 'Ctl_BlArm%s02' % self.getSide(self.stdArm02) )
     
 
 
@@ -2750,6 +2751,7 @@ def createHumanByStd( **options ):
     cmds.refresh()
     
     leftHandRig = HandRig( *Std.getLeftHandList())
+    print "---------left hand rig-------------"
     leftHandRig.createAll( controllerSize * 0.3, HumanRig.leftHandColor  )
     constrain_parent( leftArmRig.connector, leftHandRig.rigBase )
     cmds.refresh()
@@ -2770,6 +2772,7 @@ def createHumanByStd( **options ):
     cmds.refresh()
     
     rightHandRig = HandRig( *Std.getRightHandList() )
+    print "---------right hand rig-------------"
     rightHandRig.createAll( controllerSize * 0.3, HumanRig.rightHandColor )
     constrain_parent( rightArmRig.connector, rightHandRig.rigBase )
     cmds.refresh()
@@ -3447,7 +3450,10 @@ class AddAndFixRig:
                 cmds.connectAttr( plusNode + '.output3D', divNode + '.input1' )
                 cmds.setAttr( divNode + '.input2', 0.1, 0.1, 0.1 )
                 
-                cmds.connectAttr( divNode + '.output', offsetCtl + '.r', f=1 )
+                if not cmds.objExists( offsetCtl ):
+                    origCtl = stdLists[i][j].replace( 'StdJnt', 'Ctl' )
+                    offsetCtl = makeParent( origCtl, n= offsetCtl )
+                    cmds.connectAttr( divNode + '.output', offsetCtl + '.r', f=1 )
 
 
 

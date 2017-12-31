@@ -4,6 +4,7 @@ import Models
 from __qtImport import *
 import json, os
 
+
 class Dialog_addProject( QDialog ):
     
     objectName = 'ui_pingowms_addProject'

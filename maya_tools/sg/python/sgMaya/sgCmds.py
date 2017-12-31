@@ -4,7 +4,6 @@ import math, copy
 import os
 import math
 from sgMaya import sgModel
-from sgMaya.sgPlugin.sgCppPlug_modelingTool.format import BoundingBox
 
 
 
@@ -903,6 +902,7 @@ def getShadingEngines( inputTarget ):
 
 
 
+
 def copyShader( inputFirst, inputSecond ):
     first = pymel.core.ls( inputFirst )[0]
     second = pymel.core.ls( inputSecond )[0]
@@ -937,6 +937,33 @@ def copyShader( inputFirst, inputSecond ):
             cmds.sets( targetObj, e=1, forceElement=engine.name() )
             copyObjAndEngines.append( [targetObj, engine.name()] )
     return copyObjAndEngines
+
+
+
+def separateShaderForEachMesh( targets ):
+    
+    shadingEngines = {}
+    for target in targets:
+        eachShadingEngines = getShadingEngines( target )
+        if not eachShadingEngines: continue
+        shaderName = eachShadingEngines[0].name()
+        if not shadingEngines.has_key( shaderName ):
+            shadingEngines[ shaderName ] = [target]
+        else:
+            shadingEngines[ shaderName ].append( target )
+    
+    for key in shadingEngines.keys():
+        for targetObject in shadingEngines[key]:
+            targetShape = getShape( targetObject )
+            if not targetShape: continue
+            duEngine = pymel.core.duplicate( key, un=1, n='du_' + key )[0]
+            newEngine = pymel.core.sets( n=key, renderable=True, noSurfaceShader=True, empty=1 )
+            for origCon, srcCon in pymel.core.listConnections( duEngine, s=1, d=0, p=1, c=1 ):
+                srcCon >> newEngine.attr( origCon.longName() )
+            pymel.core.delete( duEngine )
+            cmds.sets( targetShape.name(), e=1, forceElement=newEngine.name() )
+
+
 
 
 
@@ -1487,9 +1514,10 @@ def copyShapeToTransform( inputShape, inputTransform ):
         oSurface = getMObject( shape )
         fnSurface = OpenMaya.MFnNurbsSurface( oSurface )
         fnSurface.copy( oSurface, oTarget )
-
-    setIndexColor( tempTr.getShape(), getIndexColor( shape ) )
-    pymel.core.parent( tempTr.getShape(), transform, shape=1, add=1 )
+    
+    if tempTr.getShape():
+        setIndexColor( tempTr.getShape(), getIndexColor( shape ) )
+        pymel.core.parent( tempTr.getShape(), transform, shape=1, add=1 )
     pymel.core.delete( tempTr )
 
 
@@ -1672,12 +1700,15 @@ def getNodeFromHistory( target, nodeType ):
 
 def setGeometryMatrixToTarget( inputGeo, inputMatrixTarget ):
     
+    try:
+        matrixTarget = pymel.core.ls( inputMatrixTarget )[0]
+        targetMatrix = listToMatrix( pymel.core.xform( matrixTarget, q=1, ws=1, matrix=1 ) )
+    except:
+        targetMatrix = listToMatrix( inputMatrixTarget )
+
     geo = pymel.core.ls( inputGeo )[0]
-    matrixTarget = pymel.core.ls( inputMatrixTarget )[0]
     geoShapes = geo.listRelatives( s=1 )
-    
-    geoMatrix    = listToMatrix( pymel.core.xform( geo, q=1, ws=1, matrix=1 ) )
-    targetMatrix = listToMatrix( pymel.core.xform( matrixTarget, q=1, ws=1, matrix=1 ) )
+    geoMatrix = listToMatrix( pymel.core.xform( geo, q=1, ws=1, matrix=1 ) )
     
     for shape in geoShapes:
         if shape.attr( 'io' ).get():
@@ -1686,6 +1717,7 @@ def setGeometryMatrixToTarget( inputGeo, inputMatrixTarget ):
     geoShapes = geo.listRelatives( s=1 )
     
     for geoShape in geoShapes:
+        if not geoShape.nodeType() in ['nurbsCurve', 'nurbsSurface', 'mesh']: continue
         cmds.select( geoShape.name() )
         cmds.CreateCluster()
         cmds.select( geoShape.name() )
@@ -1698,7 +1730,7 @@ def setGeometryMatrixToTarget( inputGeo, inputMatrixTarget ):
         if origShape.type() == 'mesh':
             outputAttr = 'outMesh'
             inputAttr = 'inMesh'
-        elif origShape.type() == 'nurbsCurve':
+        elif origShape.type() in ['nurbsCurve','nurbsSurface']:
             outputAttr = 'local'
             inputAttr = 'create'
         
@@ -1709,7 +1741,7 @@ def setGeometryMatrixToTarget( inputGeo, inputMatrixTarget ):
         cmds.select( geoShape.name() )
         cmds.DeleteHistory()
     
-    pymel.core.xform( geo, ws=1, matrix= matrixTarget.wm.get() )
+    pymel.core.xform( geo, ws=1, matrix= matrixToList( targetMatrix ) )
 
 
 
@@ -2354,7 +2386,23 @@ def connectCurveScale( inputCurveOrigAttr, inputCurveCurrentAttr, inputTargetJnt
     
     divNode.outputX >> targetJnt.attr( 'scale%s' % axisName )
     
-        
+
+
+def getTangentAtParam( inputCurve, param ):
+    
+    curve = pymel.core.ls( inputCurve )[0]
+    curveShape = getShape( curve )
+    
+    fnCurve = OpenMaya.MFnNurbsCurve( getDagPath( curveShape ) )
+    return fnCurve.tangent( param )
+
+
+
+def getParamFromLength( inputCurve, param ):
+    
+    pass
+
+
     
 
 def duplicateBlendShapeByCtl(ctls, inputSrcMesh ):
@@ -3656,11 +3704,14 @@ def getPivotLocalMatrix( inputTarget ):
 def getPivotWorldMatrix( inputTarget ):
     
     target = pymel.core.ls( inputTarget )[0]
-    rp = pymel.core.getAttr( target + '.rotatePivot' )
-    rpMtx = listToMatrix( [1,0,0,0, 0,1,0,0, 0,0,1,0 , rp[0], rp[1], rp[2], 1 ] )
-    mtx = listToMatrix( cmds.getAttr( target + '.wm' ) )
+    rotPivot = pymel.core.xform( target, q=1, ws=1, rotatePivot=1 )
+    matrix = pymel.core.xform( target, q=1, ws=1, matrix=1 )
     
-    return rpMtx * mtx
+    matrix[12] = rotPivot[0]
+    matrix[13] = rotPivot[1]
+    matrix[14] = rotPivot[2]
+    
+    return listToMatrix( matrix )
 
 
 
@@ -4178,6 +4229,15 @@ def getDistance( inputNode ):
 
 
 
+
+def getDistanceNode( inputAttr ):
+    attr = pymel.core.ls( inputAttr )[0]
+    distNode = pymel.core.createNode( 'distanceBetween' )
+    attr >> distNode.point1
+    return distNode
+
+
+
 def replaceConnection( *args ):
     
     first = pymel.core.ls( args[0] )[0] 
@@ -4445,7 +4505,8 @@ def createWorldGeometry( inputTarget ):
         outputAttr = targetShape.local
         inputAttr = pymel.core.createNode( targetShape.nodeType() ).create
     else:
-        cmds.error( "%s is not edit able" % target.name() )
+        cmds.warning( "%s is not edit able" % target.name() )
+        return None
     
     trGeo = pymel.core.createNode( 'transformGeometry' )
     outputAttr >> trGeo.inputGeometry
@@ -4467,6 +4528,7 @@ def createWorldGeometryGroup( inputGrp ):
     
     for geo in geos:
         worldGeo = createWorldGeometry( geo )
+        if not worldGeo: continue
         worldGeos.append( worldGeo )
     
     grp = pymel.core.group( em=1 )
@@ -4474,6 +4536,57 @@ def createWorldGeometryGroup( inputGrp ):
     grp.rename( pymel.core.ls( inputGrp )[0].nodeName() + '_worldGeo' )
     return grp
         
+
+
+
+def createLocalGeometry( inputTarget, inverseTarget, multTarget=None ):
+    
+    target = pymel.core.ls( inputTarget )[0]
+    if target.nodeType() == 'transform':
+        targetShape = target.getShape()
+    else:
+        targetShape = target
+    
+    outputAttr = None
+    inputAttr = None
+    if targetShape.nodeType() == 'mesh':
+        outputAttr = targetShape.outMesh
+        inputAttr = pymel.core.createNode( 'mesh' ).inMesh
+    elif targetShape.nodeType() in ['nurbsCurve', 'nurbsSurface']:
+        outputAttr = targetShape.local
+        inputAttr = pymel.core.createNode( targetShape.nodeType() ).create
+    else:
+        cmds.warning( "%s is not edit able" % target.name() )
+        return None
+    
+    trGeo = pymel.core.createNode( 'transformGeometry' )
+    mm = pymel.core.createNode( 'multMatrix' )
+    outputAttr >> trGeo.inputGeometry
+    target.wm >> mm.i[0]
+    inverseTarget.wim >> mm.i[1]
+    if multTarget: multTarget.wm >> mm.i[2]
+    mm.o >> trGeo.transform
+    trGeo.outputGeometry >> inputAttr
+    
+    copyShader( target, inputAttr.node().getParent() )
+    inputAttr.node().getParent().rename( target.nodeName() + '_worldGeo' )
+    
+    return inputAttr.node()
+
+
+
+def createLocalGeometryGroup( inputGrp, mtxTarget, multTarget=None ):
+
+    geos = [ target for target in pymel.core.listRelatives( inputGrp, c=1, ad=1, type='transform' ) if target.getShape() ]
+    localGeos = []
+    
+    for geo in geos:
+        localGeo = createLocalGeometry( geo, mtxTarget, multTarget )
+        if not localGeo: continue
+        localGeos.append( localGeo )
+    
+    pymel.core.parent( localGeos, mtxTarget )
+    return mtxTarget
 
 
     
@@ -4561,7 +4674,6 @@ def setAllDefault( inputTarget ):
 
 def getClosestParamAtPoint( inputTargetObj, inputCurve ):
     
-    targetObj = pymel.core.ls( inputTargetObj )[0]
     curve = pymel.core.ls( inputCurve )[0]
     
     if curve.nodeType() == 'transform':
@@ -4569,12 +4681,17 @@ def getClosestParamAtPoint( inputTargetObj, inputCurve ):
     else:
         crvShape = curve
     
-    dagPathTarget = getDagPath( targetObj )
-    mtxTarget = dagPathTarget.inclusiveMatrix()
+    if type( inputTargetObj ) in [ list, type( OpenMaya.MPoint() ), type( OpenMaya.MVector() ) ]:
+        pointTarget = getMPoint( inputTargetObj )
+    else:
+        targetObj = pymel.core.ls( inputTargetObj )[0]
+        dagPathTarget = getDagPath( targetObj )
+        mtxTarget = dagPathTarget.inclusiveMatrix()
+        pointTarget = OpenMaya.MPoint( mtxTarget[3] )
+        
+    
     dagPathCurve  = getDagPath( crvShape )
     mtxCurve  = dagPathCurve.inclusiveMatrix()
-    
-    pointTarget = OpenMaya.MPoint( mtxTarget[3] )
     pointTarget *= mtxCurve.inverse()
     
     fnCurve = OpenMaya.MFnNurbsCurve( getDagPath( crvShape ) )
@@ -4590,7 +4707,7 @@ def getClosestParamAtPoint( inputTargetObj, inputCurve ):
 
 
 
-def attachToCurve( inputTargetObj, inputCurve ):
+def attachToCurve( inputTargetObj, inputCurve, connectTangent=False ):
     
     targetObj = pymel.core.ls( inputTargetObj )[0]
     curve = pymel.core.ls( inputCurve )[0]
@@ -4612,7 +4729,7 @@ def attachToCurve( inputTargetObj, inputCurve ):
     curveInfo.position >> vectorNode.input1
     targetObj.pim >> vectorNode.matrix
     vectorNode.output >> targetObj.t
-    
+
 
 
 def getPointAtParam( inputCurveObj, paramValue ):
@@ -4687,7 +4804,7 @@ def lookAt( inputAimTarget, inputRotTarget, baseDir=None, **options ):
     if not baseDir:
         baseDir = [[1,0,0], [0,1,0], [0,0,1], [-1,0,0], [0,-1,0], [0,0,-1]][directionIndex]
     
-    baseDir = OpenMaya.MVector( *baseDir )
+    baseDir = getMVector( baseDir )
     direction = OpenMaya.MVector( *direction )
     localAngle = baseDir.rotateTo( direction ).asMatrix()
     
@@ -4711,6 +4828,14 @@ def setOrientByChild( inputTargetJnt, evt=0 ):
     lookAt( targetJnt, children[0] )
     for i in range( len(children) ):
         cmds.xform( children[i], ws=1, matrix= childrenMats[i] )
+
+
+
+
+def setOrientByTarget( target, src ):
+    
+    rotValue = pymel.core.xform( src, q=1, ws=1, ro=1 )
+    pymel.core.xform( target, ws=1, ro=rotValue )
     
     
     
@@ -5109,6 +5234,19 @@ def getShape( inputTarget ):
         return target.getShape()
     else:
         return target
+    
+    
+
+
+def getShadersFromObject( inputTarget ):
+    target = pymel.core.ls( inputTarget )[0]
+    targetShape = target.getShape()
+    shadingEngines = targetShape.listConnections( s=0, d=1, type='shadingEngine' )
+    if not shadingEngines: return None
+    shaders = shadingEngines[0].attr( 'surfaceShader' ).listConnections( s=1, d=0 )
+    if not shaders: return None
+    return shaders
+
 
 
 
@@ -5168,7 +5306,7 @@ def createBlendTwoMatrixNode( inputFirstAttr, inputSecondAttr ):
     secondAttr = pymel.core.ls( inputSecondAttr )[0]
     
     wtAddMtx = pymel.core.createNode( 'wtAddMatrix' )
-    addAttr( wtAddMtx, ln='blend', min=0, max=1, dv=0.5, k=1 )
+    wtAddMtx.addAttr( 'blend', min=0, max=1, dv=0.5, k=1 )
     
     revNode  = pymel.core.createNode( 'reverse' )
 
@@ -5589,7 +5727,7 @@ def getMMatrix( inputAttr ):
 
 
 
-def tangentContraint( inputCurve, inputUpObject, inputTarget ):
+def tangentConstraint( inputCurve, inputUpObject, inputTarget ):
 
     curve    = pymel.core.ls( inputCurve )[0]
     upObject = pymel.core.ls( inputUpObject )[0]
@@ -5673,7 +5811,7 @@ def getLookAtChildMatrixAttr( lookTargetMatrix, baseMatrix, baseVector ):
 
 
 
-def tangentContraintByGroup( inputCurve, inputTargets, inputUpObjects, aimDirection ):
+def tangentConstraintByGroup( inputCurve, inputTargets, inputUpObjects, aimDirection ):
     
     curve = pymel.core.ls( inputCurve )[0]
     targets = [ pymel.core.ls( inputTarget )[0] for inputTarget in inputTargets ]
@@ -6203,18 +6341,23 @@ def getMatrixFromRotate( rotValue ):
 
 
 
-def setMatrixToTarget( mtxValue, inputTarget ):
+def setMatrixToTarget( mtxValue, inputTarget, **options ):
 
-    mtx = OpenMaya.MMatrix()
-    if type( mtxValue ) == list:
-        mtx = listToMatrix( mtxValue )
-    else:
-        mtx = mtxValue
+    mtx = listToMatrix( mtxValue )
     transMtxList = [1,0,0,0,
                     0,1,0,0,
                     0,0,1,0,
                     mtx(3,0), mtx(3,1), mtx(3,2), 1]
     target = pymel.core.ls( inputTarget )[0]
+    
+    pcp = False
+    if options.has_key( 'pcp' ):
+        pcp = options['pcp']
+    
+    childrenAndMtxInfos = []
+    if pcp:
+        for child in pymel.core.listRelatives( target, c=1, type='transform' ):
+            childrenAndMtxInfos.append( [child, child.wm.get()] )
     
     if target.type() == 'joint':
         joValue = target.jo.get()
@@ -6227,6 +6370,24 @@ def setMatrixToTarget( mtxValue, inputTarget ):
     else:
         pymel.core.xform( target, ws=1, matrix= matrixToList( mtx ) )
 
+    if pcp:
+        for child, childMtx in childrenAndMtxInfos:
+            pymel.core.xform( child, ws=1, matrix= childMtx )
+    target.rotatePivot.set( 0,0,0 )
+    target.rotatePivotTranslate.set( 0,0,0 )
+    target.scalePivot.set( 0,0,0 )
+    target.scalePivotTranslate.set( 0,0,0 )
+
+
+
+
+def setPivotZero( inputTarget ):
+    target = pymel.core.ls( inputTarget )[0]
+    target.rotatePivot.set( 0,0,0 )
+    target.scalePivot.set( 0,0,0 )
+    target.rotatePivotTranslate.set( 0,0,0 )
+    target.scalePivotTranslate.set( 0,0,0 )
+
 
 
 
@@ -6235,24 +6396,37 @@ def setMatrixToGeoGroup( mtx, inputTarget ):
     target = pymel.core.ls( inputTarget )[0]
     tr = cmds.createNode( 'transform' )
     setMatrixToTarget( mtx, tr )
-    selChildren = cmds.listRelatives( target.name(), c=1, f=1, ad=1, type='transform' )
+    selChildren = target.listRelatives( c=1, f=1, ad=1, type='transform' )
     if not selChildren: selChildren = []
-    selChildren.append( target.name() )
+    selChildren.append( target )
     unParentList = []
     for selChild in selChildren:
-        if cmds.listRelatives( selChild, s=1, f=1 ):
-            try:selP = cmds.listRelatives( selChild, p=1, f=1 )[0]
+        #isInverted = isInvertedTransform( selChild )
+        if selChild.listRelatives( s=1 ):
+            try:selP = selChild.listRelatives( p=1, f=1 )[0]
             except:selP = None
-            try:selChild = cmds.parent( selChild, w=1 )[0]
+            try:selChild = pymel.core.parent( selChild, w=1 )[0]
             except:pass
+            selChildShape = selChild.getShape()
+            if len( selChildShape.listRelatives( ap=1 ) ) > 1:
+                tempChild = pymel.core.duplicate( selChild )[0]
+                pymel.core.delete( selChild )
+                selChild = tempChild
             setGeometryMatrixToTarget( selChild, tr )
             unParentList.append( [selChild,selP] )
         else:
             setMatrixToTarget( mtx, selChild )
+        '''
+        if isInverted:
+            selChildShape = selChild.getShape()
+            if selChildShape and selChildShape.nodeType() == 'mesh':
+                pymel.core.polyNormal( selChildShape, normalMode=0, userNormalMode=0, ch=1 )
+        '''
     for child, parent in unParentList:
         if not parent: continue
-        cmds.parent( child, parent )
-    cmds.delete( tr )
+        pymel.core.parent( child, parent )
+    pymel.core.delete( tr )
+    setPivotZero(target)
 
 
 
@@ -6720,8 +6894,8 @@ def makeInterPointer( inputCtls, alwaysConnected = False ):
         
         interPointer1 = pymel.core.createNode( 'transform' ); interPointer1.dh.set( 1 )
         interPointer2 = pymel.core.createNode( 'transform' ); interPointer2.dh.set( 1 )
-        interPointer1.rename( 'startIP_' + firstCtl.shortName() )
-        interPointer2.rename( 'endIP_' + secondCtl.shortName() )
+        interPointer1.rename( 'startIP_' + firstCtl.nodeName() )
+        interPointer2.rename( 'endIP_' + secondCtl.nodeName() )
         interPointer1.setParent( firstCtl ); setTransformDefault( firstInvObj )
         interPointer2.setParent( secondCtl ); setTransformDefault( secondInvObj )
         localDcmpPointer1 = getLocalDecomposeMatrix( secondInvObj.wm, firstInvObj.wim )
@@ -6729,6 +6903,7 @@ def makeInterPointer( inputCtls, alwaysConnected = False ):
         
         twoInterPointers     = [ interPointer1, interPointer2 ]
         twoLocalDcmpPointers = [ localDcmpPointer1, localDcmpPointer2 ]
+        
         
         for i in range( 2 ):
             setTransformDefault( twoInterPointers[i] )
@@ -6785,7 +6960,7 @@ def reverseSelection():
 
 
 
-def tangentContraintByStartAndEndUp( inputCurve, inputStartUp, inputEndUp, inputTargets ):
+def tangentConstraintByStartAndEndUp( inputCurve, inputStartUp, inputEndUp, inputTargets ):
     
     startUp = pymel.core.ls( inputStartUp )[0]
     endUp   = pymel.core.ls( inputEndUp )[0]
@@ -6925,9 +7100,10 @@ def makeMirrorTransform( inputTrTarget ):
         reverseShape( mirrorTransform.getShape() )
     
     targetParent = trTarget.getParent()
-    otherSideParentStr = getOtherSideStr( targetParent.name())
-    if pymel.core.objExists( otherSideParentStr ):
-        pymel.core.parent( mirrorTransform, otherSideParentStr )
+    if targetParent:
+        otherSideParentStr = getOtherSideStr( targetParent.name() )
+        if pymel.core.objExists( otherSideParentStr ):
+            pymel.core.parent( mirrorTransform, otherSideParentStr )
     
     return mirrorTransform
 
@@ -7342,7 +7518,9 @@ def getLocalMapFolder():
     
     sceneName = cmds.file( q=1, sceneName=1 )
     sceneFolder = os.path.dirname( sceneName )
-    mapfolder = sceneFolder + '/maps'
+    mapfolder = sceneFolder + '/map'
+    if not os.path.exists( mapfolder ):
+        mapfolder = sceneFolder + '/maps'
     makeFolder( mapfolder )
     return mapfolder
 
@@ -7358,6 +7536,7 @@ def printCurvePoints( crv ):
         returnStr += str( crvShape.controlPoints[i].get() ) + ",\n"
     returnStr = returnStr[:-2] + "]"
     print returnStr
+
 
 
 
@@ -7968,6 +8147,282 @@ def createConnectedGeoFromReferenceGeo( mainGrp ):
             mainChildShape.outMesh >> duChildShape.inMesh
         elif mainChildShape.nodeType() in ['nurbsCurve', 'nurbsSurface']:
             mainChildShape.local >> duChildShape.create
+
+
+
+def setSquashLattice( inputTargetGrp, boundingBoxObject ):
+    
+    targetGrp = pymel.core.ls( inputTargetGrp )[0]
+    
+    ffd, lattice, latticeBase = pymel.core.lattice( targetGrp,  divisions=[2,5,2], ldv=[2,6,2] )
+    
+    allGrp = pymel.core.createNode( 'transform', n='UpperSquashGrp' )\
+    
+    multDouble = pymel.core.createNode( 'multDoubleLinear' )
+    boundingBoxObject.sy >> multDouble.input1
+    multDouble.input2.set( -0.5 )
+    addDouble  = pymel.core.createNode( 'addDoubleLinear' )
+    multDouble.output >> addDouble.input1
+    boundingBoxObject.ty >> addDouble.input2
+    addDouble.output >> allGrp.ty
+    
+    boundingBoxObject.tx >> allGrp.tx
+    boundingBoxObject.tz >> allGrp.tz
+    
+    boundingBoxObject.s >> lattice.s
+    boundingBoxObject.s >> latticeBase.s
+    transHalf = pymel.core.createNode( 'multDoubleLinear' )
+    boundingBoxObject.sy >> transHalf.input1
+    transHalf.input2.set( 0.5 )
+    
+    pymel.core.parent( lattice, latticeBase, allGrp )
+    lattice.t.set( 0,0,0 )
+    latticeBase.t.set( 0,0,0 )
+    transHalf.output >> lattice.ty
+    transHalf.output >> latticeBase.ty
+
+    return lattice, latticeBase, allGrp
+
+
+
+
+def getAddVectorNodeAttr( firstInputAttr, secondInputAttr ):
+    
+    plusNode = pymel.core.createNode( 'plusMinusAverage' )
+    plusNode.op.set( 1 )
+    firstInputAttr >> plusNode.input3D[0]
+    secondInputAttr >> plusNode.input3D[1]
+    return plusNode.output3D
+
+
+def getMinusVectorNodeAttr( firstInputAttr, secondInputAttr ):
+    
+    plusNode = pymel.core.createNode( 'plusMinusAverage' )
+    plusNode.op.set( 2 )
+    firstInputAttr >> plusNode.input3D[0]
+    secondInputAttr >> plusNode.input3D[1]
+    return plusNode.output3D
+
+
+
+def getDistDivNodeAttr( firstInputAttr, secondInputAttr ):
+    
+    divNode = pymel.core.createNode( 'multiplyDivide' )
+    divNode.op.set( 2 )
+    getDistanceNode(firstInputAttr).distance >> divNode.input1X
+    getDistanceNode(secondInputAttr).distance >> divNode.input2X
+    return divNode.outputX
+
+
+
+def getSquashWidthNode( scaleInputAttr, squashRateAttr ):
+
+    divNode = pymel.core.createNode( 'multiplyDivide' )
+    divNode.op.set( 2 )
+    divNode.input1X.set( 1 )
+    scaleInputAttr >> divNode.input2X
+    sqrtNode = pymel.core.createNode( 'multiplyDivide' )
+    sqrtNode.op.set( 3 )
+    
+    squashAttrMult = pymel.core.createNode( 'multDoubleLinear' )
+    squashRateAttr >> squashAttrMult.input1
+    squashAttrMult.input2.set( 0.5 )
+    squashAttrMult.output >> sqrtNode.input2X
+    
+    divNode.outputX >> sqrtNode.input1X
+    return sqrtNode.outputX
     
     
 
+
+def connectBindPreMatrixByGroup( jntsGrp, bindPresGrp, targetGeo ):
+    
+    jnts = pymel.core.listRelatives( jntsGrp, c=1, type='transform' )
+    bindPres = pymel.core.listRelatives( bindPresGrp, c=1, type='transform' )
+    for i in range( len( jnts ) ):
+        connectBindPreMatrix( jnts[i], bindPres[i], targetGeo )
+
+
+
+
+
+def setSquashBendRig( inputTargetGrp, boundingBoxObject ):
+    
+    def creaeSquashUpperCtl(boundingBoxObject,allGrp):
+        ctlUpper = makeController( sgModel.Controller.trianglePoints, n='Ctl_SquashUpper', makeParent=1 )
+        ctlUpper.getShape().attr( 'shape_ty' ).set( 1 )
+        ctlUpper.getShape().attr( 'shape_rz' ).set( 180 )
+        ctlPUpper = ctlUpper.getParent()
+        
+        ctlPUpper.setParent( allGrp )
+        ctlPUpper.t.set( 0,0,0 )
+        boundingBoxObject.sy >> ctlPUpper.ty
+        return ctlUpper, ctlPUpper
+    
+    
+    def createSquashLowerCtl(boundingBoxObject,allGrp):
+        ctlLower = makeController( sgModel.Controller.trianglePoints, n='Ctl_SquashLower', makeParent=1 )
+        ctlLower.getShape().attr( 'shape_ty' ).set( -1 )
+        ctlPLower = ctlLower.getParent()
+        
+        ctlPLower.setParent( allGrp )
+        ctlPLower.t.set( 0,0,0 )
+        return ctlLower, ctlPLower
+
+
+    def createCenterPointer( ctlUpper, ctlLower ):
+        centerPointer = pymel.core.createNode( 'transform', n='pointer_squashCenter' )
+        centerPointer.dh.set( 1 )
+        centerPointer.setParent( allGrp )
+        centerPointer.t.set( 0,0,0 )
+        
+        blendTwoMtxNode = getBlendTwoMatrixNode( ctlUpper, ctlLower )
+        dcmp = getDecomposeMatrix( getMultMatrix( blendTwoMtxNode.matrixSum, allGrp.wim ).matrixSum )
+        dcmp.oty >> centerPointer.ty
+        centerPointer.v.set( 0 )
+        return centerPointer
+        
+    
+    def createCurves( ctlLower, centerPointer, ctlUpper ):
+        
+        interPointers = makeInterPointer( [ctlLower, centerPointer, ctlUpper] )
+        [ interPointer.v.set( 0 ) for interPointer in interPointers ]
+        lookChildUpper = makeLookAtChild( centerPointer, ctlUpper )
+        lookChildLower = makeLookAtChild( centerPointer, ctlLower )
+        interPointers[-1].setParent( lookChildUpper )
+        interPointers[0].setParent( lookChildLower )
+    
+        pointers = [ctlLower] + interPointers + [ctlUpper]
+        
+        curve = makeCurveFromObjects( *pointers )
+        baseCurve = makeCurveFromObjects( ctlPLower, ctlPUpper, d=1 )
+        curve.rename( 'squashCurve' )
+        baseCurve.rename( 'squashBaseCurve' )
+        rebuildCurve,     rebuildNode     = pymel.core.rebuildCurve( curve, ch=1, rpo=0, rt=0, end=1, kr=0, kcp=0, kep=0, kt=0, s=5, d=3, tol=0.01 )
+        rebuildBaseCurve, rebuildBaseNode = pymel.core.rebuildCurve( baseCurve, ch=1, rpo=0, rt=0, end=1, kr=0, kcp=0, kep=0, kt=0, s=5, d=3, tol=0.01 )
+        rebuildCurve.rename( 'squashCurve_rebuild' )
+        rebuildBaseCurve.rename( 'squashBaseCurve_rebuild' )
+        return rebuildCurve, rebuildBaseCurve
+
+    
+    def createDetailCtls( ctlUpper, ctlLower, curve, baseCurve ):
+        
+        lowerPos = getMVector( pymel.core.xform( ctlLower, q=1, ws=1, t=1 ) )
+        upperPos = getMVector( pymel.core.xform( ctlUpper, q=1, ws=1, t=1 ) )
+        
+        ctls = []
+        joints = []
+        bindPreObjs = []
+        for i in range( 5 ):
+            ctlPos = ( upperPos - lowerPos )/4 * i + lowerPos
+            
+            ctl = makeController( sgModel.Controller.circlePoints, 1, makeParent=1 )
+            ctl.rename( 'Ctl_squashDt_%d' % i )
+            ctl.getParent().t.set( ctlPos.x, ctlPos.y, ctlPos.z )
+            constrainedJoint = pymel.core.createNode( 'joint' )
+            bindPreObj = pymel.core.createNode( 'transform' )
+            constrain_all( ctl, constrainedJoint )
+            bindPreObj.t.set( ctlPos.x, ctlPos.y, ctlPos.z )
+            ctls.append( ctl )
+            joints.append( constrainedJoint )
+            bindPreObjs.append( bindPreObj )
+
+        for i in range( len( joints ) ):
+            attachToCurve( ctls[i].getParent(), curve )
+            attachToCurve( bindPreObjs[i], baseCurve )
+
+        tangentConstraintByGroup( curve, [ ctl.getParent() for ctl in ctls], [ctlLower, ctlUpper], [0,1,0] )
+        tangentConstraintByGroup( baseCurve, bindPreObjs, [ctlLower.getParent(), ctlUpper.getParent()], [0,1,0] )
+
+        ctlGrp = pymel.core.group( em=1, n='squashDtCtlsGrp' )
+        bindPreObjGrp = pymel.core.group( em=1, n='squashDtBindPreGrp' )
+        jointGrp = pymel.core.group( em=1, n='squashDtJointGrp' )
+        pymel.core.parent( [ ctl.getParent() for ctl in ctls], ctlGrp )
+        pymel.core.parent( bindPreObjs, bindPreObjGrp )
+        pymel.core.parent( joints, jointGrp)
+        
+        bindPreObjGrp.v.set( 0 )
+        jointGrp.v.set( 0 )
+        
+        return joints, bindPreObjs, ctls
+
+
+    def setSkinCluster( joints, bindPreObjs, lattice ):
+        
+        pymel.core.skinCluster( joints, lattice, tsb=1, dropoffRate=10000 )
+    
+        for i in range( len( joints ) ):
+            connectBindPreMatrix( joints[i], bindPreObjs[i], lattice )
+        
+        skinNode = getNodeFromHistory( lattice, 'skinCluster' )[0]
+        lattice.wm >> skinNode.geomMatrix
+
+
+    lattice, latticeBase, allGrp = setSquashLattice( inputTargetGrp, boundingBoxObject )
+    ctlUpper, ctlPUpper = creaeSquashUpperCtl( boundingBoxObject,allGrp )
+    ctlLower, ctlPLower = createSquashLowerCtl( boundingBoxObject,allGrp )
+    centerPointer = createCenterPointer( ctlUpper, ctlLower )
+    curve, baseCurve = createCurves( ctlLower, centerPointer, ctlUpper )
+    joints, bindPreObjs, ctls = createDetailCtls( ctlUpper, ctlLower, curve, baseCurve )
+    setSkinCluster( joints, bindPreObjs, lattice )
+    
+
+
+def isInvertedTransform( targetTransform ):
+    selMtx = listToMatrix( pymel.core.xform( targetTransform, q=1, ws=1, matrix=1 ) )
+    selRotate = pymel.core.xform( targetTransform, q=1, ws=1, ro=1 )
+    selRotMatrix = getMatrixFromRotate( selRotate )
+    
+    mtxList = matrixToList( selMtx * selRotMatrix.inverse() )
+    xVector = OpenMaya.MVector( *mtxList[:3] )
+    yVector = OpenMaya.MVector( *mtxList[4:7] )
+    zVector = OpenMaya.MVector( *mtxList[8:11] )
+    compairVector = OpenMaya.MVector( 1,1,1 )
+    for vector in [ xVector, yVector, zVector ]:
+        if vector * compairVector < 0:
+            return True
+    return False
+
+
+
+
+def optimizeMesh( inputTarget ):
+    
+    pymel.core.select( inputTarget )
+    cmds.DeleteHistory()
+    target = pymel.core.ls( inputTarget )[0]
+    targetShape = getShape( target )
+    
+    if len( targetShape.listRelatives( ap=1 ) ) > 1:
+        duTarget = pymel.core.duplicate( target )[0]
+        targetNodeName = target.nodeName()
+        pymel.core.delete( target )
+        duTarget.rename( targetNodeName )
+        target = duTarget
+    
+    pivMatrix = getPivotWorldMatrix( target )
+    setMatrixToGeoGroup( pivMatrix, target )
+
+
+
+def setBlendShapeConnectionFromOtherBlendShapeMesh( srcMesh, trgMesh ):
+ 
+    srcBls = getNodeFromHistory( srcMesh, 'blendShape' )
+    trgBls = getNodeFromHistory( trgMesh, 'blendShape' )
+    
+    srcAttrInfos = {}
+    for srcBl in srcBls:
+        attrs = cmds.ls( srcBl + '.w[*]' )
+        for attr in attrs:
+            nodeName, onlyAttrName = attr.split( '.' )
+            if onlyAttrName.find( '[' ) != -1: continue
+            srcAttrInfos[ onlyAttrName ] = attr
+    
+    for trgBl in trgBls:
+        attrs = cmds.ls( trgBl + '.w[*]' )
+        for attr in attrs:
+            nodeName, onlyAttrName = attr.split( '.' )
+            if not srcAttrInfos.has_key( onlyAttrName ): continue
+            srcAttr = cmds.listConnections( srcAttrInfos[ onlyAttrName ], s=1, d=0, p=1 )
+        cmds.connectAttr( srcAttr[0], attr )
+    

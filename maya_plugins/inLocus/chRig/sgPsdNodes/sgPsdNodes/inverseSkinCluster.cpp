@@ -34,10 +34,10 @@ inverseSkinCluster::~inverseSkinCluster()
 }
 
 
-MStatus inverseSkinCluster::deform( MDataBlock& data,
-									   MItGeometry& itGeo,
-									   const MMatrix& localToWorldMatrix,
-									   unsigned int geomIndex )
+MStatus inverseSkinCluster::deform(MDataBlock& data,
+	MItGeometry& itGeo,
+	const MMatrix& localToWorldMatrix,
+	unsigned int geomIndex)
 {
 	MStatus status;
 

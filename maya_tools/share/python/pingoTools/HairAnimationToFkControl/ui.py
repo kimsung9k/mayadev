@@ -36,5 +36,3 @@ class hairUI():
 #_Jnt.scrollList()
 
 #cmds.textScrollList(append=selA, ams=1, w=200, h=80)
-
-

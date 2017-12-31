@@ -50,15 +50,17 @@ class TreeWidgetCmds:
             brush = QBrush( Models.Colors.serverModified )
         else:
             brush = QBrush( Models.Colors.equar )
-        
+        brushForPath = QBrush( Models.Colors.serverOnly )
+
         targetItem.setForeground( 0, brush )
-        
+        targetItem.setForeground( 2, brushForPath )
+
         cuLocalUnitPath  = FileControl.getArrangedPathString( cuLocalFullPath )
         currentScenePath = cmds.file( q=1, sceneName=1 )
-        
+
         currentScenePath = FileControl.getArrangedPathString( currentScenePath )
         localFullPath = FileControl.getArrangedPathString( cuLocalUnitPath )
-        
+
         if currentScenePath and currentScenePath.find( localFullPath ) != -1:
             targetItem.setText( 1, "Opened".decode( 'utf-8' ) )
             cuColor = brush.color()
@@ -85,6 +87,9 @@ class TreeWidgetCmds:
             for item in items:
                 if not item.text(0): continue
                 TreeWidgetCmds.setTreeItemCondition( item )
+        
+        treeWidget.resizeColumnToContents( 0 )
+        treeWidget.setColumnWidth( 1, 70 )
 
 
 
@@ -117,37 +122,35 @@ class TreeWidgetCmds:
             taskPath = taskData[ Models.ControlBase.labelTaskPath ]
             itemWidget = QTreeWidgetItem( targetTreeWidget )
             itemWidget.setText( 0, taskName )
+            itemWidget.setText( 2, taskPath )
             itemWidget.taskPath = taskPath
             itemWidget.unitPath = ""
-            targetTreeWidget.resizeColumnToContents( i )
             if addChild :addHierarchy( itemWidget )
-
-        targetTreeWidget.resizeColumnToContents( 0 )
         TreeWidgetCmds.setTreeItemsCondition( targetTreeWidget )
 
 
 
     @staticmethod
     def updateTaskHierarchy( *args ):
-        
+
         expandedItem = args[0]
         for i in range( expandedItem.childCount() ):
             expandedItem.takeChild( 0 )
-        
+
         if expandedItem.isExpanded():
             serverPath = FileControl.getCurrentServerProjectPath()
             localPath   = FileControl.getCurrentLocalProjectPath()
             path = expandedItem.taskPath + expandedItem.unitPath
-            
+
             serverFullPath = serverPath + path
             localFullPath  = localPath  + path
             if not os.path.exists( serverFullPath ) and not os.path.exists( localFullPath ): return
 
             numTasks = 0
-            
+
             unitDirs  = []
             unitFiles = []
-            
+
             for root, dirs, names in os.walk( serverFullPath ):
                 for directory in dirs:
                     unitDirs.append( root[len(serverPath):] + '/' + directory )
@@ -161,16 +164,17 @@ class TreeWidgetCmds:
                 for name in [ name for name in names if os.path.splitext( name )[-1] != '.' + Models.ControlBase.editorInfoExtension ]:
                     unitFiles.append( root[len(localPath):] + '/' + name )
                 break
-            
+
             unitDirs  = list( set( unitDirs ) )
             unitFiles = list( set( unitFiles ) )
-            
+
             unitDirs.sort()
             unitFiles.sort()
-        
+
             for unitDir in unitDirs:
                 newItem = QTreeWidgetItem( expandedItem )
                 newItem.setText( 0, unitDir.split( '/' )[-1] )
+                newItem.setText( 2, expandedItem.taskPath )
                 newItem.taskPath = expandedItem.taskPath
                 newItem.unitPath = unitDir[ len( expandedItem.taskPath ): ]
                 emptyChild = QTreeWidgetItem( newItem )
@@ -178,21 +182,21 @@ class TreeWidgetCmds:
             for unitFile in unitFiles:
                 newItem = QTreeWidgetItem( expandedItem )
                 newItem.setText( 0, unitFile.split( '/' )[-1] )
+                newItem.setText( 2, expandedItem.taskPath )
                 newItem.taskPath = expandedItem.taskPath
                 newItem.unitPath = unitFile[ len( expandedItem.taskPath ): ]
                 numTasks += 1
         else:
             QTreeWidgetItem( expandedItem )
-        
+
         treeWidget = expandedItem.treeWidget()
-        
+
         TreeWidgetCmds.setTreeItemsCondition( treeWidget )
-        treeWidget.resizeColumnToContents( 0 )
-    
-    
+
+
     @staticmethod
     def updateFamily():
-        
+
         selItems = Models.ControlBase.uiTreeWidget.selectedItems()
         if not selItems: return None
         selItems[0].setSelected( False )
@@ -474,7 +478,7 @@ class FileControl:
         data = json.load( f )
         f.close()
         if not data.has_key( Models.ControlBase.labelDefaultServerPath ): return None
-        if os.path.exists( data[Models.ControlBase.labelDefaultServerPath] ): return data[Models.ControlBase.labelDefaultServerPath].replace( '\\', '/' )
+        if os.path.exists( data[ Models.ControlBase.labelDefaultServerPath ] ): return data[Models.ControlBase.labelDefaultServerPath].replace( '\\', '/' )
         else: return ''
 
 
@@ -557,7 +561,7 @@ class FileControl:
         
         filename = ntpath.split( filePath )[-1]
         stringtime = Models.FileTime( timeTarget ).stringTime()
-        dirpath = os.path.dirname( filePath ) + '/' + Models.ControlBase.backupDirName + '/' + stringtime
+        dirpath = os.path.dirname( filePath ) + '/' + Models.ControlBase.backupDirName + '/' + filename + '/' + stringtime
         FileControl.makeFolder( dirpath )
         return dirpath + '/' + filename
     
@@ -759,7 +763,8 @@ class SceneControl:
         from maya import mel
         from functools import partial
         
-        nodeAndAttrList = [('file', 'fileTextureName'), ('mesh', 'miProxyFile')]
+        nodeAndAttrList = [('file', 'fileTextureName'), ('mesh', 'miProxyFile'),
+                           ('RedshiftProxyMesh','fileName'), ('gpuCache','cacheFileName')]
         
         nodeAndElsePathsList = []
         for nodeType, attr in nodeAndAttrList:
@@ -1230,7 +1235,7 @@ class ContextMenuCmds:
                             pass
                         break
             
-            EditorCmds.fixEditorInfo( localUnit.fullPath()  )
+            EditorCmds.fixEditorInfo( localUnit.fullPath() )
             EditorCmds.fixEditorInfo( serverUnit.fullPath() )
             targetPaths = []
             

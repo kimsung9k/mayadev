@@ -6,6 +6,8 @@ from __qtImprot import *
 import maya.OpenMayaUI
 import ntpath
 
+if not cmds.pluginInfo( 'AbcExport', q=1, l=1 ):
+    cmds.loadPlugin( 'AbcExport' )
 
 
 def makeFolder( pathName ):

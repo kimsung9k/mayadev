@@ -7,4 +7,4 @@ startUp = sels[1]
 endUp = sels[2]
 targets = sels[3:]
 
-sgCmds.tangentContraintByStartAndEndUp( curve, startUp, endUp, targets )
+sgCmds.tangentConstraintByStartAndEndUp( curve, startUp, endUp, targets )

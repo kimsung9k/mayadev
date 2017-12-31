@@ -4,10 +4,8 @@ import commands
 import Models
 from __qtImport import *
 import json, os
-    
-    
-    
-    
+
+
 
 class Dialog_downloadFileList( QDialog ):
     

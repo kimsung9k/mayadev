@@ -54,10 +54,11 @@ class WorkTreeWidget( QTreeWidget ):
         
         QTreeWidget.__init__( self, *args, **kwargs )
         self.installEventFilter( self )
-        self.setColumnCount(2)
+        self.setColumnCount(3)
         headerItem = self.headerItem()
         headerItem.setText( 0, '작업이름'.decode('utf-8') )
         headerItem.setText( 1, '상태'.decode('utf-8') )
+        headerItem.setText( 2, '경로'.decode('utf-8') )
 
 
 

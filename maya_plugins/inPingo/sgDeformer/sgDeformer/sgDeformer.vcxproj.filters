@@ -24,25 +24,43 @@
     <ClCompile Include="main.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="sgFootPrintDeformer.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
     <ClCompile Include="sgPrintf.cpp">
       <Filter>sgPrintf</Filter>
     </ClCompile>
     <ClCompile Include="sgMeshInfo.cpp">
       <Filter>sgMeshInfo</Filter>
     </ClCompile>
+    <ClCompile Include="sgFootPrintMesh.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="sgModifiedMeshKeeper.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="sgSnowBulge.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="sgBulgeDeformer.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="sgFootPrintDeformer.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="sgPrintf.h">
       <Filter>sgPrintf</Filter>
     </ClInclude>
     <ClInclude Include="sgMeshInfo.h">
       <Filter>sgMeshInfo</Filter>
+    </ClInclude>
+    <ClInclude Include="sgFootPrintMesh.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="sgModifiedMeshKeeper.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="sgSnowBulge.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="sgBulgeDeformer.h">
+      <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

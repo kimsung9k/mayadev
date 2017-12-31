@@ -29,4 +29,3 @@ class Dialog_help_fileCondition( QDialog ):
         localOnly_layout.addWidget( localOnly_icon )
         localOnly_layout.addWidget( localOnly_label )
         mainLayout.addLayout( localOnly_layout )
-
