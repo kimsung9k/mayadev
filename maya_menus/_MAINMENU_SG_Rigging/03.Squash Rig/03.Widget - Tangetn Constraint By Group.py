@@ -1,0 +1,2 @@
+from sgMaya.sgWidget import tangentConstraintByGroup
+tangentConstraintByGroup.show()

@@ -3,6 +3,7 @@ from maya import cmds
 import pymel.core
 from sgMaya import sgCmds, sgModel
 import random
+from sgMaya.sgCmds import getDistanceNodeBetwwenTwoObjs
 
 
 
@@ -1024,6 +1025,7 @@ def createDefaultPropRig( propGrp ):
 
 
     
+
 def createSimplePlaneControl( inputTarget ):
     
     target = pymel.core.ls( inputTarget )[0]
@@ -1057,6 +1059,109 @@ def createSimplePlaneControl( inputTarget ):
     sgCmds.setMatrixToTarget( worldCtl.wm.get(), target, pcp=1  )
     sgCmds.setPivotZero( target )
     sgCmds.constrain_all( worldCtl, target )
+
+
+
+
+def makeLookAtSquashTransform( lookObject, baseObject, lookParentObject=None, baseParentObject=None, size=1 ):
+
+    if not lookParentObject:
+        lookParentObject = pymel.core.ls( lookObject )[0].getParent()
+    if not baseParentObject:
+        baseParentObject = pymel.core.ls( baseObject )[0].getParent()
+        if not baseParentObject:
+            baseParentObject = baseObject
+
+    dcmpBase   = sgCmds.getDecomposeMatrix( sgCmds.getMultMatrix( lookParentObject + '.wm', baseParentObject + '.wim' ).o )
+    dcmpSquash = sgCmds.getDecomposeMatrix( sgCmds.getMultMatrix( lookObject + '.wm', baseObject + '.wim' ).o )
+    directionIndex = sgCmds.getDirectionIndex( dcmpBase.ot.get() )
+
+    lookAtChild = sgCmds.makeLookAtChild( lookObject, baseObject )
+    lookAtChild.rename( 'lookAtChild_' + baseObject )
+    squashTransform = sgCmds.makeChild( lookAtChild, 'null' )
+    squashTransform.rename( 'squashTr_' + baseObject )
+    squashCenter = sgCmds.makeChild( squashTransform )
+    sgCmds.addAttr( squashCenter, ln='positionParam', min=0, max=1, dv=0.5, k=1 )
+    
+    sgCmds.createControllerShape( sgModel.Controller.diamondPoints,squashCenter, size )
+    centerTrMult = pymel.core.createNode( 'multiplyDivide' )
+    dcmpBase.attr( ['otx', 'oty', 'otz'][ (directionIndex) % 3 ] ) >> centerTrMult.attr( ['input1X', 'input1Y', 'input1Z'][ (directionIndex) % 3 ] )
+    squashCenter.attr( 'positionParam' ) >> centerTrMult.input2X
+    squashCenter.attr( 'positionParam' ) >> centerTrMult.input2Y
+    squashCenter.attr( 'positionParam' ) >> centerTrMult.input2Z
+    centerTrMult.output >> squashCenter.t
+    
+    distBase   = sgCmds.getDistance( dcmpBase )
+    distSquash = sgCmds.getDistance( dcmpSquash )
+    
+    scaleNode = pymel.core.createNode( 'multiplyDivide' )
+    distSquash.distance >> scaleNode.input1X
+    distBase.distance   >> scaleNode.input2X
+    scaleNode.op.set( 2 )
+    
+    
+    scaleNode.outputX >> squashTransform.attr( ['sx', 'sy', 'sz'][ directionIndex % 3 ] )
+    
+    sgCmds.addOptionAttribute( lookObject )
+    sgCmds.addAttr( lookObject, ln='squash', k=1, dv=1 )
+    
+    squashAttr = sgCmds.createSquashAttr( scaleNode.outputX, lookObject + '.squash' )
+    squashAttr >> squashTransform.attr( ['sx', 'sy', 'sz'][ (directionIndex+1) % 3 ] )
+    squashAttr >> squashTransform.attr( ['sx', 'sy', 'sz'][ (directionIndex+2) % 3 ] )
+    
+    return squashCenter
+
+
+
+
+def makeLookAtSquashBendTransform( lookObject, baseObject, lookParentObject=None, size=1 ):
+
+    if not lookParentObject:
+        lookParentObject = pymel.core.ls( lookObject )[0].getParent()
+
+    dcmpBase   = sgCmds.getDecomposeMatrix( sgCmds.getMultMatrix( lookParentObject + '.wm', baseObject + '.wim' ).o )
+    dcmpSquash = sgCmds.getDecomposeMatrix( sgCmds.getMultMatrix( lookObject + '.wm', baseObject + '.wim' ).o )
+    directionIndex = sgCmds.getDirectionIndex( dcmpBase.ot.get() )
+
+    centerBaseObject = sgCmds.makeChild( baseObject )
+    centerBaseObject.rename( 'centerBase_' + baseObject )
+    sgCmds.addAttr( centerBaseObject, ln='positionParam', min=0, max=1, dv=0.5, k=1 )
+    multCenterNode = pymel.core.createNode( 'multiplyDivide' )
+    dcmpSquash.attr( ['otx', 'oty', 'otz'][ (directionIndex) % 3 ] ) >> multCenterNode.attr( ['input1X', 'input1Y', 'input1Z'][ (directionIndex) % 3 ] )
+    centerBaseObject.attr( 'positionParam' ) >> multCenterNode.attr('input2X')
+    centerBaseObject.attr( 'positionParam' ) >> multCenterNode.attr('input2Y')
+    centerBaseObject.attr( 'positionParam' ) >> multCenterNode.attr('input2Z')
+    multCenterNode.output >> centerBaseObject.t
+
+    lookAtChild = sgCmds.makeLookAtChild( lookObject, centerBaseObject )
+    lookAtChild.rename( 'lookAtChild_' + centerBaseObject )
+    squashTransform = sgCmds.makeChild( lookAtChild, 'null' )
+    squashTransform.rename( 'squashTr_' + centerBaseObject )
+    
+    sgCmds.createControllerShape( sgModel.Controller.diamondPoints,squashTransform, size )
+    
+    distBase   = sgCmds.getDistance( dcmpBase )
+    distSquash = sgCmds.getDistance( dcmpSquash )
+    
+    scaleNode = pymel.core.createNode( 'multiplyDivide' )
+    distSquash.distance >> scaleNode.input1X
+    distBase.distance   >> scaleNode.input2X
+    scaleNode.op.set( 2 )
+    
+    scaleNode.outputX >> squashTransform.attr( ['sx', 'sy', 'sz'][ directionIndex % 3 ] )
+    
+    sgCmds.addOptionAttribute( lookObject )
+    sgCmds.addAttr( lookObject, ln='squash', k=1, dv=1 )
+    
+    squashAttr = sgCmds.createSquashAttr( scaleNode.outputX, lookObject + '.squash' )
+    squashAttr >> squashTransform.attr( ['sx', 'sy', 'sz'][ (directionIndex+1) % 3 ] )
+    squashAttr >> squashTransform.attr( ['sx', 'sy', 'sz'][ (directionIndex+2) % 3 ] )
+    
+    return centerBaseObject
+    
+    
+    
+    
     
     
     

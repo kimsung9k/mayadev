@@ -254,6 +254,8 @@ class sgCmds:
     @staticmethod
     def tangentConstraintByGroup( inputCurve, inputTargets, inputUpObjects, aimDirection ):
     
+        cmds.undoInfo( ock=1 )
+    
         curve = pymel.core.ls( inputCurve )[0]
         targets = [ pymel.core.ls( inputTarget )[0] for inputTarget in inputTargets ]
         upObjects = [ pymel.core.ls( inputUpObject )[0] for inputUpObject in inputUpObjects ]
@@ -391,6 +393,60 @@ class sgCmds:
             
             dcmp = sgCmds.getDecomposeMatrix( mmResult.o )
             dcmp.outputRotate >> target.r
+        
+        cmds.undoInfo( cck=1 )
+    
+    
+    @staticmethod
+    def curveBaseScaleConnectByGroup( inputCurve, inputTargets, inputUpObjects ):
+    
+        cmds.undoInfo( ock=1 )
+    
+        curve = pymel.core.ls( inputCurve )[0]
+        targets = [ pymel.core.ls( inputTarget )[0] for inputTarget in inputTargets ]
+        upObjects = [ pymel.core.ls( inputUpObject )[0] for inputUpObject in inputUpObjects ]
+        
+        
+        def twoUpObjectAndParam( target, upObjects, curve ):
+            
+            if len( upObjects ) == 1:
+                firstUpObject  = upObjects[0]
+                secondUpObject = upObjects[0]
+            else:
+                firstUpObject  = upObjects[0]
+                secondUpObject = upObjects[1]
+            
+            targetParam = sgCmds.getClosestParamAtPoint( target, curve )
+            
+            betweenParam = 1
+            for i in range( len( upObjects )-1 ):
+                firstUpObject = upObjects[i]
+                secondUpObject = upObjects[i+1]
+                firstUpParam = sgCmds.getClosestParamAtPoint( firstUpObject, curve )
+                secondUpParam = sgCmds.getClosestParamAtPoint( secondUpObject, curve )
+                multParamDirection = 1
+                if firstUpParam > secondUpParam:
+                    multParamDirection = -1
+                if multParamDirection * ( targetParam - firstUpParam ) < 0:
+                    betweenParam = 0
+                    break
+                elif multParamDirection * ( targetParam - secondUpParam ) < 0:
+                    betweenParam = ( targetParam - firstUpParam ) / ( secondUpParam - firstUpParam )
+                    break
+                else:
+                    continue
+            return firstUpObject, secondUpObject, betweenParam
+    
+        for target in targets:
+            firstUpObject, secondUpObject, betweenParam = twoUpObjectAndParam( target, upObjects, curve )
+            
+            blendColors = pymel.core.createNode( 'blendColors' )
+            firstUpObject.scale >> blendColors.color2
+            secondUpObject.scale >> blendColors.color1
+            blendColors.output >> target.scale 
+            blendColors.blender.set( betweenParam )
+            
+        cmds.undoInfo( cck=1 )
 
 
 
@@ -596,7 +652,8 @@ class Window( QDialog ):
         separator2 = Widget_horizontalSeparator()
         w_aimDirectionPart = Widget_aimDirectionPart()
         separator3 = Widget_horizontalSeparator()
-        w_button = QPushButton( "Constraint" )
+        w_tangentButton = QPushButton( "Constraint tangent" )
+        w_scaleButton = QPushButton( "Constraint scale" )
         
         listLayoutWidget = QWidget()
         listLayout = QHBoxLayout( listLayoutWidget )
@@ -611,7 +668,8 @@ class Window( QDialog ):
         mainLayout.addWidget( separator2 )
         mainLayout.addWidget( listLayoutWidget )
         mainLayout.addWidget( separator3 )
-        mainLayout.addWidget( w_button )
+        mainLayout.addWidget( w_tangentButton )
+        mainLayout.addWidget( w_scaleButton )
         
         self.lineEdit_curve = w_curvePart.lineEdit
         self.listWidget_upObjects = w_upObjectsPart.listWidget
@@ -621,10 +679,11 @@ class Window( QDialog ):
         self.z_lineEdit = w_aimDirectionPart.lineEdit3
         self.checkBox_autoUpVector = w_aimDirectionPart.checkBox
         
-        QtCore.QObject.connect( w_button, QtCore.SIGNAL( 'clicked()' ), self.constraint )
+        QtCore.QObject.connect( w_tangentButton, QtCore.SIGNAL( 'clicked()' ), self.constraintTangent )
+        QtCore.QObject.connect( w_scaleButton, QtCore.SIGNAL( 'clicked()' ), self.constraintScale )
     
     
-    def constraint(self):
+    def constraintTangent(self):
         
         curveName = self.lineEdit_curve.text()
         upObjects = self.listWidget_upObjects.upObjects
@@ -637,6 +696,21 @@ class Window( QDialog ):
             aimDirection = [ float(self.x_lineEdit.text()), float( self.y_lineEdit.text()), float( self.z_lineEdit.text() ) ]
         
         sgCmds.tangentConstraintByGroup( curveName, targets, upObjects, aimDirection )
+    
+    
+    def constraintScale(self):
+        
+        curveName = self.lineEdit_curve.text()
+        upObjects = self.listWidget_upObjects.upObjects
+        targets   = self.listWidget_constrainTargets.constrainTargets
+        
+        aimDirection = []
+        if self.checkBox_autoUpVector.isChecked():
+            aimDirection = sgCmds.getAimDirection( curveName, targets )
+        else:
+            aimDirection = [ float(self.x_lineEdit.text()), float( self.y_lineEdit.text()), float( self.z_lineEdit.text() ) ]
+        
+        sgCmds.curveBaseScaleConnectByGroup( curveName, targets, upObjects )
         
         
         

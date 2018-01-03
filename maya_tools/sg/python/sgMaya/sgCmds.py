@@ -2859,6 +2859,7 @@ def makeCurveFromSelection( *inputSels, **options ):
 
 
 
+
 def getDistanceNodeBetwwenTwoObjs( inputFirst, inputSecond ):
     
     first = pymel.core.ls( inputFirst )[0]
@@ -5783,6 +5784,16 @@ def getMultMatrix( *matrixAttrList ):
 
 
 
+def createMultMatrix( *matrixAttrList ):
+    
+    mm = pymel.core.createNode( 'multMatrix' )
+    for i in range( len( matrixAttrList ) ):
+        pymel.core.connectAttr( matrixAttrList[i], mm.i[i] )
+    return mm
+
+
+
+
 def getLookAtChildMatrixAttr( lookTargetMatrix, baseMatrix, baseVector ):
 
     baseInverse = pymel.core.createNode( 'inverseMatrix' )
@@ -5807,6 +5818,67 @@ def getLookAtChildMatrixAttr( lookTargetMatrix, baseMatrix, baseVector ):
     baseMatrix >> mm.i[1]
 
     return mm.matrixSum
+
+
+
+
+
+def createControllerShape( pointers, targetTransform=None, size=1 ):
+    
+    if not targetTransform:
+        targetTransform = pymel.core.createNode( 'transform' )
+    targetTransform = pymel.core.ls( targetTransform )[0]
+    
+    newPointList = copy.deepcopy( pointers )
+    options = {'p':newPointList, 'd':1}
+    
+    crv = pymel.core.curve( **options )
+    crvShape = crv.getShape()
+
+    pymel.core.parent( crvShape, targetTransform, add=1, shape=1 )
+    pymel.core.delete( crv )
+    crvShape = targetTransform.getShape()
+    
+    ioShape = addIOShape( targetTransform )
+    ioShape = pymel.core.ls( ioShape )[0]
+    
+    crvShape.addAttr( 'shape_tx', dv=0 ); targetTransform.shape_tx.set( e=1, cb=1 )
+    crvShape.addAttr( 'shape_ty', dv=0); targetTransform.shape_ty.set( e=1, cb=1 )
+    crvShape.addAttr( 'shape_tz', dv=0); targetTransform.shape_tz.set( e=1, cb=1 )
+    crvShape.addAttr( 'shape_rx', dv=0, at='doubleAngle' ); targetTransform.shape_rx.set( e=1, cb=1 )
+    crvShape.addAttr( 'shape_ry', dv=0, at='doubleAngle' ); targetTransform.shape_ry.set( e=1, cb=1 )
+    crvShape.addAttr( 'shape_rz', dv=0, at='doubleAngle' ); targetTransform.shape_rz.set( e=1, cb=1 )
+    crvShape.addAttr( 'shape_sx', dv=1 ); targetTransform.shape_sx.set( e=1, cb=1 )
+    crvShape.addAttr( 'shape_sy', dv=1 ); targetTransform.shape_sy.set( e=1, cb=1 )
+    crvShape.addAttr( 'shape_sz', dv=1 ); targetTransform.shape_sz.set( e=1, cb=1 )
+    crvShape.addAttr( 'scaleMult', dv=size, min=0 ); targetTransform.scaleMult.set( e=1, cb=1 )
+    composeMatrix = pymel.core.createNode( 'composeMatrix' )
+    composeMatrix2 = pymel.core.createNode( 'composeMatrix' )
+    multMatrix = pymel.core.createNode( 'multMatrix' )
+    composeMatrix.outputMatrix >> multMatrix.i[0]
+    composeMatrix2.outputMatrix >> multMatrix.i[1]
+    crvShape.shape_tx >> composeMatrix.inputTranslateX
+    crvShape.shape_ty >> composeMatrix.inputTranslateY
+    crvShape.shape_tz >> composeMatrix.inputTranslateZ
+    crvShape.shape_rx >> composeMatrix.inputRotateX
+    crvShape.shape_ry >> composeMatrix.inputRotateY
+    crvShape.shape_rz >> composeMatrix.inputRotateZ
+    crvShape.shape_sx >> composeMatrix.inputScaleX
+    crvShape.shape_sy >> composeMatrix.inputScaleY
+    crvShape.shape_sz >> composeMatrix.inputScaleZ
+    crvShape.scaleMult >> composeMatrix2.inputScaleX
+    crvShape.scaleMult >> composeMatrix2.inputScaleY
+    crvShape.scaleMult >> composeMatrix2.inputScaleZ
+    trGeo = pymel.core.createNode( 'transformGeometry' )
+    try:targetTransform.attr( 'radius' ).set( 0 )
+    except:pass
+    
+    ioShape.local >> trGeo.inputGeometry
+    multMatrix.matrixSum >> trGeo.transform
+    
+    trGeo.outputGeometry >> crvShape.create
+
+    return crvShape
 
 
 
@@ -8230,6 +8302,30 @@ def getSquashWidthNode( scaleInputAttr, squashRateAttr ):
     squashAttrMult.output >> sqrtNode.input2X
     
     divNode.outputX >> sqrtNode.input1X
+    return sqrtNode.outputX
+
+
+
+
+def createSquashAttr( inputScaleAttr, inputSquashRateAttr ):
+
+    scaleInputAttr = pymel.core.ls( inputScaleAttr )[0]
+    squashRateAttr = pymel.core.ls( inputSquashRateAttr )[0]
+
+    divNode = pymel.core.createNode( 'multiplyDivide' )
+    divNode.op.set( 2 )
+    divNode.input1X.set( 1 )
+    
+    scaleInputAttr >> divNode.input2X
+    sqrtNode = pymel.core.createNode( 'multiplyDivide' )
+    sqrtNode.op.set( 3 )
+    
+    squashAttrMult = pymel.core.createNode( 'multDoubleLinear' )
+    squashRateAttr >> squashAttrMult.input1
+    squashAttrMult.input2.set( 0.5 )
+    squashAttrMult.output >> sqrtNode.input2X
+    divNode.outputX >> sqrtNode.input1X
+    
     return sqrtNode.outputX
     
     
