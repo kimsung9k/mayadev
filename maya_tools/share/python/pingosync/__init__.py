@@ -7,6 +7,8 @@ from ui_Dialog_addTask import *
 from ui_Dialog_help_fileCondition import *
 from ui_Window_manageProject import *
 
+from functools import partial
+
 
 class Window_Login( QDialog ):
     
@@ -254,6 +256,7 @@ class Window( QMainWindow ):
         enableReference = commands.QueryCmds.isEnableReference( targetPath_inServer, targetPath_inLocal )
         enableExportReferenceInfo = commands.QueryCmds.isEnableExportReferneceInfo( targetPath_inLocal )
         enableFileDownload = commands.QueryCmds.isEnableFileDownload( targetPath_inServer )
+        enableDownloadHierarchy = commands.QueryCmds.isEnableDownloadHierarchy( targetPath_inServer )
         enableBackup = commands.QueryCmds.isEnableBackup( targetPath_inLocal )
         
         if enableOpenFile: 
@@ -264,6 +267,15 @@ class Window( QMainWindow ):
         separator = QAction( self ); separator.setSeparator( True );menu.addAction( separator )
         if enableFileDownload:
             menu.addAction("다운로드".decode( 'utf-8'), commands.ContextMenuCmds.download )
+        if enableDownloadHierarchy:
+            submenu = menu.addMenu( "일괄 다운로드".decode( 'utf-8' ) )
+            submenu.addAction( "Maya Scene 파일 다운로드".decode( 'utf-8' ), partial( commands.ContextMenuCmds.downloadHierarchy, ['.mb', '.ma' ] ) )
+            submenu.addAction( "Texture 파일 다운로드".decode( 'utf-8' ), partial( commands.ContextMenuCmds.downloadHierarchy, ['.jpg', '.png','.exr', '.tx', '.tga' ] ) )
+            submenu.addAction( "cache 파일 다운로드".decode( 'utf-8' ), partial( commands.ContextMenuCmds.downloadHierarchy, ['.abc', '.rs', '.m' ] ) )
+            submenu.addAction( "동영상 파일 다운로드".decode( 'utf-8' ), partial( commands.ContextMenuCmds.downloadHierarchy, ['.mov', '.mp4', '.avi', '.mkv' ] ) )
+            separator = QAction( self ); separator.setSeparator( True );submenu.addAction( separator )
+            submenu.addAction( "전체 파일 다운로드".decode( 'utf-8' ), partial( commands.ContextMenuCmds.downloadHierarchy, [] ) )
+            
         if enableExportReferenceInfo:
             menu.addAction("업로드( +레퍼런스 정보 )".decode( 'utf-8'), commands.ContextMenuCmds.upload )
         else:

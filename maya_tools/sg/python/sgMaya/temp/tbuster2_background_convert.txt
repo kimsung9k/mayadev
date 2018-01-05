@@ -1,0 +1,144 @@
+import pymel.core
+
+sceneName = cmds.file( q=1, sceneName=1 )
+resultPath = sceneName.replace( 'Village_ref', 'Village' )
+cmds.file( rename=resultPath )
+cmds.file( s=1, f=1 )
+
+references = pymel.core.ls( type='reference' )
+for refNode in references:
+    try:cmds.file( importReference=1, referenceNode=refNode.name() )
+    except:pass
+
+references = pymel.core.ls( type='reference' )
+for refNode in references:
+    try:cmds.file( importReference=1, referenceNode=refNode.name() )
+    except:pass
+    
+    
+import pymel.core
+from sgMaya import sgCmds
+from maya import cmds, OpenMaya, mel
+import ntpath, os
+
+
+def getBoundingBoxDistStr( sel ):
+    
+    bbMin = sel.getShape().boundingBoxMin.get()
+    bbMax = sel.getShape().boundingBoxMax.get()
+    
+    minPoint = OpenMaya.MPoint( *bbMin )
+    maxPoint = OpenMaya.MPoint( *bbMax )
+    
+    dist = minPoint.distanceTo( maxPoint )
+    startSum = minPoint.x + minPoint.y + minPoint.z
+    
+    distStr = ( '%.3f' % (dist + startSum) ).replace( '.', '_' )
+    return distStr
+
+
+def isVisible( target ):
+    allParents = target.getAllParents()
+    allParents.append( target )
+    for parent in allParents:
+        if not parent.v.get(): return False
+    return True
+
+
+targetGrps = pymel.core.ls( sl=1 )
+
+resultGrps = []
+otherGrps = []
+meshs = {}
+sels = []
+
+for child in pymel.core.ls( type='transform' ):
+    childShapes = child.listRelatives( s=1 )
+    meshExists = False
+    gpuExists = False
+    for childShape in childShapes:
+        if childShape.nodeType() == 'mesh':
+            meshExists = True
+        elif childShape.nodeType() == 'gpuCache':
+            gpuExists = True
+    if not meshExists: continue
+    if gpuExists: continue
+    sels.append( child )
+
+for sel in sels:
+    selShape = sel.getShape()
+    numVertices = selShape.numVertices()
+    bbStr = getBoundingBoxDistStr( sel )
+    keyStr = ('mesh_%d_%s' %( numVertices, bbStr )).replace( '-', 'm' )
+    if not meshs.has_key( keyStr ):
+        print sel
+        meshs[ keyStr ] = [sel]
+    else:
+        meshs[ keyStr ].append( sel )
+
+srcMeshGrp = 'srcMeshs'
+if not pymel.core.objExists( srcMeshGrp ):
+    pymel.core.createNode( 'transform', n=srcMeshGrp )
+
+lenKeys = len( meshs.keys() )
+cuIndex = 0
+for key in meshs.keys():
+    if not pymel.core.objExists( key ):
+        meshTr = pymel.core.duplicate( meshs[ key ][0] )[0]
+        meshTr.rename( key )
+        meshTr.setParent( srcMeshGrp )
+    
+    targetMeshs = meshs[ key ]
+    for targetMesh in targetMeshs:
+        cmds.connectAttr( key + '.outMesh', targetMesh.getShape().inMesh.name() )
+    cuIndex += 1
+    print "%.2f is done" % (float( cuIndex )/lenKeys * 100)
+
+
+import pymel.core
+
+
+def copyShader_multi( inputFirst, inputSeconds ):
+    first = pymel.core.ls( inputFirst )[0]
+    if not pymel.core.objExists( first ): return None
+    try:firstShape = first.getShape()
+    except:firstShape = first
+    engines = firstShape.listConnections( type='shadingEngine' )
+    if not engines: return None
+    
+    engines = list( set( engines ) )
+    copyObjAndEngines = []
+    
+    seconds = [ pymel.core.ls( inputSecond )[0] for inputSecond in inputSeconds ]
+    
+    for engine in engines:
+        srcCons = filter( lambda x : x.longName() in ['message', 'outColor'], engine.listConnections( s=1, d=0, p=1 ) )
+        if not srcCons: continue
+        pymel.core.hyperShade( objects = srcCons[0].node() )
+        selObjs = pymel.core.ls( sl=1 )
+        targetObjs = []
+        for selObj in selObjs:
+            if selObj.node() != firstShape: continue
+            if selObj.find( '.' ) != -1:
+                for second in seconds:
+                    targetObjs.append( second+'.'+ selObj.split( '.' )[-1] )
+            else:
+                for second in seconds:
+                    targetObjs.append( second )
+        if not targetObjs: continue        
+        for targetObj in targetObjs:
+            if not type( targetObj ) in [type( "" ), type( u"" )]:
+                targetObj = targetObj.name()
+            cmds.sets( targetObj, e=1, forceElement=engine.name() )
+            copyObjAndEngines.append( [targetObj, engine.name()] )
+
+    return copyObjAndEngines
+
+for key in meshs.keys():
+    keyShapes = cmds.listRelatives( key, s=1 )
+    if not keyShapes: continue
+    keyShape = keyShapes[0]
+    targets = cmds.listConnections( keyShape + '.outMesh', s=0, d=1 )
+    if not targets: continue
+    if len( targets ) == 1: continue
+    copyShader_multi( key, targets )

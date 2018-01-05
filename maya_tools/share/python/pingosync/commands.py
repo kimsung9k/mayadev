@@ -225,7 +225,7 @@ class QueryCmds:
     @staticmethod
     def isEnableFileDownload( serverPath ):
         if not os.path.exists( serverPath ): return False
-        if os.path.isdir( serverPath ): return True
+        if os.path.isdir( serverPath ): return False
         return True
 
 
@@ -263,6 +263,12 @@ class QueryCmds:
     def isEnableBackup( targetPath ):
         
         if not os.path.exists(targetPath): return False
+        return True
+    
+    
+    @staticmethod
+    def isEnableDownloadHierarchy( targetPath ):
+        if not os.path.isdir( targetPath ): return False
         return True
         
 
@@ -575,7 +581,6 @@ class FileControl:
     @staticmethod
     def isEditorInfoFile( filePath ):
         return os.path.splitext( filePath )[-1] == '.' + Models.ControlBase.editorInfoExtension
-    
     
     
     @staticmethod
@@ -1144,6 +1149,38 @@ class ContextMenuCmds:
         
         TreeWidgetCmds.setTreeItemsCondition( Models.ControlBase.uiTreeWidget )
         
+    
+    
+    @staticmethod
+    def downloadHierarchy( extensionList = [] ):
+        
+        print "download hierarchy"
+        
+        selItems = Models.ControlBase.uiTreeWidget.selectedItems()
+        serverUnit = Models.FileUnit( FileControl.getCurrentServerProjectPath(), selItems[0].taskPath, selItems[0].unitPath )
+        localUnit  = Models.FileUnit( FileControl.getCurrentLocalProjectPath(),  selItems[0].taskPath, selItems[0].unitPath )
+        
+        serverPath = serverUnit.fullPath()
+        localPath  = localUnit.fullPath()
+        
+        FileControl.makeFolder( localPath )
+        
+        copyList = []
+        for root, dirs, names in os.walk( serverPath ):
+            for name in names:
+                extension = os.path.splitext( name )[-1]
+                if extensionList and not extension in extensionList: continue
+                serverFullPath = ( root + '\\' + name ).replace( '\\', '/' )
+                copyList.append( [serverFullPath[ len( serverUnit.projectPath ): ], extension] )
+        
+        ui_updateFileList = Dialog_downloadFileList( Models.ControlBase.mayawin )
+        ui_updateFileList.setServerPath( serverUnit.projectPath )
+        ui_updateFileList.setLocalPath( localUnit.projectPath )
+        for serverElsePath, extension in copyList:
+            ui_updateFileList.appendFilePath( serverElsePath, extension )
+        ui_updateFileList.updateUI()
+        ui_updateFileList.show()
+    
     
     
     @staticmethod

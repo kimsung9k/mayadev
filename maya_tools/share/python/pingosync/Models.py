@@ -67,9 +67,9 @@ class FileUnit:
     
     def __init__(self, projectPath, taskPath, unitPath ):
         
-        self.projectPath = projectPath
-        self.taskPath = taskPath
-        self.unitPath = unitPath
+        self.projectPath = projectPath.replace( '\\', '/' )
+        self.taskPath = taskPath.replace( '\\', '/' )
+        self.unitPath = unitPath.replace( '\\', '/' )
     
     def fullPath(self):
         

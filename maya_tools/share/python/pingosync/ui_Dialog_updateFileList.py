@@ -85,7 +85,7 @@ class Dialog_downloadFileList( QDialog ):
         
         labelString = "Server Work Area : \n    %s\n\nLocal Work Area : \n    %s\n"
         
-        print "self.typeAndFiles : ",self.typeAndFiles
+        #print "self.typeAndFiles : ",self.typeAndFiles
         
         for nodeType in self.typeAndFiles.keys():
             paths = self.typeAndFiles[ nodeType ]
@@ -98,22 +98,37 @@ class Dialog_downloadFileList( QDialog ):
     
     def cmd_download(self):
         
+        print "cmd_download"
+        
         import shutil
         import pymel.core, os
         from maya import mel
         
         for nodeType in self.typeAndFiles.keys():
             paths = self.typeAndFiles[ nodeType ]
+            
+            allSizes = 0
             for path in paths:
                 serverPath = self.serverPath + path
-                localPath  = self.localPath + path
-                
+                if not os.path.exists( serverPath ): continue
+                fileSize = os.path.getsize( serverPath )
+                allSizes += fileSize
+            
+            currentSize = 0
+            for path in paths:
+                serverPath = self.serverPath + path
+                localPath  = self.localPath  + path
                 if os.path.exists( serverPath ):
                     editorInfo = commands.EditorCmds.getEditorInfoFromFile( serverPath )
                     commands.EditorCmds.setEditorInfoToFile( editorInfo, localPath )
                     commands.FileControl.downloadFile( serverPath, localPath )
                 
-        cmds.deleteUI( Dialog_downloadFileList.objectName, wnd=1 )
+                currentSize += os.path.getsize( serverPath )
+                percent = float(currentSize) / allSizes
+                print "percent download : %.2f" % (percent*100)
+                
+                
+        cmds.deleteUI( Dialog_downloadFileList.objectName )
         commands.TreeWidgetCmds.setTreeItemsCondition()
         
         for cmd in self.downloadCmds:

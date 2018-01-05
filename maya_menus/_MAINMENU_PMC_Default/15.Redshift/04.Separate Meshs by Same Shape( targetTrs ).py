@@ -3,38 +3,6 @@ from sgMaya import sgCmds
 from maya import cmds, OpenMaya, mel
 import ntpath, os
 
-def renameSelOrder( sels, firstName=None ):
-    if not firstName:
-        firstName = sels[0].name()
-    firstLocalName = firstName.split( '|' )[-1]
-    
-    digitIndices = []
-    for i in range( len( firstLocalName ) ):
-        if firstLocalName[i].isdigit():
-            if len( digitIndices ):
-                if i == digitIndices[-1]+1:
-                    digitIndices.append( i )
-                else:
-                    digitIndices = [i]
-            else:
-                digitIndices.append( i )
-    
-    if digitIndices:
-        sepNameFront = firstLocalName[:digitIndices[0]]
-        sepNameBack  = firstLocalName[digitIndices[-1]+1:]
-        
-        numFormat = "%0" + str(len( digitIndices )) + "d"
-        
-        startNum = int( firstLocalName[digitIndices[0]:digitIndices[-1]+1] )
-        fullNameFormat = sepNameFront + numFormat + sepNameBack
-    else:
-        startNum = 0
-        fullNameFormat = firstName.split( '|' )[-1] + '%02d'
-        
-    for sel in sels:
-        sel.rename( fullNameFormat % startNum )
-        startNum += 1
-        
 
 def getBoundingBoxDistStr( sel ):
     
@@ -76,13 +44,11 @@ for targetGrp in targetGrps:
     
     meshs = {}
     
-    renameSelOrder( sels, 'mesh' )
-    
     for sel in sels:
         selShape = sel.getShape()
         numVertices = selShape.numVertices()
         bbStr = getBoundingBoxDistStr( sel )
-        keyStr = 'mesh_%d_%s' %( numVertices, bbStr )
+        keyStr = targetGrp + '_%d_%s' %( numVertices, bbStr )
         if not meshs.has_key( keyStr ):
             meshs[ keyStr ] = [sel]
         else:
@@ -97,10 +63,6 @@ for targetGrp in targetGrps:
             resultGrps.append( grp )
 
 pymel.core.delete( otherGrps )
-
-for resultGrp in resultGrps:
-    children = resultGrp.listRelatives( c=1 )
-    renameSelOrder( children, firstName= resultGrp.name() + '_00' )
 
 pymel.core.select( resultGrps )
 

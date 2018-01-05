@@ -1458,7 +1458,7 @@ def addAnimCurveConnection( inputAttr ):
     
     fullAttr = pymel.core.ls( inputAttr )[0]
     node = fullAttr.node().name()
-    attr = fullAttr.attrName()
+    attr = inputAttr.split( '.' )[-1]
     separateParentConnection( node, attr )
           
     cons = cmds.listConnections( node+'.'+attr, s=1, d=0, p=1, c=1 )
@@ -1469,6 +1469,8 @@ def addAnimCurveConnection( inputAttr ):
             cons[1] = srcCon[0]
     
     attrType = cmds.attributeQuery( attr, node= node, attributeType=1 )
+    
+    print "attr  : ", attr
     
     if attrType == 'doubleLinear':
         animCurveType= 'animCurveUL'
