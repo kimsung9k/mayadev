@@ -30,6 +30,7 @@ class UICmds:
 
 
 class TreeWidgetCmds:
+    
 
     @staticmethod
     def setTreeItemCondition( targetItem ):
@@ -53,7 +54,12 @@ class TreeWidgetCmds:
         brushForPath = QBrush( Models.Colors.serverOnly )
 
         targetItem.setForeground( 0, brush )
-        targetItem.setForeground( 2, brushForPath )
+        targetItem.setForeground( 1, brush )
+        cuColor = brush.color()
+        cuColor.setAlpha( 120 )
+        brush = QBrush( cuColor )
+        targetItem.setForeground( 1, brush )
+        targetItem.setForeground( 3, brushForPath )
 
         cuLocalUnitPath  = FileControl.getArrangedPathString( cuLocalFullPath )
         currentScenePath = cmds.file( q=1, sceneName=1 )
@@ -61,13 +67,12 @@ class TreeWidgetCmds:
         currentScenePath = FileControl.getArrangedPathString( currentScenePath )
         localFullPath = FileControl.getArrangedPathString( cuLocalUnitPath )
 
-        if currentScenePath and currentScenePath.find( localFullPath ) != -1:
-            targetItem.setText( 1, "Opened".decode( 'utf-8' ) )
-            cuColor = brush.color()
-            cuColor.setAlpha( 100 )
-            targetItem.setForeground( 1, QBrush( cuColor ) )
+        if currentScenePath and FileControl.hasPath( currentScenePath, localFullPath ):
+            targetItem.setText( 2, "Opened".decode( 'utf-8' ) )
+            targetItem.setForeground( 2, brush )
         else:
-            targetItem.setText( 1, "" )
+            targetItem.setText( 2, "" )
+        targetItem.setSelected( False )
 
 
     @staticmethod
@@ -89,7 +94,8 @@ class TreeWidgetCmds:
                 TreeWidgetCmds.setTreeItemCondition( item )
         
         treeWidget.resizeColumnToContents( 0 )
-        treeWidget.setColumnWidth( 1, 70 )
+        treeWidget.resizeColumnToContents( 1 )
+        treeWidget.setColumnWidth( 2, 50 )
 
 
 
@@ -121,11 +127,12 @@ class TreeWidgetCmds:
             taskData = tasksData[ taskName ]
             taskPath = taskData[ Models.ControlBase.labelTaskPath ]
             itemWidget = QTreeWidgetItem( targetTreeWidget )
-            itemWidget.setText( 0, taskName )
-            itemWidget.setText( 2, taskPath )
             itemWidget.taskPath = taskPath
             itemWidget.unitPath = ""
             if addChild :addHierarchy( itemWidget )
+            itemWidget.setText( 0, taskName )
+            itemWidget.setText( 3, taskPath )
+            
         TreeWidgetCmds.setTreeItemsCondition( targetTreeWidget )
 
 
@@ -173,18 +180,35 @@ class TreeWidgetCmds:
 
             for unitDir in unitDirs:
                 newItem = QTreeWidgetItem( expandedItem )
-                newItem.setText( 0, unitDir.split( '/' )[-1] )
-                newItem.setText( 2, expandedItem.taskPath )
                 newItem.taskPath = expandedItem.taskPath
                 newItem.unitPath = unitDir[ len( expandedItem.taskPath ): ]
                 emptyChild = QTreeWidgetItem( newItem )
+                newItem.setText( 0, unitDir.split( '/' )[-1] )
+                newItem.setText( 3, unitDir )
                 numTasks += 1
+                
             for unitFile in unitFiles:
                 newItem = QTreeWidgetItem( expandedItem )
-                newItem.setText( 0, unitFile.split( '/' )[-1] )
-                newItem.setText( 2, expandedItem.taskPath )
                 newItem.taskPath = expandedItem.taskPath
                 newItem.unitPath = unitFile[ len( expandedItem.taskPath ): ]
+                newItem.setText( 0, unitFile.split( '/' )[-1] )
+                newItem.setText( 3, unitFile )
+                
+                serverUnitFile = serverPath + unitFile
+                localUnitFile  = localPath  + unitFile
+                
+                targetTime = None
+                if os.path.exists( serverUnitFile ) and os.path.exists( localUnitFile ):
+                    serverTime = Models.FileTime( serverUnitFile )
+                    localTime  = Models.FileTime( localUnitFile )
+                    targetTime = serverTime if serverTime > localTime else localTime
+                elif os.path.exists( serverUnitFile ) and not os.path.exists( localUnitFile ):
+                    targetTime = Models.FileTime( serverUnitFile )
+                elif os.path.exists( localUnitFile ):
+                    targetTime = Models.FileTime( localUnitFile )
+                if targetTime:
+                    newItem.setText( 1, targetTime.getStrFromMTime( targetTime.mtime() ) + " "*3 )
+                
                 numTasks += 1
         else:
             QTreeWidgetItem( expandedItem )
@@ -201,6 +225,45 @@ class TreeWidgetCmds:
         if not selItems: return None
         selItems[0].setSelected( False )
         TreeWidgetCmds.updateTaskHierarchy( selItems[0].parent() )
+    
+    
+    @staticmethod
+    def selectPath( inputPath, treeWidget ):
+        
+        path = FileControl.getArrangedPathString( inputPath )
+        serverProjectPath = FileControl.getArrangedPathString( FileControl.getCurrentServerProjectPath() )
+        localProjectPath  = FileControl.getArrangedPathString( FileControl.getCurrentLocalProjectPath() )
+        
+        if path.find( serverProjectPath ) == -1 and path.find( localProjectPath ) == -1: return None
+        
+        basePath = localProjectPath if FileControl.hasPath( path, localProjectPath ) else serverProjectPath
+        
+        resultItem = None
+        for i in range( treeWidget.topLevelItemCount() ):
+            resultItem = treeWidget.topLevelItem( i )
+            resultPath = basePath + resultItem.taskPath + resultItem.unitPath
+            
+            if not FileControl.hasPath( path, resultPath ): continue
+            
+            whileCount = 0
+            while len( resultPath ) < len( path ):
+                treeWidget.expandItem( resultItem )
+                TreeWidgetCmds.updateTaskHierarchy( resultItem )
+                
+                for j in range( resultItem.childCount() ):
+                    childItem = resultItem.child( j )
+                    resultPath = basePath + childItem.taskPath + childItem.unitPath
+                    if not FileControl.hasPath( path, resultPath ): continue
+                    resultItem = childItem
+                    break
+                whileCount += 1
+                if whileCount > 10: break
+            if resultPath == path: break
+            
+        resultItem.setSelected( True ) 
+        
+        
+    
 
 
 
@@ -417,6 +480,26 @@ class ProjectControl:
 
 class FileControl:
     
+    
+    @staticmethod
+    def hasPath( inputBasePath, inputTargetPath ):
+        
+        basePath = inputBasePath.replace( '\\', '/' )
+        targetPath = inputTargetPath.replace( '\\', '/' )
+        
+        baseSplits   = basePath.split( '/' )
+        targetSplits = targetPath.split( '/' )
+        
+        if len( targetSplits ) > len( baseSplits ): return False
+        
+        for i in range( len( targetSplits ) ):
+            if targetSplits[i].lower() != baseSplits[i].lower(): return False
+        
+        return True
+        
+        
+    
+    
     @staticmethod
     def isMayaFile( targetPath ):
         
@@ -439,7 +522,6 @@ class FileControl:
         if os.path.exists( pathName ):return None
         os.makedirs( pathName )
         return pathName
-
 
 
     @staticmethod
@@ -1153,8 +1235,6 @@ class ContextMenuCmds:
     
     @staticmethod
     def downloadHierarchy( extensionList = [] ):
-        
-        print "download hierarchy"
         
         selItems = Models.ControlBase.uiTreeWidget.selectedItems()
         serverUnit = Models.FileUnit( FileControl.getCurrentServerProjectPath(), selItems[0].taskPath, selItems[0].unitPath )

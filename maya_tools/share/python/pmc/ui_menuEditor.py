@@ -227,6 +227,7 @@ class Dialog_create( QDialog ):
 
 class MenuListWidget( QListWidget ):
 
+    clipedFolderPath = None
 
     def __init__(self, basePath, **kwargs ):
         
@@ -284,9 +285,56 @@ class MenuListWidget( QListWidget ):
         menu.addSeparator()
         menu.addAction( "Rename Target".decode( 'utf-8' ), self.renameTarget )
         menu.addAction( "Delete Target".decode( 'utf-8' ), self.removeTarget )
+        
+        if self.selectedItems() and os.path.isdir(self.selectedItems()[0].targetPath):
+            menu.addSeparator()
+            menu.addAction( "Copy Folder".decode( 'utf-8' ), self.copyFolder )
+        
+        if MenuListWidget.clipedFolderPath and os.path.exists( MenuListWidget.clipedFolderPath ):
+            menu.addSeparator()
+            menu.addAction( "Past Folder".decode( "utf-8" ), self.pastFolder )
+        
         pos = QCursor.pos()
         point = QtCore.QPoint( pos.x()+10, pos.y() )
         menu.exec_( point )
+    
+    
+    def copyFolder(self):
+        
+        selItems = self.selectedItems()
+        if not selItems: return None
+        targetItem = selItems[0]
+        MenuListWidget.clipedFolderPath = targetItem.targetPath
+        print "clip folder path : ", MenuListWidget.clipedFolderPath
+    
+    
+    
+    def pastFolder(self):
+        
+        if not MenuListWidget.clipedFolderPath or not os.path.exists( MenuListWidget.clipedFolderPath ): return
+        
+        sourceRootPath = MenuListWidget.clipedFolderPath
+        targetRootPath = self.basePath + '/' + ntpath.split( MenuListWidget.clipedFolderPath )[-1]
+        
+        sourceDirList  = [sourceRootPath]
+        sourceFileList = []
+        
+        for root, dirs, names in os.walk( sourceRootPath ):
+            for directory in dirs:
+                sourceDirList.append( root.replace( '\\', '/' ) + '/' + directory )
+            for name in names:
+                sourceFileList.append( root.replace( '\\', '/' ) + '/' + name )
+        
+        for sourceDir in sourceDirList:
+            targetDir = sourceDir.replace( sourceRootPath, targetRootPath )
+            if not os.path.exists( targetDir ):
+                os.makedirs( targetDir )
+        
+        for sourceFile in sourceFileList:
+            targetFile = sourceFile.replace( sourceRootPath, targetRootPath )
+            shutil.copy( sourceFile, targetFile )
+        self.loadMenu()
+        
     
 
 

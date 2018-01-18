@@ -149,3 +149,11 @@ class WinA:
 
         cmds.window( self.winName, e=1, wh=[ self.width, self.height ], rtf=1 )
         cmds.showWindow( self.winName )
+
+
+def show():
+    WinA().create()
+
+
+if __name__ == '__main__':
+    show()

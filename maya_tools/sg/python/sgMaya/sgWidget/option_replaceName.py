@@ -63,3 +63,14 @@ class Win:
                 
         cmds.window( Win_Global.winName, e=1, width= Win_Global.width, height= Win_Global.height )
         cmds.showWindow( Win_Global.winName )
+
+
+
+def show():
+    
+    Win().create()
+
+
+
+if __name__ == '__main__':
+    show()

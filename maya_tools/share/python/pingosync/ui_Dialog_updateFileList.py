@@ -98,36 +98,45 @@ class Dialog_downloadFileList( QDialog ):
     
     def cmd_download(self):
         
-        print "cmd_download"
-        
-        import shutil
-        import pymel.core, os
-        from maya import mel
+        percent = 0
+        allSizes = 0
         
         for nodeType in self.typeAndFiles.keys():
             paths = self.typeAndFiles[ nodeType ]
             
-            allSizes = 0
             for path in paths:
                 serverPath = self.serverPath + path
                 if not os.path.exists( serverPath ): continue
                 fileSize = os.path.getsize( serverPath )
                 allSizes += fileSize
+        
+        currentSize = 0
+        for nodeType in self.typeAndFiles.keys():
+            paths = self.typeAndFiles[ nodeType ]
             
-            currentSize = 0
             for path in paths:
                 serverPath = self.serverPath + path
+                if not os.path.exists( serverPath ): continue
+                
+                try:
+                    currentSize += os.path.getsize( serverPath )
+                except:
+                    continue
+                
                 localPath  = self.localPath  + path
                 if os.path.exists( serverPath ):
-                    editorInfo = commands.EditorCmds.getEditorInfoFromFile( serverPath )
-                    commands.EditorCmds.setEditorInfoToFile( editorInfo, localPath )
-                    commands.FileControl.downloadFile( serverPath, localPath )
-                
-                currentSize += os.path.getsize( serverPath )
+                    try:
+                        commands.FileControl.downloadFile( serverPath, localPath )
+                        editorInfo = commands.EditorCmds.getEditorInfoFromFile( serverPath )
+                        commands.EditorCmds.setEditorInfoToFile( editorInfo, localPath )
+                    except:continue
+
                 percent = float(currentSize) / allSizes
                 print "percent download : %.2f" % (percent*100)
-                
-                
+        
+        if float( "%.2f" % (percent * 100 ) ) != 100.0:
+            print "percent download : 100.00"
+        
         cmds.deleteUI( Dialog_downloadFileList.objectName )
         commands.TreeWidgetCmds.setTreeItemsCondition()
         
@@ -221,18 +230,38 @@ class Dialog_uploadFileList( QDialog ):
 
     def cmd_upload(self):
         
-        import shutil
-        import pymel.core, os
-        from maya import mel
+        percent = 0
+        allSizes = 0
         
         for filePath in self.files:
             serverPath = self.serverPath + filePath
             localPath  = self.localPath + filePath
+            if not os.path.exists( localPath ): continue
+            try:fileSize = os.path.getsize( localPath )
+            except:continue
+            allSizes += fileSize
+        
+        currentSize = 0
+        
+        for filePath in self.files:
+            serverPath = self.serverPath + filePath
+            localPath  = self.localPath + filePath
+            if not os.path.exists( localPath ): continue
+            try:currentSize += os.path.getsize( localPath )
+            except:continue
             
-            if os.path.exists( localPath ):
+            try:
                 editorInfoLocal  = commands.EditorCmds.getEditorInfoFromFile( localPath )
                 commands.FileControl.uploadFile( localPath, serverPath )
                 commands.EditorCmds.setEditorInfoToFile( editorInfoLocal, serverPath )
+            except:pass
+            
+            percent = float(currentSize) / allSizes
+            print "percent upload : %.2f" % (percent*100)
+        
+        if float( "%.2f" % (percent * 100 ) ) != 100.0:
+            print "percent upload : 100.00"
+
         cmds.deleteUI( Dialog_uploadFileList.objectName, wnd=1 )
         commands.TreeWidgetCmds.setTreeItemsCondition()
     

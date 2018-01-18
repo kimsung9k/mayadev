@@ -1,2 +1,2 @@
-from sgMaya.sgWidget import ui_setAttr
-ui_setAttr.show()
+from sgMaya.sgWidget import setAttr
+setAttr.show()

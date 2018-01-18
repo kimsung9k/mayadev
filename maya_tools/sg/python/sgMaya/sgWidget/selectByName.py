@@ -1,6 +1,4 @@
 import maya.cmds as cmds
-from functools import partial
-
 
 
 class WinA_Global:
@@ -101,3 +99,10 @@ class WinA:
         WinA_Global.fld_searchString = self.uiField.txf
 
 
+def show():
+    
+    WinA().create()
+
+
+if __name__ == '__main__':
+    show()

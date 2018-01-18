@@ -106,6 +106,8 @@ class Window_manageProject( QMainWindow ):
         dialog.show()
 
         def rename():
+            dialog.close()
+            
             cuText = lineEdit.text()
             
             data = commands.ProjectControl.getProjectListData()
@@ -113,13 +115,12 @@ class Window_manageProject( QMainWindow ):
             
             selItems = self.workTreeWidget.selectedItems()
             cuProjectData[ Models.ControlBase.labelTasks ][ cuText ] = cuProjectData[ Models.ControlBase.labelTasks ][ selItems[0].text(0) ]
-            del cuProjectData[ Models.ControlBase.labelTasks ][ selItems[0].text(0) ]
+            cuProjectData[ Models.ControlBase.labelTasks ].pop(selItems[0].text(0))
             
             commands.ProjectControl.setProjectListData( data )
             
             self.loadUIInfo()
             Models.ControlBase.mainui.updateProjectList( self.currentProjectName )
-            dialog.close()
         
         QtCore.QObject.connect( lineEdit, QtCore.SIGNAL( "returnPressed()" ), rename )
         QtCore.QObject.connect( button, QtCore.SIGNAL( "clicked()" ), rename )
@@ -137,7 +138,7 @@ class Window_manageProject( QMainWindow ):
         dialog = QDialog( self )
         dialog.setWindowFlags( QtCore.Qt.Drawer )
         dialog.setObjectName( objectName )
-        dialog.setWindowTitle( "이름변경".decode( 'utf-8' ) )
+        dialog.setWindowTitle( "작업영역삭제".decode( 'utf-8' ) )
         dialog.resize( 200, 50 )
         dialog.setModal(True )
         
@@ -153,22 +154,25 @@ class Window_manageProject( QMainWindow ):
         dialog.show()
 
         def delete():
+            
+            dialog.close()
+            
             data = commands.ProjectControl.getProjectListData()
             cuProjectData = data[ self.currentProjectName ]
             
             selItems = self.workTreeWidget.selectedItems()
-            del cuProjectData[ Models.ControlBase.labelTasks ][ selItems[0].text(0) ]
+            print cuProjectData[ Models.ControlBase.labelTasks ]
+            print selItems[0].text(0)
+            print cuProjectData[ Models.ControlBase.labelTasks ].pop( selItems[0].text(0) )
             
             commands.ProjectControl.setProjectListData( data )
             
             self.loadUIInfo()
             Models.ControlBase.mainui.updateProjectList( self.currentProjectName )
-            dialog.close()
-    
     
         def cancel():
             dialog.close()
-        
+
         QtCore.QObject.connect( buttonDelete, QtCore.SIGNAL( "clicked()" ), delete )
         QtCore.QObject.connect( buttonCancel, QtCore.SIGNAL( "clicked()" ), cancel )
         

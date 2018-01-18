@@ -472,3 +472,10 @@ class WinMain:
         
         self.scriptJob()
         WinMain_Cmd.updateTableBySelection()
+
+
+def show():
+    WinMain().create()
+
+if __name__ == '__main__':
+    show()

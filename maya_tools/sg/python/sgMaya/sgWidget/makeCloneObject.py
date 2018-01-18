@@ -1,5 +1,4 @@
 import maya.cmds as cmds
-from functools import partial
 import pymel.core
 
 
@@ -318,4 +317,15 @@ class WinA:
         WinA_Global.ui_clones = self.uiCloneTargets
         WinA_Global.chk_shapeOn = chk_shapeOn
         WinA_Global.chk_connectionOn = chk_connectionOn
-        
+
+
+def show():
+    WinA.create()
+
+
+if __name__ == '__main__':
+    show()
+
+
+
+

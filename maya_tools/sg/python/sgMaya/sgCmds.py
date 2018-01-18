@@ -1,5 +1,6 @@
 from maya import OpenMaya, OpenMayaUI, cmds
 import pymel.core
+from pymel.core import datatypes, general
 import math, copy
 import os
 import math
@@ -122,6 +123,14 @@ def getDagPath( inputTarget ):
         return dagPath
     except:
         return None
+
+
+
+
+def getCurrentCam():
+    panel = cmds.getPanel( wf=1 )
+    if cmds.getPanel( to=panel ) != "modelPanel": return None
+    return pymel.core.ls( cmds.modelEditor( panel, q=1, camera=1 ) )[0]
 
 
 
@@ -438,7 +447,7 @@ def separateParentConnection( inputNode, attrName ):
 def convertMultDoubleConnection( inputAttr ):
     
     attr = pymel.core.ls( inputAttr )[0]
-    attrName = attr.shortName()
+    attrName = attr.nodeName()
     newAttrName = 'mult_' + attrName
     node = attr.node()
     
@@ -485,7 +494,7 @@ def getAttrInfo( inputTargetAttr ):
 
     targetAttr = pymel.core.ls( inputTargetAttr )[0]
     
-    inputAttrInfo.shortName = targetAttr.shortName()
+    inputAttrInfo.shortName = targetAttr.nodeName()
     inputAttrInfo.longName  = targetAttr.longName()
     inputAttrInfo.type    = targetAttr.type()
     inputAttrInfo.keyable = targetAttr.isKeyable()
@@ -535,12 +544,12 @@ def copyAttribute( inputSrc, inputDst, attrName ):
         if srcAttr.type() == 'enum':
             enumNames = pymel.core.attributeQuery( attrName, node=inputSrc, le=1 )
             enumStr = ':'.join( enumNames ) + ':'
-            addAttr( dst, ln= srcAttr.longName(), sn= srcAttr.shortName(), at=srcAttr.type(), en=enumStr, dv=defaultList[0] )
+            addAttr( dst, ln= srcAttr.longName(), sn= srcAttr.nodeName(), at=srcAttr.type(), en=enumStr, dv=defaultList[0] )
         else:
-            addAttr( dst, ln= srcAttr.longName(), sn= srcAttr.shortName(), at=srcAttr.type(), dv=defaultList[0] )
+            addAttr( dst, ln= srcAttr.longName(), sn= srcAttr.nodeName(), at=srcAttr.type(), dv=defaultList[0] )
     except:
         try:
-            addAttr( dst, ln= srcAttr.longName(), sn= srcAttr.shortName(), dt=srcAttr.type(), dv=defaultList[0] )
+            addAttr( dst, ln= srcAttr.longName(), sn= srcAttr.nodeName(), dt=srcAttr.type(), dv=defaultList[0] )
         except:
             pass
 
@@ -924,7 +933,6 @@ def copyShader( inputFirst, inputSecond ):
         if not srcCons: continue
         pymel.core.hyperShade( objects = srcCons[0].node() )
         selObjs = pymel.core.ls( sl=1 )
-        print "sel Objs : ", selObjs
         targetObjs = []
         for selObj in selObjs:
             if selObj.node() != firstShape: continue
@@ -1411,7 +1419,7 @@ def makeParent( inputSel, **options ):
     
     sel = pymel.core.ls( inputSel )[0]
     if not options.has_key( 'n' ) and not options.has_key( 'name' ):
-        options.update( {'n':'P'+ sel.shortName()} )
+        options.update( {'n':'P'+ sel.nodeName()} )
     selP = sel.getParent()
     transform = pymel.core.createNode( 'transform', **options )
     if selP: pymel.core.parent( transform, selP )
@@ -3413,8 +3421,8 @@ def makeSubCtl( inputCtl, cloneName = 'subCtl' ):
     
     ctl = pymel.core.ls( inputCtl )[0]
     cloneCtl = makeCloneObject( ctl, cloneAttrName=cloneName, shapeOn=1 )
-    cloneCtl.rename( ctl.shortName() )
-    ctl.rename( 'sub_' + ctl.shortName().split( '|' )[-1] )
+    cloneCtl.rename( ctl.nodeName() )
+    ctl.rename( 'sub_' + ctl.nodeName().split( '|' )[-1] )
     
     udAttrs = cmds.listAttr( ctl.name(), ud=1 )
     keyAttrs = cmds.listAttr( ctl.name(), k=1 )
@@ -3570,7 +3578,7 @@ def createBoundingBox( inputTarget ):
     points[6] = [bbmin[0], bbmin[1], bbmin[2]]
     points[7] = [bbmax[0], bbmin[1], bbmin[2]]
     
-    cube = pymel.core.polyCube( ch=1, o=1, cuv=4, n= target.shortName() + '_boundingBox' )[0]
+    cube = pymel.core.polyCube( ch=1, o=1, cuv=4, n= target.nodeName() + '_boundingBox' )[0]
     for i in range( 8 ):
         pymel.core.move( points[i][0], points[i][1], points[i][2], cube + '.vtx[%d]' % i )
     return cube
@@ -3724,7 +3732,8 @@ def getWorldPosition( inputTarget ):
     
     pos = pymel.core.xform( inputTarget, q=1, ws=1, t=1 )
     return OpenMaya.MPoint( *pos )
-
+    
+    
 
 
 
@@ -4144,7 +4153,7 @@ def getOtherSideStr( inputStr ):
 def mirrorControllerShape( inputTarget ):
 
     target = pymel.core.ls( inputTarget )[0]
-    targetName = target.shortName()
+    targetName = target.nodeName()
     othersideName = getOtherSideStr( targetName )
 
     cvs = cmds.ls( target + '.cv[*]', fl=1 )
@@ -4904,7 +4913,6 @@ def getIndexColor( inputDagNode ):
     
     dagNode = pymel.core.ls( inputDagNode )[0]
     return dagNode.overrideColor.get()
-
 
 
 
@@ -5709,7 +5717,7 @@ def getMVector( inputSrc ):
         return OpenMaya.MVector( inputSrc )
     elif type( inputSrc ) == list:
         return OpenMaya.MVector( *inputSrc )
-    elif type( inputSrc ) == pymel.core.datatypes.Vector:
+    elif type( inputSrc ) == datatypes.Vector:
         return OpenMaya.MVector( inputSrc.x, inputSrc.y, inputSrc.z )
     return OpenMaya.MVector( *pymel.core.xform( inputSrc, q=1, ws=1, t=1 ) )
     
@@ -5718,10 +5726,10 @@ def getMVector( inputSrc ):
 
 def getMMatrix( inputAttr ):
     
-    if type( inputAttr ) == pymel.core.general.Attribute:
+    if type( inputAttr ) == general.Attribute:
         attr = pymel.core.ls( inputAttr )[0]
         return listToMatrix( cmds.getAttr( attr.name() ) )
-    elif type( inputAttr ) == pymel.core.datatypes.Matrix:
+    elif type( inputAttr ) == datatypes.Matrix:
         return listToMatrix( inputAttr )
     else:
         return inputAttr
@@ -6161,97 +6169,13 @@ def connectScaleByTranslateDistance( inputDistTarget1, inputDistTarget2, inputTa
 
 
 
-def createLineController( inputTopJoint, **options ):
-    
-    topJoint = pymel.core.ls( inputTopJoint )[0]
-    jointH = topJoint.listRelatives( c=1, ad=1, type='joint' )
-    jointH.append( topJoint )
-    jointH.reverse()
-    
-    startJoint = jointH[0]
-    endJoint   = jointH[-1]
-    
-    firstCtl  = makeController( sgModel.Controller.cubePoints, makeParent=1 )
-    secondCtl = makeController( sgModel.Controller.cubePoints, makeParent=1 )
-    pymel.core.xform( firstCtl.getParent(),  ws=1, matrix=startJoint.wm.get() )
-    pymel.core.xform( secondCtl.getParent(), ws=1, matrix=endJoint.wm.get() )
-    
-    curveFirst   = createRiggedCurve( firstCtl, secondCtl )
-    
-    middlePoint = createPointOnCurve( curveFirst, 1 )[0]
-    blendTwoMatrixConnect( firstCtl, secondCtl, middlePoint, ct=0 )
-    
-    middleCtl = makeController( sgModel.Controller.spherePoints, makeParent=1 )
-    pymel.core.xform( middleCtl.getParent(), ws=1, matrix=middlePoint.wm.get() )
-    constrain_point( middlePoint, middleCtl.getParent() )
-    tangentContraint( curveFirst, middlePoint, middleCtl.getParent() )
-    
-    curveSecond = createRiggedCurve( firstCtl, middleCtl, secondCtl )
-    
-    minValue = curveSecond.getShape().minValue.get()
-    maxValue = curveSecond.getShape().maxValue.get()
-    
-    middleParam = getClosestParamAtPoint( middleCtl, curveSecond )
-    eachCtls = []
-    allPoints = [middlePoint]
-    for i in range( len( jointH ) ):
-        closeParam = getClosestParamAtPoint( jointH[i], curveSecond )
-        paramAttrValue = ( closeParam - minValue )/maxValue * 10
-        eachPointBase = createPointOnCurve( curveSecond, 1 )[0]
-        eachPointBase.parameter.set( paramAttrValue )
-        allPoints.append( eachPointBase )
-        
-        if closeParam < middleParam:
-            blendTwoMatrixConnect( firstCtl, middleCtl, eachPointBase, ct=0 )
-            eachPointBase.blend.set( closeParam/(middleParam - minValue) )
-        else:
-            blendTwoMatrixConnect( middleCtl, secondCtl, eachPointBase, ct=0 )
-            eachPointBase.blend.set( (closeParam-middleParam)/(maxValue - middleParam) )
-        
-        eachPoint = makeChild( eachPointBase )
-        pymel.core.xform( eachPoint, ws=1, matrix=jointH[i].wm.get() )
-        
-        eachCtl = makeController( sgModel.Controller.planePoints, makeParent=1 )
-        if i == len( jointH )-1:
-            constrain_all( secondCtl, eachCtl.getParent() )
-        else:
-            pymel.core.xform( eachCtl.getParent(), ws=1, matrix= eachPoint.wm.get() )
-            constrain_point( eachPoint, eachCtl.getParent() )
-            tangentContraint( curveSecond, eachPoint, eachCtl.getParent() )
-        eachCtls.append( eachCtl )
-    
-    for i in range( len( eachCtls )-1 ):
-        constrain_point( eachCtls[i], jointH[i] )
-        aimConstraint( eachCtls[i+1], eachCtls[i], jointH[i] )
-        getDecomposeScaleConnection( jointH[i] )
-        getDecomposeShearConnection( jointH[i] )
-        jointH[i].segmentScaleCompensate.set( 0 )
-        separateParentConnection( jointH[i], 'scale' )
-        connectScaleByTranslateDistance( eachCtls[i], eachCtls[i+1], jointH[i], 0 )
-        
-    constrain_parent( eachCtls[i+1], jointH[i+1] )
-    
-    direction = ( getMVector(eachCtls[1]) - getMVector( jointH[0] ) ) * getMMatrix( jointH[0].wim )
-    aimIndex = getDirectionIndex( direction )
-    for i in range( len( eachCtls ) ):
-        if aimIndex == 0: eachCtls[i].shape_rz.set( 90 )
-        elif aimIndex == 2: eachCtls[i].shape_rx.set( 90 )
-    
-    etcGrp = pymel.core.group( allPoints, curveFirst, curveSecond )
-    ctlsGrp = pymel.core.group( firstCtl.getParent(), secondCtl.getParent(), middleCtl.getParent(), [ eachCtl.getParent() for eachCtl in eachCtls ] )
-    etcGrp.v.set( 0 )
-
-    return firstCtl, secondCtl, middleCtl, eachCtls, ctlsGrp, etcGrp
-
-
-
 def putControllerToGeo( inputTarget, points, multSize = 1.0 ):
     
     def makeParent( target ):
         targetP = pymel.core.createNode( 'transform' )
         pymel.core.xform( targetP, ws=1, matrix= target.wm.get() )
         pymel.core.parent( target, targetP )
-        targetP.rename( 'P' + target.shortName() )
+        targetP.rename( 'P' + target.nodeName() )
         return targetP
     
     target = pymel.core.ls( inputTarget )[0]
@@ -6424,6 +6348,9 @@ def setMatrixToTarget( mtxValue, inputTarget, **options ):
                     mtx(3,0), mtx(3,1), mtx(3,2), 1]
     target = pymel.core.ls( inputTarget )[0]
     
+    if target.getShape():
+        setGeometryMatrixToTarget( target, mtxValue )
+    
     pcp = False
     if options.has_key( 'pcp' ):
         pcp = options['pcp']
@@ -6513,7 +6440,7 @@ def createDefaultPropRig( propGrp ):
         targetP = pymel.core.createNode( 'transform' )
         pymel.core.xform( targetP, ws=1, matrix= target.wm.get() )
         pymel.core.parent( target, targetP )
-        targetP.rename( 'P' + target.shortName() )
+        targetP.rename( 'P' + target.nodeName() )
         return targetP
     
     worldCtl = pymel.core.ls( makeController( sgModel.Controller.circlePoints ).name() )[0]
@@ -6552,7 +6479,7 @@ def createDefaultPropRig( propGrp ):
     worldCtl.getShape().setAttr( 'overrideEnabled', 1 )
     worldCtl.getShape().setAttr( 'overrideColor', 17 )
     
-    shortName = propGrp.shortName().split( '|' )[-1]
+    shortName = propGrp.nodeName().split( '|' )[-1]
     rootCtl.rename( 'Ctl_%s_Root' % shortName )
     moveCtl.rename( 'Ctl_%s_Move' % shortName )
     worldCtl.rename( 'Ctl_%s_World' % shortName )
@@ -7164,7 +7091,7 @@ def makeMirrorTransform( inputTrTarget ):
     
     trTarget = pymel.core.ls( inputTrTarget )[0]
     mirrorTransform = pymel.core.createNode( trTarget.nodeType() )
-    mirrorTransform.rename( getOtherSideStr( trTarget.shortName() ) )
+    mirrorTransform.rename( getOtherSideStr( trTarget.nodeName() ) )
     mirrorTransform.dh.set( trTarget.dh.get() )
     setMirrorTransform( trTarget, mirrorTransform )
     
@@ -7209,7 +7136,7 @@ def makeMirrorTransformWithHierarchy( inputTrTarget, cloneAttrName = 'mirrorH' )
         for con in cons:
             if not pymel.core.attributeQuery( cloneAttrName, node=con, ex=1 ): continue
             srcTarget = con
-            cloneParent.rename( getOtherSideStr(srcTarget.shortName()) )
+            cloneParent.rename( getOtherSideStr(srcTarget.nodeName()) )
             mirrorMatrix = matrixToList( getMirrorMatrix( getMMatrix( srcTarget.wm ) ) )
             pymel.core.xform( cloneParent, ws=1, matrix=mirrorMatrix )
     try:cloneObj.dh.set( trTarget.dh.get() )
@@ -7281,8 +7208,8 @@ def getNameReplaceList( firstName, secondName ):
 
 def copyChildren( source, target ):
     first = source
-    firstName = source.shortName()
-    secondName = target.shortName()
+    firstName = source.nodeName()
+    secondName = target.nodeName()
     
     replaceStrsList = getNameReplaceList(firstName, secondName)
     
@@ -7290,10 +7217,10 @@ def copyChildren( source, target ):
     firstChildren.reverse()
     
     for firstChild in firstChildren:
-        childName = firstChild.shortName()
+        childName = firstChild.nodeName()
         for replaceSrc, replaceDst in replaceStrsList:
             childName = childName.replace( replaceSrc, replaceDst )
-        parentName = firstChild.getParent().shortName()
+        parentName = firstChild.getParent().nodeName()
         for replaceSrc, replaceDst in replaceStrsList:
             parentName = parentName.replace( replaceSrc, replaceDst )
         if not cmds.objExists( parentName ): continue
@@ -7333,8 +7260,8 @@ def copyAndPastRig( inputCopyTarget, inputPastTarget, sourceTransformsDicts, mir
             return pymel.core.ls( copyedObj )[0]
         
         destTarget = None
-        if sourceTransformsDicts.has_key( sourceNode.shortName() ):
-            destTarget = sourceTransformsDicts[ sourceNode.shortName() ]
+        if sourceTransformsDicts.has_key( sourceNode.nodeName() ):
+            destTarget = sourceTransformsDicts[ sourceNode.nodeName() ]
 
         print "dest target : ", destTarget
         if destTarget and cmds.objExists( destTarget ):
@@ -7394,8 +7321,8 @@ def copyRigH( inputSource, inputTarget, mirrorCopy=False ):
     source = pymel.core.ls( inputSource )[0]
     target = pymel.core.ls( inputTarget )[0]
     
-    sourceName = source.shortName()
-    targetName = target.shortName()
+    sourceName = source.nodeName()
+    targetName = target.nodeName()
     
     replaceStrList = getNameReplaceList(sourceName, targetName)
     
@@ -8503,6 +8430,7 @@ def optimizeMesh( inputTarget ):
 
 
 
+
 def setBlendShapeConnectionFromOtherBlendShapeMesh( srcMesh, trgMesh ):
  
     srcBls = getNodeFromHistory( srcMesh, 'blendShape' )
@@ -8523,4 +8451,127 @@ def setBlendShapeConnectionFromOtherBlendShapeMesh( srcMesh, trgMesh ):
             if not srcAttrInfos.has_key( onlyAttrName ): continue
             srcAttr = cmds.listConnections( srcAttrInfos[ onlyAttrName ], s=1, d=0, p=1 )
         cmds.connectAttr( srcAttr[0], attr )
+        
+        
+
+
+
+def createRedshiftProxy( inputTarget, targetName=None ):
     
+    target = pymel.core.ls( inputTarget )[0]
+    sceneName = cmds.file( q=1, sceneName=1 )
+    proxydir = os.path.dirname( sceneName ) + '/proxy'
+    if not os.path.exists( proxydir ):
+        os.makedirs( proxydir )
+    if not targetName:
+        targetName = target.name().replace( '|', '_' )
+    proxyPath = proxydir + '/%s.rs' % targetName
+    origMtx = target.wm.get()
+    pymel.core.select( target )
+    transformKeep = sgModel.TransformKeep( target )
+    transformKeep.setToDefault()
+    cmds.file( proxyPath, force=1, options="exportConnectivity=0;enableCompression=0;", typ="Redshift Proxy", pr=1, es=1 )
+    pymel.core.rsProxy( fp=proxyPath, sl=1 )
+    transformKeep.setToOrig()
+    
+    newMesh = pymel.core.createNode( 'mesh' )
+    rsProxyNode = pymel.core.createNode( 'RedshiftProxyMesh' )
+    rsProxyNode.fileName.set( proxyPath )
+    rsProxyNode.outMesh >> newMesh.inMesh
+    newTransform = newMesh.getParent()
+    
+    newTransform.rename( target.nodeName() + '_rsProxy' )
+    rsProxyNode.rename( newTransform.nodeName() + 'Shape' )
+    transformKeep.setToOther( newTransform )
+    
+    return newTransform
+
+
+
+def createGpuCache( inputTarget, targetName=None ):
+    
+    target = pymel.core.ls( inputTarget )[0]
+    sceneName = cmds.file( q=1, sceneName=1 )
+    proxydir = os.path.dirname( sceneName ) + '/proxy'
+    if not os.path.exists( proxydir ):
+        os.makedirs( proxydir )
+    if not targetName:
+        targetName = target.name().replace( '|', '_' )
+    abcFolder = proxydir
+    transformKeep = sgModel.TransformKeep( target )
+    transformKeep.setToDefault()
+    abcPath = cmds.gpuCache( target.name(), startTime=1, endTime=1, optimize=1, optimizationThreshold=1000, writeMaterials=0, dataFormat='ogawa',
+                                 directory=abcFolder, fileName=targetName, saveMultipleFiles=False )[0]
+    transformKeep.setToOrig()
+    
+    gpuCacheNode = pymel.core.createNode( 'gpuCache' )
+    gpuCacheNode.cacheFileName.set( abcPath )
+    gpuCacheTr = gpuCacheNode.getParent()
+    gpuCacheTr.rename( target.nodeName() + '_gpu' )
+    gpuCacheNode.rename( gpuCacheTr.nodeName() + 'Shape' )
+    transformKeep.setToOther( gpuCacheTr )
+    
+    return gpuCacheTr
+
+
+
+def isVisible( target ):
+    allParents = target.getAllParents()
+    allParents.append( target )
+    for parent in allParents:
+        if not parent.v.get(): return False
+    return True
+
+
+
+def getTopTransformNodes():
+    
+    trs = cmds.ls( type='transform' )
+    
+    topTransforms = []
+    for tr in trs:
+        if cmds.listRelatives( tr, p=1 ): continue
+        topTransforms.append( pymel.core.ls( tr )[0] )
+    
+    return topTransforms
+
+
+
+def getBoundingBoxSize( sel ):
+    
+    bb = pymel.core.exactWorldBoundingBox( sel )
+    bbmin = OpenMaya.MVector( *bb[:3] )
+    bbmax = OpenMaya.MVector( *bb[-3:] )
+    return (bbmax - bbmin).length()
+    
+
+
+
+def getBoundingBoxDistStr( sel ):
+    
+    bbMin = sel.getShape().boundingBoxMin.get()
+    bbMax = sel.getShape().boundingBoxMax.get()
+    
+    minPoint = OpenMaya.MPoint( *bbMin )
+    maxPoint = OpenMaya.MPoint( *bbMax )
+    
+    dist = minPoint.distanceTo( maxPoint )
+    startSum = minPoint.x + minPoint.y + minPoint.z
+    
+    distStr = ( '%.3f' % (dist + startSum) ).replace( '.', '_' )
+    return distStr
+
+
+
+
+
+def makeBroder( inputTarget, inputParentChild ):
+    
+    target = pymel.core.ls( inputTarget )[0]
+    parentChild = pymel.core.ls( inputParentChild )[0]
+    
+    if not parentChild.getParent(): return None
+    target.setParent( parentChild.getParent() )    
+
+    
+

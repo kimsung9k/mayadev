@@ -280,3 +280,11 @@ class UI:
 
 def show():
     UI().show()
+
+
+
+if __name__ == '__main__':
+    show()
+
+
+

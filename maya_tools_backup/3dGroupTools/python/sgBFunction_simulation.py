@@ -3,8 +3,6 @@ import maya.mel as mel
 
 def createPointConstrainedCam( targetObject ):
     
-    import sgBFunction_scene
-    
     cam = sgBFunction_scene.getCurrentCam()
     panel = cmds.getPanel( wf=1 )
     if not cam:

@@ -159,3 +159,10 @@ class ReplaceNameUI:
         
         self.appendCmdToSetButton()
 
+
+def show():
+    ReplaceNameUI().show()
+
+
+if __name__ == '__main__':
+    show()

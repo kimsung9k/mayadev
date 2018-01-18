@@ -1,9 +1,10 @@
 from maya import OpenMaya
-from maya import cmds
+from maya import cmds, mel
 import pymel.core
 from sgMaya import sgCmds, sgModel
 import random
-from sgMaya.sgCmds import getDistanceNodeBetwwenTwoObjs
+import math
+from sgMaya.sgCmds import makeController
 
 
 
@@ -1162,6 +1163,475 @@ def makeLookAtSquashBendTransform( lookObject, baseObject, lookParentObject=None
     
     
     
+def createMatrixObjectFromGeo( target, directionBasedGeo=False ):
+    
+    targetShapes = pymel.core.listRelatives( target, c=1, ad=1, type='mesh' )
+    
+    if directionBasedGeo:
+        vectorDicts = {}
+        xBaseVector = OpenMaya.MVector( 1,0,0 )
+        yBaseVector = OpenMaya.MVector( 0,1,0 )
+        zBaseVector = OpenMaya.MVector( 0,0,1 )
+        
+        for targetShape in targetShapes:
+            dagPathMesh = sgCmds.getDagPath(targetShape)
+            fnMesh = OpenMaya.MFnMesh( dagPathMesh )
+            
+            points = OpenMaya.MPointArray()
+            fnMesh.getPoints( points, OpenMaya.MSpace.kWorld )
+            
+            for i in range( fnMesh.numEdges() ):
+                util = OpenMaya.MScriptUtil()
+                util.createFromList([0,0],2)
+                int2Ptr = util.asInt2Ptr()
+                fnMesh.getEdgeVertices( i, int2Ptr )
+                index1 = util.getInt2ArrayItem( int2Ptr, 0, 0 )
+                index2 = util.getInt2ArrayItem( int2Ptr, 0, 1 )
+                
+                point1 = points[ index1 ]
+                point2 = points[ index2 ]
+                
+                vector = point2 - point1
+                
+                dotX = math.fabs( xBaseVector * vector )
+                dotY = math.fabs( yBaseVector * vector )
+                dotZ = math.fabs( zBaseVector * vector )
+                
+                if dotY == max( [ dotX, dotY, dotZ ] ):
+                    continue
+                
+                if dotX > dotZ:
+                    convertedVector = vector if xBaseVector * vector > 0 else -vector
+                elif dotZ >= dotX:
+                    convertedVector = vector if zBaseVector * vector > 0 else -vector
+                
+                key = "%.2f,%.2f,%.2f" %( convertedVector.x, convertedVector.y, convertedVector.z )
+                if not vectorDicts.has_key( key ):
+                    vectorDicts[ key ] = { "value":[convertedVector.x, 0, convertedVector.z], "length":convertedVector.length()}
+                else:
+                    vectorDicts[ key ]['length'] += convertedVector.length()
+                    vectorDicts[ key ]['value'][0] +=  convertedVector.x
+                    vectorDicts[ key ]['value'][1] +=  0
+                    vectorDicts[ key ]['value'][2] +=  convertedVector.z
+            
+        maxLength = 0.0
+        maxLengthKey = None
+        for key in vectorDicts.keys():
+            if maxLength < vectorDicts[ key ]['length']:
+                maxLength = vectorDicts[ key ]['length']
+                maxLengthKey = key
+        
+        horizonVector = OpenMaya.MVector( *vectorDicts[ maxLengthKey ][ 'value' ] ).normal()
+        upVector      = OpenMaya.MVector( 0,1,0 )
+        
+        dotX = math.fabs( xBaseVector * horizonVector )
+        dotZ = math.fabs( zBaseVector * horizonVector )
+        
+        if dotX > dotZ:
+            xVector = horizonVector
+            yVector = upVector
+            zVector = horizonVector ^ upVector
+        else:
+            xVector = horizonVector
+            yVector = upVector
+            zVector = upVector ^ horizonVector
+    else:
+        xVector = OpenMaya.MVector( 1,0,0 )
+        yVector = OpenMaya.MVector( 0,1,0 )
+        zVector = OpenMaya.MVector( 0,0,1 )
+    
+    worldPivot = pymel.core.xform( target, q=1, ws=1, rotatePivot=1 )
+    mtxList = [xVector.x, xVector.y, xVector.z,0, yVector.x, yVector.y, yVector.z,0, zVector.x, zVector.y, zVector.z,0, worldPivot[0],worldPivot[1],worldPivot[2],1]
+    mtx = sgCmds.listToMatrix( mtxList )
+    invMtx = mtx.inverse()
+    
+    bb = OpenMaya.MBoundingBox()
+    
+    pointsList = []
+    for targetShape in targetShapes:
+        dagPathMesh = sgCmds.getDagPath(targetShape)
+        fnMesh = OpenMaya.MFnMesh( dagPathMesh )
+        
+        points = OpenMaya.MPointArray()
+        fnMesh.getPoints( points, OpenMaya.MSpace.kWorld )
+        pointsList.append( points )
+    
+    for points in pointsList:
+        for i in range( points.length() ):
+            bb.expand( points[i] * invMtx )
+        
+    bbCenter = bb.center() * mtx
+    mtxList[12] = bbCenter.x;mtxList[13] = bbCenter.y;mtxList[14] = bbCenter.z
+    
+    tr = pymel.core.createNode( 'transform' )
+    tr.dh.set( 1 )
+    pymel.core.xform( tr, ws=1, matrix= mtxList )
+    xSize = bb.max().x-bb.min().x
+    ySize = bb.max().y-bb.min().y
+    zSize = bb.max().z-bb.min().z
+    tr.s.set( xSize, ySize, zSize )
+    return tr
+
+
+
+
+def setMatrixToCenterPoint( target, directionBasedGeo=False ):
+    
+    trObject = createMatrixObjectFromGeo( target )
+    trObjectMtxList = trObject.wm.get()
+    trObjectMtx = sgCmds.listToMatrix( trObjectMtxList )
+    pymel.core.delete( trObject )
+    point = OpenMaya.MPoint( 0, 0, 0 ) * trObjectMtx
+    defaultMtx = sgCmds.getDefaultMatrix()
+    defaultMtx[12] = point.x
+    defaultMtx[13] = point.y
+    defaultMtx[14] = point.z
+    sgCmds.setMatrixToTarget( defaultMtx, target, pcp=1 )
+
+
+
+
+def setMatrixToButtomPoint( target, directionBasedGeo=False ):
+    
+    trObject = createMatrixObjectFromGeo( target )
+    trObjectMtxList = trObject.wm.get()
+    trObjectMtx = sgCmds.listToMatrix( trObjectMtxList )
+    pymel.core.delete( trObject )
+    point = OpenMaya.MPoint( 0, -0.5, 0 ) * trObjectMtx
+    defaultMtx = sgCmds.getDefaultMatrix()
+    defaultMtx[12] = point.x
+    defaultMtx[13] = point.y
+    defaultMtx[14] = point.z
+    sgCmds.setMatrixToTarget( defaultMtx, target, pcp=1 )
+
+
+        
+    
+def createPlaneController( target, directionBasedGeo=False ):
+    
+    trObject = createMatrixObjectFromGeo( target )
+    trObjectMtxList = trObject.wm.get()
+    trObjectMtx = sgCmds.listToMatrix( trObjectMtxList )
+    pymel.core.delete( trObject )
+    
+    vectorX = OpenMaya.MVector( trObjectMtx[0] )
+    vectorY = OpenMaya.MVector( trObjectMtx[1] )
+    vectorZ = OpenMaya.MVector( trObjectMtx[2] )
+    point = OpenMaya.MPoint( 0, -0.5, 0 ) * trObjectMtx
+    
+    ctl = sgCmds.makeController( sgModel.Controller.planePoints, 1, makeParent=1 )
+    ctlP = ctl.getParent()
+    ctlShape = ctl.getShape()
+    ctlShape.shape_sx.set( vectorX.length() )
+    ctlShape.shape_sy.set( vectorY.length() )
+    ctlShape.shape_sz.set( vectorZ.length() )
+    ctlShape.scaleMult.set( 0.5 )
+    
+    pymel.core.xform( ctlP, ws=1, ro=sgCmds.getRotateFromMatrix( trObjectMtxList ) )
+    pymel.core.xform( ctlP, ws=1, t=[point.x,point.y,point.z] )
+    
+    targetP = target.getParent()
+    targetGrp = pymel.core.createNode( 'transform' )
+    if targetP: targetGrp.setParent( targetP )
+    sgCmds.constrain_all( ctl, targetGrp )
+    target.setParent( targetGrp )
+    pymel.core.select( ctl )
+    sgCmds.setIndexColor( ctl, 22 )
+    return ctl
+    
+    
+    
+def createCubeController_toCenter( target, directionBasedGeo=False ):
+    
+    trObject = createMatrixObjectFromGeo( target )
+    trObjectMtxList = trObject.wm.get()
+    trObjectMtx = sgCmds.listToMatrix( trObjectMtxList )
+    pymel.core.delete( trObject )
+    
+    vectorX = OpenMaya.MVector( trObjectMtx[0] )
+    vectorY = OpenMaya.MVector( trObjectMtx[1] )
+    vectorZ = OpenMaya.MVector( trObjectMtx[2] )
+    point = OpenMaya.MPoint( 0, 0, 0 ) * trObjectMtx
+    
+    ctl = sgCmds.makeController( sgModel.Controller.cubePoints, 1, makeParent=1 )
+    ctlP = ctl.getParent()
+    ctlShape = ctl.getShape()
+    ctlShape.shape_sx.set( vectorX.length() )
+    ctlShape.shape_sy.set( vectorY.length() )
+    ctlShape.shape_sz.set( vectorZ.length() )
+    
+    pymel.core.xform( ctlP, ws=1, ro=sgCmds.getRotateFromMatrix( trObjectMtxList ) )
+    pymel.core.xform( ctlP, ws=1, t=[point.x,point.y,point.z] )
+    
+    targetP = target.getParent()
+    targetGrp = pymel.core.createNode( 'transform' )
+    if targetP: targetGrp.setParent( targetP )
+    sgCmds.constrain_all( ctl, targetGrp )
+    target.setParent( targetGrp )
+    pymel.core.select( ctl )
+    sgCmds.setIndexColor( ctl, 22 )
+    return ctl
+
+
+
+def createCubeController_toButtom( target, directionBasedGeo=False ):
+    
+    trObject = createMatrixObjectFromGeo( target )
+    trObjectMtxList = trObject.wm.get()
+    trObjectMtx = sgCmds.listToMatrix( trObjectMtxList )
+    pymel.core.delete( trObject )
+    
+    vectorX = OpenMaya.MVector( trObjectMtx[0] )
+    vectorY = OpenMaya.MVector( trObjectMtx[1] )
+    vectorZ = OpenMaya.MVector( trObjectMtx[2] )
+    point = OpenMaya.MPoint( 0, -0.5, 0 ) * trObjectMtx
+    
+    ctl = sgCmds.makeController( sgModel.Controller.cubePoints, 1, makeParent=1 )
+    ctlP = ctl.getParent()
+    ctlShape = ctl.getShape()
+    ctlShape.shape_sx.set( vectorX.length() )
+    ctlShape.shape_sy.set( vectorY.length() )
+    ctlShape.shape_sz.set( vectorZ.length() )
+    ctlShape.shape_ty.set( vectorY.length() * 0.5 )
+    
+    pymel.core.xform( ctlP, ws=1, ro=sgCmds.getRotateFromMatrix( trObjectMtxList ) )
+    pymel.core.xform( ctlP, ws=1, t=[point.x,point.y,point.z] )
+    
+    targetP = target.getParent()
+    targetGrp = pymel.core.createNode( 'transform' )
+    if targetP: targetGrp.setParent( targetP )
+    sgCmds.constrain_all( ctl, targetGrp )
+    target.setParent( targetGrp )
+    pymel.core.select( ctl )
+    sgCmds.setIndexColor( ctl, 22 )
+    return ctl
+    
+    
+    
+
+def shadowEffect( lightTransform, projectTargets, projectBase ):
+    
+    children = pymel.core.listRelatives( projectTargets, c=1, ad=1, type='mesh' )
+    projectTargets = [ child.getParent() for child in children if sgCmds.isVisible( child ) ]
+    
+    def getLocalGeometry( geometry, parentObject ):
+        geometryShape = geometry.getShape()
+        mm = pymel.core.createNode( 'multMatrix' )
+        trGeo = pymel.core.createNode( 'transformGeometry' )
+        newMeshShape = pymel.core.createNode( 'mesh' )
+        
+        geometry.wm >> mm.i[0]
+        parentObject.wim >> mm.i[1]
+        
+        geometryShape.attr( 'outMesh' ) >> trGeo.inputGeometry
+        mm.matrixSum >> trGeo.transform
+        trGeo.outputGeometry >> newMeshShape.attr( 'inMesh' )
+        return newMeshShape.getParent()
+    
+    def projectMesh( projTarget, projBase ):
+        projTargetShape = projTarget.getShape()
+        projBaseShape   = projBase.getShape()
+        shrinkWrap = pymel.core.deformer( projTargetShape, type='shrinkWrap' )[0]
+        shrinkWrap.attr( 'reverse' ).set( 1 )
+        shrinkWrap.attr( 'projection' ).set( 2 )
+        attrList = ['keepMapBorders','continuity','smoothUVs','keepBorder',
+                    'boundaryRule','keepHardEdge','propagateEdgeHardness']
+        for attr in attrList:
+            projTargetShape.attr( attr ) >> shrinkWrap.attr( attr )
+        projBaseShape.attr( 'worldMesh' ) >> shrinkWrap.attr( 'targetGeom' )
+        return shrinkWrap
+
+    def getOutMesh( targetMesh ):
+        targetMeshShape = targetMesh.getShape()
+        newMesh = pymel.core.createNode( 'mesh' )
+        targetMeshShape.outMesh >> newMesh.inMesh
+        return newMesh.getParent()
+
+    
+    def getProjectionTypeOutput( lightTransform ):
+        sgCmds.addAttr( lightTransform, ln='projectionType', at='enum', en=':point:directionX:directionY:directionZ', k=1 )
+        pmaNode = pymel.core.createNode( 'plusMinusAverage' )
+        for i, outputValues in [ (0,[0,0,0]),(1,[1,0,0]),(2,[0,1,0]),(3,[0,0,1]) ]:
+            condition = pymel.core.createNode( 'condition' )
+            lightTransform.attr( 'projectionType' ) >> condition.firstTerm
+            condition.attr( 'secondTerm' ).set( i )
+            condition.colorIfTrue.set( *outputValues )
+            condition.colorIfFalse.set( 0,0,0 )
+            condition.outColor >> pmaNode.input3D[i]
+        return pmaNode.attr( 'output3Dx' ), pmaNode.attr( 'output3Dy' ), pmaNode.attr( 'output3Dz' )
+    
+    def addOffsetAttribute( lightTransform, shrinkWrapNode ):
+        sgCmds.addAttr( lightTransform, ln='offset', min=0, k=1 )
+        lightTransform.attr( 'offset' ) >> shrinkWrapNode.attr( 'targetInflation' )
+
+    constrainGrp = pymel.core.createNode( 'transform', n=lightTransform.nodeName() + '_shadowCoreGrp' )
+    resultGrp    = pymel.core.createNode( 'transform', n=lightTransform.nodeName() + '_shadowResultGrp' )
+    localProjBase = getLocalGeometry( projectBase, lightTransform )
+    localProjBase.setParent( constrainGrp )
+    localProjBase.attr( 'inheritsTransform' ).set( 0 )
+    localProjBase.v.set( 0 )
+    
+    xOutput, yOutput, zOutput = getProjectionTypeOutput( lightTransform )
+    
+    localGeometrys = []
+    resultObjects = []
+    for projectTarget in projectTargets:
+        localProjTarget = getLocalGeometry( projectTarget, lightTransform )
+        localProjTarget.attr( 'inheritsTransform' ).set( 0 )
+        localProjTarget.v.set( 0 )
+        
+        shrinkWrap = projectMesh( localProjTarget, localProjBase )
+        resultObject = getOutMesh( localProjTarget )
+        sgCmds.copyShader( projectTarget, resultObject )
+        xOutput >> shrinkWrap.attr( 'alongX' )
+        yOutput >> shrinkWrap.attr( 'alongY' )
+        zOutput >> shrinkWrap.attr( 'alongZ' )
+        addOffsetAttribute( lightTransform, shrinkWrap )
+        
+        pymel.core.parent( localProjTarget, resultObject, constrainGrp )
+        localGeometrys.append( localProjTarget )
+        resultObjects.append( resultObject )
+    
+    pymel.core.group( localGeometrys, n='LocalObjects' )
+    pymel.core.parent( resultObjects, resultGrp )
+    
+    if not cmds.objExists( 'shadowEffectSurfaceShader' ):
+        surfaceShader = cmds.shadingNode( 'surfaceShader', asShader=1, n='shadowEffectSurfaceShader' )
+    else:
+        surfaceShader = 'shadowEffectSurfaceShader'
+    if not cmds.objExists( 'shadowEffectSurfaceShaderSG' ):
+        surfaceShaderSG = cmds.sets( renderable=True, noSurfaceShader=True, empty=1, name=surfaceShader + 'SG' )
+    else:
+        surfaceShaderSG = 'shadowEffectSurfaceShaderSG'
+
+    if not cmds.isConnected( surfaceShader + '.outColor', surfaceShaderSG + '.surfaceShader' ):
+        cmds.connectAttr( surfaceShader + '.outColor', surfaceShaderSG + '.surfaceShader' )  
+    cmds.sets( resultGrp.name(), forceElement=surfaceShaderSG )
+    
+    sgCmds.constrain_all( lightTransform, constrainGrp )
+    sgCmds.constrain_all( lightTransform, resultGrp )
+
+
+
+
+def createLatticeController( targets, numController=0 ):
+
+    numController = max([numController,2])
+    deformer, lattice, latticeBase = pymel.core.lattice(  divisions=[2,numController,2], objectCentered=False,  ldv=[2,numController+1,2] )
+    mtxObject = createMatrixObjectFromGeo( targets )
+    pymel.core.parent( lattice, latticeBase, mtxObject )
+    lattice.t.set( 0,0,0 ), lattice.r.set( 0,0,0 ), lattice.s.set( 1,1,1 )
+    latticeBase.t.set( 0,0,0 ), latticeBase.r.set( 0,0,0 ), latticeBase.s.set( 1,1,1 )
+    
+    mtxObjectSize = mtxObject.sx.get() + mtxObject.sy.get() + mtxObject.sz.get()
+    minSize = mtxObjectSize / 20.0
+    mtxObject.sx.set( max( [minSize,mtxObject.sx.get()] ) )
+    mtxObject.sy.set( max( [minSize,mtxObject.sy.get()] ) )
+    mtxObject.sz.set( max( [minSize,mtxObject.sz.get()] ) )
+    mtxObject.v.set( 0 )
+
+    mainCtl = sgCmds.makeController( sgModel.Controller.cubePoints, 1, makeParent=1 );sgCmds.setIndexColor( mainCtl, 22 )
+    pymel.core.xform( mainCtl, ws=1, matrix=mtxObject.wm.get() )
+
+    sgCmds.constrain_all( mainCtl, mtxObject )
+
+    dtCtlBase = pymel.core.createNode( 'transform' )
+    sgCmds.constrain_parent( mainCtl, dtCtlBase )
+
+    pointers = []
+    for i in range( numController ):
+        position = float(i)/(numController-1) - 0.5
+        pointer = pymel.core.createNode( 'transform' )
+        pointer.setParent( mainCtl )
+        sgCmds.setTransformDefault( pointer )
+        pointer.ty.set( position )
+        pointers.append( pointer )
+        sgCmds.constrain_scale( dtCtlBase, pointer )
+    
+    conditionNode = pymel.core.createNode( 'condition' )
+    conditionNode.op.set( 4 )
+    mtxObject.sx >> conditionNode.firstTerm
+    mtxObject.sz >> conditionNode.secondTerm
+    mtxObject.sx >> conditionNode.colorIfTrueR
+    mtxObject.sz >> conditionNode.colorIfFalseR
+    
+    joints = []
+    bindPres = []
+    planeCtls = []
+    
+    beforeParent = dtCtlBase
+    for pointer in pointers:
+        moveCtl = makeController( sgModel.Controller.movePoints, 1, makeParent=1 );sgCmds.setIndexColor( moveCtl, 20 )
+        conditionNode.outColorR >> moveCtl.scaleMult
+        
+        dcmp = sgCmds.getLocalDecomposeMatrix( pointer.wm, beforeParent.wim )
+        planeCtl = sgCmds.makeController( sgModel.Controller.circlePoints, 0.5, makeParent=1 );sgCmds.setIndexColor( planeCtl, 18 )
+        moveCtl.getParent().setParent( planeCtl )
+        ctlShape = planeCtl.getShape()
+        pPlaneCtl = planeCtl.getParent()
+        pPlaneCtl.setParent( beforeParent )
+        dcmp.ot >> pPlaneCtl.t
+        dcmp.outputRotate >> pPlaneCtl.r
+        mainCtl.sx >> ctlShape.shape_sx
+        mainCtl.sy >> ctlShape.shape_sy
+        mainCtl.sz >> ctlShape.shape_sz
+        
+        multSxMinus = pymel.core.createNode( 'multDoubleLinear' )
+        multSxPlus = pymel.core.createNode( 'multDoubleLinear' )
+        multSzMinus = pymel.core.createNode( 'multDoubleLinear' )
+        multSzPlus = pymel.core.createNode( 'multDoubleLinear' )
+        
+        mainCtl.sx >> multSxMinus.input1; multSxMinus.input2.set( -0.5 )
+        mainCtl.sx >> multSxPlus.input1; multSxPlus.input2.set( 0.5 )
+        mainCtl.sz >> multSzMinus.input1; multSzMinus.input2.set( -0.5 )
+        mainCtl.sz >> multSzMinus.input1; multSzMinus.input2.set( 0.5 )
+        
+        for i, position in [ (0,[multSxMinus,multSzMinus]), (1,[multSxMinus,multSzPlus]), 
+                             (2,[multSxPlus,multSzMinus]), (3,[multSxPlus,multSzPlus]) ]:
+            pymel.core.select( moveCtl )
+            joint   = pymel.core.joint(); joint.drawStyle.set( 2 )
+            bindPre = pymel.core.createNode( 'transform' )
+            bindPre.setParent( pointer )
+            sgCmds.setTransformDefault( bindPre )
+            joints.append( joint )
+            bindPres.append( bindPre )
+            position[0].output >> joint.tx; position[1].output >> joint.tz
+            position[0].output >> bindPre.tx; position[1].output >> bindPre.tz
+        planeCtls.append( planeCtl )
+        beforeParent = pointer
+    
+    for i in range( len( planeCtls )-1 ):
+        planeCtls[i+1].getParent().setParent( planeCtls[i] )
+
+    skinCluster = pymel.core.skinCluster( joints, lattice, dr=1000 )
+    for i in range( len( joints ) ):
+        sgCmds.setBindPreMatrix( joints[i], bindPres[i] )
+    lattice.wm >> skinCluster.geomMatrix
+
+    allGrp = pymel.core.createNode( 'transform' )
+    pymel.core.parent( mainCtl.getParent(), mtxObject, dtCtlBase, allGrp )
+
+    return mainCtl
+    
+
+def createPointConstrainedCam( targetObject ):
+    
+    targetObject = pymel.core.ls( targetObject )[0].name()
+    
+    cam = sgCmds.getCurrentCam().name()
+    panel = cmds.getPanel( wf=1 )
+    if not cam:
+        cam = 'persp'
+    duCam = cmds.duplicate( cam )[0]
+    
+    camGrp = cmds.group( em=1 )
+    cmds.pointConstraint( targetObject, camGrp )
+    
+    cmds.parent( duCam, camGrp )
+    
+    if cmds.getPanel( to=panel ):
+        print 'lookThroughModelPanel %s %s;' %( duCam, panel )
+        mel.eval( 'lookThroughModelPanel %s %s;' %( duCam, panel ) )
     
     
     

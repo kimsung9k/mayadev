@@ -78,5 +78,11 @@ class Win:
         cmds.showWindow( Win_Global.winName )
 
 
+def show():
+    Win.create()
+
+
+if __name__ == '__main__':
+    show()
 
 

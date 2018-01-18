@@ -77,8 +77,6 @@ class UI_Form( QMainWindow ):
         QtCore.QObject.connect( buttonCancel, QtCore.SIGNAL( 'clicked()' ), self.cmd_cancel )
     
 
-
-
     def secondPage(self):
         
         for i in range( self.mainLayout.count() ):

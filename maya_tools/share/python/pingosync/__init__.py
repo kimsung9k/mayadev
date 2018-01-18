@@ -2,6 +2,7 @@
 
 from maya import OpenMayaUI
 
+from __qtImport import *
 from ui_Dialog_addProject import *
 from ui_Dialog_addTask import *
 from ui_Dialog_help_fileCondition import *
@@ -136,6 +137,111 @@ class Window_CreateAcount( QDialog ):
         
 
 
+class Widget_search( QWidget ):
+
+
+    def __init__(self, *args, **kwargs ):
+        
+        QWidget.__init__( self, *args, **kwargs )
+        hLayout = QHBoxLayout( self ); hLayout.setContentsMargins(0,0,0,0)
+        
+        label = QLabel( "경로탐색 : ".decode( 'utf-8' ) ); label.setFixedWidth( 90 )
+        lineEdit = QLineEdit()
+        button = QPushButton()
+        
+        pixmap = QPixmap( os.path.dirname(__file__) + '/resource/search.png' );
+        icon   = QIcon(pixmap);
+        button.setIcon(icon);
+        
+        hLayout.addWidget( label )
+        hLayout.addWidget( lineEdit )
+        hLayout.addWidget( button )
+        
+        self.lineEdit = lineEdit
+        
+        QtCore.QObject.connect( button, QtCore.SIGNAL( 'clicked()' ), self.searchPath )
+    
+    
+    def searchPath(self):
+        
+        import ntpath
+        
+        def lowerPath( path ):
+            return path.replace( '\\', '/' ).lower()
+        
+        path = self.lineEdit.text()
+        if not os.path.exists( path ):
+            QMessageBox.warning(self, self.tr("Error"),'해당 경로가 존재하지 않습니다.'.decode( 'utf-8' ), QMessageBox.Ok )
+            return
+        
+        serverProjectPath = commands.FileControl.getCurrentServerProjectPath()
+        localProjectPath  = commands.FileControl.getCurrentLocalProjectPath()
+        currentProjectName = commands.ProjectControl.getCurrentProjectName()
+        
+        if not commands.FileControl.hasPath( path, serverProjectPath ) and not commands.FileControl.hasPath( path, localProjectPath ):
+            projectNames = commands.ProjectControl.getAllProjectNames()
+            projectList = commands.ProjectControl.getProjectListData()
+            projectExists = False
+            for projectName in projectNames:
+                serverProjectPath_other  = projectList[ projectName ]['localPath']
+                localProjectPath_other = projectList[ projectName ]['serverPath']
+                if commands.FileControl.hasPath( path, serverProjectPath_other ) or commands.FileControl.hasPath( path, localProjectPath_other ):
+                    for i in range( Models.ControlBase.mainui.comboBox.count() ):
+                        if projectName == Models.ControlBase.mainui.comboBox.itemText( i ):
+                            Models.ControlBase.mainui.comboBox.setCurrentIndex( i )
+                            Models.ControlBase.mainui.loadProject()
+                            projectExists = True
+                            serverProjectPath = commands.FileControl.getCurrentServerProjectPath()
+                            localProjectPath  = commands.FileControl.getCurrentLocalProjectPath()
+                            currentProjectName = commands.ProjectControl.getCurrentProjectName()
+                            break
+            
+            if not projectExists:
+                resultButton = QMessageBox.warning(self, self.tr("Warning"),'프로젝트가 존재하지 않습니다.\n프로젝트를 생성하시겠습니까?'.decode( 'utf-8' ),
+                                                   QMessageBox.Ok|QMessageBox.Cancel )
+                if resultButton == QMessageBox.Ok:
+                    try: self.dialog.close()
+                    except:pass
+                    self.dialog = Dialog_addProject( self )
+                    self.dialog.show()
+                    
+                    basePath = path if os.path.isdir( path ) else os.path.dirname( path )
+                    basePath = basePath.replace( localProjectPath, serverProjectPath )
+                    self.dialog.serverPathEdit.setText( basePath )
+                    self.dialog.projectNameEdit.setText( ntpath.split( basePath )[-1] )
+                else:
+                    return
+        
+        projectList = commands.ProjectControl.getProjectListData()
+        
+        pathExists = False
+        if projectList[ currentProjectName ].has_key( 'tasks' ):
+            paths = projectList[ currentProjectName ][ 'tasks' ]
+            
+            for key, values in paths.items():
+                if commands.FileControl.hasPath( path, localProjectPath + values[ 'path' ] ):
+                    pathExists = True
+                elif commands.FileControl.hasPath( path, serverProjectPath + values[ 'path' ] ):
+                    pathExists = True
+        if pathExists:
+            commands.TreeWidgetCmds.selectPath( path, Models.ControlBase.uiTreeWidget )
+        else:
+            resultButton = QMessageBox.warning(self, self.tr("Warning"),'해당 경로의 작업영역이 생성되지 않았습니다.\n작업영역을 생성하시겠습니까?'.decode( 'utf-8' ),
+                                                   QMessageBox.Ok|QMessageBox.Cancel )
+            if resultButton == QMessageBox.Ok:
+                try: self.dialog.close()
+                except:pass
+                self.dialog = Dialog_addTask( self )
+                self.dialog.show()
+                
+                basePath = path if os.path.isdir( path ) else os.path.dirname( path )
+                basePath = basePath.replace( localProjectPath, serverProjectPath )
+                self.dialog.pathLineEdit.setText( basePath )
+                self.dialog.taskNameLineEdit.setText( ntpath.split( basePath )[-1] )
+            else:
+                return
+
+
 
 class Window( QMainWindow ):
     
@@ -152,6 +258,9 @@ class Window( QMainWindow ):
         self.setObjectName( Window.objectName )
         self.setWindowTitle( Window.title )
         
+        sep1 = QFrame();sep1.setFrameShape(QFrame.HLine)
+        sep2 = QFrame();sep2.setFrameShape(QFrame.HLine)
+        
         baseWidget = QWidget()
         self.setCentralWidget( baseWidget )
         
@@ -159,8 +268,8 @@ class Window( QMainWindow ):
         layout_project = QHBoxLayout()
         label_projectName = QLabel( "프로젝트 명 : ".decode('utf-8') ); label_projectName.setMinimumWidth( 90 ); label_projectName.setMaximumWidth( 90 )
         comboBox = QComboBox(); #comboBox.setMaximumWidth( 200 )
-        addProject_button = QPushButton( " + " ); addProject_button.setMaximumWidth( 30 )
-        manageProject_button = QPushButton( "프로젝트 관리".decode('utf-8') ); manageProject_button.setMaximumWidth( 100 )
+        addProject_button = QPushButton( " + ".decode('utf-8') ); addProject_button.setFixedWidth( 30 )
+        manageProject_button = QPushButton( "프로젝트 관리".decode('utf-8') ); manageProject_button.setFixedWidth( 100 )
         layout_project.addWidget( label_projectName )
         layout_project.addWidget( comboBox )
         layout_project.addWidget( addProject_button )
@@ -182,12 +291,16 @@ class Window( QMainWindow ):
         layout_localPath.addWidget( lineEdit_localPath )
         layout_localPath.addWidget( button_localPath )
         
+        widget_search = Widget_search()
+        
         treeWidget = Models.WorkTreeWidget()
         addTaskArea_button = QPushButton( '작업영역 추가'.decode('utf-8') )
-        
+
         vLayout.addLayout( layout_project )
         vLayout.addLayout( layout_serverPath )
         vLayout.addLayout( layout_localPath )
+        vLayout.addWidget( sep1 )
+        vLayout.addWidget( widget_search )
         vLayout.addWidget( treeWidget )
         vLayout.addWidget( addTaskArea_button )
         
@@ -234,7 +347,7 @@ class Window( QMainWindow ):
             print "check"
         
         infoMenu = self.menuBar().addMenu("정보".decode( 'utf-8' ) )
-        infoMenu.addAction( "파일상태정보".decode( 'utf-8' ), self.show_help_fileCondition )
+        #infoMenu.addAction( "파일상태정보".decode( 'utf-8' ), self.show_help_fileCondition )
     
 
 

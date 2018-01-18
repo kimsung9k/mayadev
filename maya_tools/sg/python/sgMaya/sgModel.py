@@ -686,3 +686,88 @@ class AttrInfo:
 
 
 vectorList = [[1,0,0],[0,1,0],[0,0,1],[-1,0,0],[0,-1,0],[0,0,-1]]
+
+
+
+class TransformKeep:
+    
+    def __init__( self, inputTarget ):
+        
+        import pymel.core
+        
+        self.target = pymel.core.ls( inputTarget )[0]
+        self.t = self.target.t.get()
+        self.r = self.target.r.get()
+        self.s = self.target.s.get()
+        self.sh = self.target.sh.get()
+        self.rotatePivot = self.target.rotatePivot.get()
+        self.scalePivot = self.target.scalePivot.get()
+        self.rotatePivotTranslate = self.target.rotatePivotTranslate.get()
+        self.scalePivotTranslate = self.target.scalePivotTranslate.get()
+        
+        self.parent = self.target.getParent()
+
+
+    def setToDefault(self):
+        
+        self.target.setParent( w=1 )
+
+        self.cons = self.target.listConnections( s=1, d=0, p=1, c=1 )
+        for origCon, dstCon in self.cons:
+            dstCon // origCon
+
+        self.target.t.set( 0,0,0 )
+        self.target.r.set( 0,0,0 )
+        self.target.s.set( 1,1,1 )
+        self.target.sh.set( 0,0,0 )
+        self.target.rotatePivot.set( 0,0,0 )
+        self.target.scalePivot.set( 0,0,0 )
+        self.target.rotatePivotTranslate.set( 0,0,0 )
+        self.target.scalePivotTranslate.set( 0,0,0 )
+
+
+    def setToOrig(self):
+        
+        if self.parent:self.target.setParent( self.parent )
+        
+        self.target.t.set( self.t )
+        self.target.r.set( self.r )
+        self.target.s.set( self.s )
+        self.target.sh.set( self.sh )
+        self.target.rotatePivot.set( self.rotatePivot )
+        self.target.scalePivot.set( self.scalePivot )
+        self.target.rotatePivotTranslate.set( self.rotatePivotTranslate )
+        self.target.scalePivotTranslate.set( self.scalePivotTranslate )
+        
+        for origCon, dstCon in self.cons:
+            dstCon >> origCon
+    
+    
+    def setToOther( self, inputOther ):
+        
+        import pymel.core
+        
+        other = pymel.core.ls( inputOther )[0]
+        origParent = other.getParent()
+        if self.parent:
+            try:other.setParent( self.parent )
+            except:pass
+        else:
+            other.setParent( w=1 )
+        other.t.set( self.t )
+        other.r.set( self.r )
+        other.s.set( self.s )
+        other.sh.set( self.sh )
+        other.rotatePivot.set( self.rotatePivot )
+        other.scalePivot.set( self.scalePivot )
+        other.rotatePivotTranslate.set( self.rotatePivotTranslate )
+        other.scalePivotTranslate.set( self.scalePivotTranslate )
+        if origParent:
+            try:other.setParent( origParent )
+            except:pass
+        
+        self.cons = self.target.listConnections( s=1, d=0, p=1, c=1 )
+        for origCon, dstCon in self.cons:
+            dstCon >> other.attr( origCon.longName() )
+
+
