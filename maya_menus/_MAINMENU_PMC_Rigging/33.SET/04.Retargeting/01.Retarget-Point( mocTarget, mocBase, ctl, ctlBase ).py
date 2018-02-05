@@ -20,4 +20,3 @@ ctl.pim >> multMtx.i[4]
 dcmp = pymel.core.createNode( 'decomposeMatrix' )
 multMtx.matrixSum >> dcmp.imat
 dcmp.ot >> ctl.t
-dcmp.outputRotate >> ctl.r
